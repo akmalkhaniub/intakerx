@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { pool } from '../db';
 import { AuthenticatedRequest, authenticateToken, requireRole } from '../middleware/auth';
 import { QueueService } from '../services/queue';
+import { generateFhirBundle, fhirJsonToXml } from '../services/fhir';
 
 const router = Router();
 
@@ -137,6 +138,33 @@ router.post('/sessions/:id/sync', async (req: AuthenticatedRequest, res: Respons
   } catch (err) {
     console.error('Trigger sync error:', err);
     res.status(500).json({ error: 'Failed to initiate EHR sync.' });
+  }
+});
+
+// Export session data as HL7 FHIR Bundle (JSON or XML)
+router.get('/sessions/:id/fhir', async (req: AuthenticatedRequest, res: Response) => {
+  const id = req.params.id as string;
+  const format = req.query.format as string;
+  const acceptHeader = req.headers.accept || '';
+
+  try {
+    const bundle = await generateFhirBundle(id);
+
+    if (format === 'xml' || acceptHeader.includes('xml') || acceptHeader.includes('application/fhir+xml')) {
+      const xml = fhirJsonToXml(bundle);
+      res.setHeader('Content-Type', 'application/fhir+xml');
+      res.send(xml);
+    } else {
+      res.setHeader('Content-Type', 'application/fhir+json');
+      res.json(bundle);
+    }
+  } catch (err: any) {
+    console.error('Export FHIR error:', err);
+    if (err.message === 'Session not found') {
+      res.status(404).json({ error: 'Session not found.' });
+    } else {
+      res.status(500).json({ error: 'Failed to export FHIR bundle.' });
+    }
   }
 });
 

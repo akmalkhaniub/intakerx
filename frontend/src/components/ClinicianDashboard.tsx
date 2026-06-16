@@ -30,6 +30,12 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // FHIR Export State
+  const [showFhirModal, setShowFhirModal] = useState(false);
+  const [fhirContent, setFhirContent] = useState('');
+  const [fhirFormat, setFhirFormat] = useState<'json' | 'xml'>('json');
+  const [isExporting, setIsExporting] = useState(false);
+
   // Sync token to storage
   useEffect(() => {
     if (token) {
@@ -186,6 +192,53 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  // FHIR Export Handlers
+  const handleExportFhir = async (format: 'json' | 'xml') => {
+    setIsExporting(true);
+    setFhirFormat(format);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/sessions/${selectedSessionId}/fhir?format=${format}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to export FHIR bundle.');
+      }
+
+      if (format === 'json') {
+        const data = await res.json();
+        setFhirContent(JSON.stringify(data, null, 2));
+      } else {
+        const text = await res.text();
+        setFhirContent(text);
+      }
+      setShowFhirModal(true);
+    } catch (err: any) {
+      alert('FHIR export failed: ' + err.message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleDownloadFhirFile = () => {
+    const mimeType = fhirFormat === 'json' ? 'application/fhir+json' : 'application/fhir+xml';
+    const blob = new Blob([fhirContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fhir-bundle-${selectedSessionId}.${fhirFormat}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyToClipboard = () => {
+    navigator.clipboard.writeText(fhirContent);
+    alert('Copied to clipboard!');
   };
 
   // Helpers for text diff indicators
@@ -405,6 +458,25 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                             <Play size={16} /> Sync SOAP to patient EHR portal
                           </button>
                         )}
+
+                        <div style={styles.fhirActionsRow}>
+                          <button 
+                            onClick={() => handleExportFhir('json')} 
+                            className="btn btn-secondary" 
+                            disabled={isExporting}
+                            style={styles.fhirBtn}
+                          >
+                            {isExporting && fhirFormat === 'json' ? 'Exporting...' : 'Export FHIR JSON'}
+                          </button>
+                          <button 
+                            onClick={() => handleExportFhir('xml')} 
+                            className="btn btn-secondary" 
+                            disabled={isExporting}
+                            style={styles.fhirBtn}
+                          >
+                            {isExporting && fhirFormat === 'xml' ? 'Exporting...' : 'Export FHIR XML'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -467,6 +539,30 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showFhirModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent} className="glass-panel">
+            <div style={styles.modalHeader}>
+              <h4 style={{ margin: 0, fontSize: '15px' }}>HL7 FHIR R4 Bundle Export Preview ({fhirFormat.toUpperCase()})</h4>
+              <button onClick={() => setShowFhirModal(false)} style={styles.closeBtn}>&times;</button>
+            </div>
+            <div style={styles.modalBody}>
+              <pre style={styles.codeBlock}>
+                <code>{fhirContent}</code>
+              </pre>
+            </div>
+            <div style={styles.modalFooter}>
+              <button onClick={handleCopyToClipboard} className="btn btn-secondary" style={{ fontSize: '13px', padding: '8px 16px' }}>
+                Copy to Clipboard
+              </button>
+              <button onClick={handleDownloadFhirFile} className="btn" style={{ fontSize: '13px', padding: '8px 16px' }}>
+                Download .{fhirFormat} File
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -764,5 +860,82 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  fhirActionsRow: {
+    display: 'flex',
+    gap: '10px',
+    marginTop: '10px',
+    width: '100%'
+  },
+  fhirBtn: {
+    flex: 1,
+    padding: '8px 12px',
+    fontSize: '12px'
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    zIndex: 999,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px'
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: '800px',
+    maxHeight: '80vh',
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: '#0f172a',
+    border: '1px solid var(--glass-border-glow)',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
+  },
+  modalHeader: {
+    padding: '16px 20px',
+    borderBottom: '1px solid var(--glass-border)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  modalBody: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '20px',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)'
+  },
+  modalFooter: {
+    padding: '16px 20px',
+    borderTop: '1px solid var(--glass-border)',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px'
+  },
+  closeBtn: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-muted)',
+    fontSize: '24px',
+    cursor: 'pointer',
+    lineHeight: '1'
+  },
+  codeBlock: {
+    margin: 0,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-all',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    color: '#818cf8',
+    backgroundColor: '#0a0d16',
+    padding: '16px',
+    borderRadius: '6px',
+    border: '1px solid rgba(255, 255, 255, 0.05)',
+    textAlign: 'left'
   }
 };
