@@ -166,6 +166,43 @@ export async function bootstrap() {
       );
     `);
 
+    // Create interaction_rules table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS interaction_rules (
+        id SERIAL PRIMARY KEY,
+        rule_type VARCHAR(50) NOT NULL,
+        trigger_item VARCHAR(255) NOT NULL,
+        conflict_item VARCHAR(255) NOT NULL,
+        severity VARCHAR(50) NOT NULL,
+        description TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Seed interaction_rules if empty
+    const rulesCheck = await migrationPool.query('SELECT COUNT(*) FROM interaction_rules');
+    if (parseInt(rulesCheck.rows[0].count, 10) === 0) {
+      console.log('Seeding clinical interaction rules...');
+      await migrationPool.query(`
+        INSERT INTO interaction_rules (rule_type, trigger_item, conflict_item, severity, description)
+        VALUES
+          ('drug_drug', 'Lisinopril', 'Spironolactone', 'high', 'Risk of severe hyperkalemia (high potassium levels). Monitor potassium closely.'),
+          ('drug_drug', 'Aspirin', 'Warfarin', 'high', 'Increased risk of major gastrointestinal and systemic bleeding.'),
+          ('drug_drug', 'Sildenafil', 'Nitroglycerin', 'high', 'Concomitant use causes severe, potentially fatal hypotension. Do not combine.'),
+          ('drug_drug', 'Ibuprofen', 'Aspirin', 'moderate', 'NSAID duplication; increased risk of GI irritation and bleeding.'),
+          ('drug_drug', 'Metformin', 'Contrast Dye', 'high', 'Risk of lactic acidosis. Temporarily suspend Metformin before/after imaging procedures.'),
+          ('drug_allergy', 'Amoxicillin', 'Penicillin', 'high', 'Patient has Penicillin allergy; Amoxicillin is a penicillin derivative (cross-allergy).'),
+          ('drug_allergy', 'Penicillin', 'Penicillin', 'high', 'Patient has Penicillin allergy; drug is contra-indicated.'),
+          ('drug_allergy', 'Cephalexin', 'Penicillin', 'moderate', 'Potential cross-sensitivity (~3-5% risk of cross-reaction with cephalosporins).'),
+          ('drug_allergy', 'Sulfamethoxazole', 'Sulfa', 'high', 'Patient has Sulfa allergy; Sulfamethoxazole is a sulfonamide (severe allergic reaction risk).'),
+          ('drug_allergy', 'Ibuprofen', 'NSAID', 'high', 'Patient has NSAID allergy; Ibuprofen is contra-indicated.'),
+          ('drug_allergy', 'Naproxen', 'NSAID', 'high', 'Patient has NSAID allergy; Naproxen is contra-indicated.'),
+          ('drug_allergy', 'Ibuprofen', 'Aspirin', 'high', 'Patient has Aspirin allergy; cross-reaction risk with NSAIDs like Ibuprofen.'),
+          ('drug_allergy', 'Naproxen', 'Aspirin', 'high', 'Patient has Aspirin allergy; cross-reaction risk with NSAIDs like Naproxen.')
+      `);
+      console.log('Clinical interaction rules seeded.');
+    }
+
     // Create index on embeddings for fast retrieval
     await migrationPool.query(`
       CREATE INDEX IF NOT EXISTS protocol_embeddings_vector_idx 

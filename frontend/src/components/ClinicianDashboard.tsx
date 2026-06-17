@@ -36,6 +36,10 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [fhirFormat, setFhirFormat] = useState<'json' | 'xml'>('json');
   const [isExporting, setIsExporting] = useState(false);
 
+  // Clinical Decision Support State
+  const [interactions, setInteractions] = useState<any[]>([]);
+  const [isCheckingInteractions, setIsCheckingInteractions] = useState(false);
+
   // Sync token to storage
   useEffect(() => {
     if (token) {
@@ -123,11 +127,31 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
       setEditAllergies(summary.allergies || []);
       setEditMeds(summary.medications || data.medications || []);
       setIsEditing(false);
+
+      // Load active interactions
+      await loadInteractions(id);
     } catch (err: any) {
       console.error(err);
       alert('Error loading session details: ' + err.message);
     } finally {
       if (showLoadingSpinner) setIsLoading(false);
+    }
+  };
+
+  const loadInteractions = async (id: string) => {
+    setIsCheckingInteractions(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/sessions/${id}/interactions`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setInteractions(data.alerts || []);
+      }
+    } catch (err) {
+      console.error('Failed to load clinical interactions:', err);
+    } finally {
+      setIsCheckingInteractions(false);
     }
   };
 
@@ -383,6 +407,62 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
 
                   {/* Form fields */}
                   <div style={styles.formWorkspaceScroll}>
+                    {/* Clinical Decision Support Warnings */}
+                    <div style={styles.cdsContainer}>
+                      <div style={styles.cdsHeader}>
+                        <ShieldCheck size={18} color={interactions.length > 0 ? '#f59e0b' : '#10b981'} />
+                        <h4 style={{ margin: 0, fontSize: '14px', color: interactions.length > 0 ? '#f59e0b' : '#10b981' }}>Clinical Decision Support Alerts</h4>
+                      </div>
+                      
+                      {isCheckingInteractions ? (
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, textAlign: 'left' }}>Evaluating clinical interactions...</p>
+                      ) : interactions.length === 0 ? (
+                        <div style={styles.cdsAlertOk}>
+                          <CheckCircle2 size={16} color="#10b981" />
+                          <span style={{ fontSize: '12px', color: '#10b981', textAlign: 'left' }}>
+                            No drug-drug conflicts or allergen contraindications detected for this patient.
+                          </span>
+                        </div>
+                      ) : (
+                        <div style={styles.cdsAlertsList}>
+                          {interactions.map((alert: any) => {
+                            const isHigh = alert.severity === 'high';
+                            return (
+                              <div 
+                                key={alert.ruleId} 
+                                style={{
+                                  ...styles.cdsAlertItem,
+                                  borderColor: isHigh ? '#ef4444' : '#f59e0b',
+                                  backgroundColor: isHigh ? 'rgba(239, 68, 68, 0.05)' : 'rgba(245, 158, 11, 0.05)'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ 
+                                    ...styles.cdsAlertBadge, 
+                                    backgroundColor: isHigh ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                    color: isHigh ? '#ef4444' : '#f59e0b'
+                                  }}>
+                                    {alert.severity.toUpperCase()} RISK
+                                  </span>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    {alert.ruleType === 'drug_drug' ? 'Drug-Drug Conflict' : 'Allergy Contraindication'}
+                                  </span>
+                                </div>
+                                <div style={{ fontWeight: 'bold', fontSize: '13px', marginTop: '6px', textAlign: 'left' }}>
+                                  {alert.ruleType === 'drug_drug' 
+                                    ? `${alert.triggerItem} + ${alert.conflictItem}`
+                                    : `Allergen: ${alert.conflictItem} vs. Med: ${alert.triggerItem}`}
+                                </div>
+                                <p style={{ fontSize: '12px', margin: '4px 0 0 0', color: 'var(--text)', textAlign: 'left' }}>
+                                  {alert.description}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
                     <div style={styles.formGroup}>
                       <label>Chief Complaint</label>
                       <input 
@@ -937,5 +1017,55 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '6px',
     border: '1px solid rgba(255, 255, 255, 0.05)',
     textAlign: 'left'
+  },
+  cdsContainer: {
+    padding: '16px',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    border: '1px solid var(--glass-border)',
+    borderRadius: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '10px'
+  },
+  cdsHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    borderBottom: '1px solid var(--glass-border)',
+    paddingBottom: '8px'
+  },
+  cdsAlertOk: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 12px',
+    backgroundColor: 'rgba(16,185,129,0.05)',
+    border: '1px solid rgba(16,185,129,0.15)',
+    borderRadius: '6px'
+  },
+  cdsAlertsList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px'
+  },
+  cdsAlertItem: {
+    padding: '12px',
+    borderRadius: '6px',
+    borderLeftWidth: '4px',
+    borderLeftStyle: 'solid',
+    borderTop: '1px solid rgba(255,255,255,0.02)',
+    borderRight: '1px solid rgba(255,255,255,0.02)',
+    borderBottom: '1px solid rgba(255,255,255,0.02)',
+    display: 'flex',
+    flexDirection: 'column',
+    textAlign: 'left'
+  },
+  cdsAlertBadge: {
+    fontSize: '10px',
+    fontWeight: 'bold',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    width: 'fit-content'
   }
 };

@@ -168,4 +168,106 @@ router.get('/sessions/:id/fhir', async (req: AuthenticatedRequest, res: Response
   }
 });
 
+// Check drug-drug and drug-allergy interactions
+router.get('/sessions/:id/interactions', async (req: AuthenticatedRequest, res: Response) => {
+  const id = req.params.id as string;
+
+  try {
+    // 1. Fetch medications from medications table
+    const medsRes = await pool.query(
+      'SELECT name FROM medications WHERE session_id = $1',
+      [id]
+    );
+
+    // 2. Fetch summary_data (which contains updated medications and allergies lists)
+    const summaryRes = await pool.query(
+      'SELECT summary_data as "summaryData" FROM intake_summaries WHERE session_id = $1',
+      [id]
+    );
+
+    // 3. Compile all active medications and allergies
+    const activeMeds: string[] = medsRes.rows.map(m => m.name);
+    const activeAllergies: string[] = [];
+
+    if (summaryRes.rowCount > 0 && summaryRes.rows[0].summaryData) {
+      const soap = summaryRes.rows[0].summaryData;
+      
+      // Add meds from summary if they are not already in list
+      if (Array.isArray(soap.medications)) {
+        soap.medications.forEach((med: any) => {
+          const medName = typeof med === 'string' ? med : med.name;
+          if (medName && !activeMeds.some(m => m.toLowerCase() === medName.toLowerCase())) {
+            activeMeds.push(medName);
+          }
+        });
+      }
+
+      // Add allergies from summary
+      if (Array.isArray(soap.allergies)) {
+        soap.allergies.forEach((allergy: any) => {
+          if (typeof allergy === 'string' && allergy) {
+            activeAllergies.push(allergy);
+          }
+        });
+      }
+    }
+
+    // If there are no medications and no allergies, return empty alerts list
+    if (activeMeds.length === 0 && activeAllergies.length === 0) {
+      res.json({ alerts: [] });
+      return;
+    }
+
+    // 4. Fetch all interaction rules from database
+    const rulesRes = await pool.query(
+      'SELECT id, rule_type as "ruleType", trigger_item as "triggerItem", conflict_item as "conflictItem", severity, description FROM interaction_rules'
+    );
+
+    const alerts: any[] = [];
+
+    // 5. Evaluate rules against active meds and allergies
+    rulesRes.rows.forEach(rule => {
+      const triggerLower = rule.triggerItem.toLowerCase();
+      const conflictLower = rule.conflictItem.toLowerCase();
+
+      if (rule.ruleType === 'drug_drug') {
+        // Find if trigger_item is in active medications AND conflict_item is in active medications
+        const hasTrigger = activeMeds.some(med => med.toLowerCase().includes(triggerLower));
+        const hasConflict = activeMeds.some(med => med.toLowerCase().includes(conflictLower));
+
+        if (hasTrigger && hasConflict) {
+          alerts.push({
+            ruleId: rule.id,
+            ruleType: 'drug_drug',
+            severity: rule.severity,
+            triggerItem: rule.triggerItem,
+            conflictItem: rule.conflictItem,
+            description: rule.description
+          });
+        }
+      } else if (rule.ruleType === 'drug_allergy') {
+        // Find if trigger_item is in active medications AND conflict_item is in patient allergies
+        const hasTrigger = activeMeds.some(med => med.toLowerCase().includes(triggerLower));
+        const hasAllergyConflict = activeAllergies.some(allergy => allergy.toLowerCase().includes(conflictLower));
+
+        if (hasTrigger && hasAllergyConflict) {
+          alerts.push({
+            ruleId: rule.id,
+            ruleType: 'drug_allergy',
+            severity: rule.severity,
+            triggerItem: rule.triggerItem,
+            conflictItem: rule.conflictItem,
+            description: rule.description
+          });
+        }
+      }
+    });
+
+    res.json({ alerts });
+  } catch (err) {
+    console.error('Check interactions error:', err);
+    res.status(500).json({ error: 'Failed to evaluate clinical interactions.' });
+  }
+});
+
 export default router;
