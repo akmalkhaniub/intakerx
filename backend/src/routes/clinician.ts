@@ -189,7 +189,7 @@ router.get('/sessions/:id/interactions', async (req: AuthenticatedRequest, res: 
     const activeMeds: string[] = medsRes.rows.map(m => m.name);
     const activeAllergies: string[] = [];
 
-    if (summaryRes.rowCount > 0 && summaryRes.rows[0].summaryData) {
+    if (summaryRes.rows.length > 0 && summaryRes.rows[0].summaryData) {
       const soap = summaryRes.rows[0].summaryData;
       
       // Add meds from summary if they are not already in list
