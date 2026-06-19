@@ -1,6 +1,169 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Mic, MicOff, AlertTriangle, ShieldCheck, HeartPulse, User, LogIn, FileText, CheckCircle } from 'lucide-react';
 
+interface VisualizerProps {
+  isRecording: boolean;
+}
+
+function AudioWaveformVisualizer({ isRecording }: VisualizerProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const isRecordingRef = useRef(isRecording);
+
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    if (!isRecording) {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height / 2);
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
+      return;
+    }
+
+    let fallbackAngle = 0;
+
+    const startAudio = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioCtx();
+        audioContextRef.current = audioCtx;
+
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        analyserRef.current = analyser;
+
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        const draw = () => {
+          if (!isRecordingRef.current) return;
+          animationFrameRef.current = requestAnimationFrame(draw);
+
+          analyser.getByteFrequencyData(dataArray);
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.3)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          const barWidth = (canvas.width / bufferLength) * 0.9;
+          let x = 0;
+
+          for (let i = 0; i < bufferLength; i++) {
+            const value = dataArray[i];
+            const percent = value / 255;
+            const barHeight = Math.max(4, percent * (canvas.height - 8));
+
+            const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+            gradient.addColorStop(0, 'rgba(124, 58, 237, 0.4)');
+            gradient.addColorStop(0.5, 'rgba(168, 85, 247, 0.8)');
+            gradient.addColorStop(1, 'rgba(236, 72, 153, 1)');
+
+            ctx.fillStyle = gradient;
+            const y = (canvas.height - barHeight) / 2;
+            
+            ctx.beginPath();
+            if (ctx.roundRect) {
+              ctx.roundRect(x, y, barWidth - 2, barHeight, 3);
+            } else {
+              ctx.rect(x, y, barWidth - 2, barHeight);
+            }
+            ctx.fill();
+
+            x += barWidth;
+          }
+        };
+
+        draw();
+      } catch (err) {
+        console.warn('Microphone access blocked/unavailable, falling back to sine wave simulation:', err);
+        
+        const drawFallback = () => {
+          if (!isRecordingRef.current) return;
+          animationFrameRef.current = requestAnimationFrame(drawFallback);
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.3)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          ctx.beginPath();
+          ctx.moveTo(0, canvas.height / 2);
+          ctx.lineWidth = 3;
+          
+          const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+          gradient.addColorStop(0, '#7c3aed');
+          gradient.addColorStop(0.5, '#a855f7');
+          gradient.addColorStop(1, '#ec4899');
+          ctx.strokeStyle = gradient;
+
+          for (let i = 0; i < canvas.width; i++) {
+            const amplitude = 12 * Math.sin(fallbackAngle + i * 0.05) * Math.sin(fallbackAngle * 0.5);
+            ctx.lineTo(i, canvas.height / 2 + amplitude);
+          }
+          ctx.stroke();
+          fallbackAngle += 0.15;
+        };
+
+        drawFallback();
+      }
+    };
+
+    startAudio();
+
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+    };
+  }, [isRecording]);
+
+  return (
+    <canvas 
+      ref={canvasRef} 
+      width={400} 
+      height={46} 
+      style={{
+        flex: 1,
+        borderRadius: '8px',
+        border: '1px solid var(--glass-border)',
+        boxShadow: '0 0 10px rgba(168, 85, 247, 0.15)',
+        background: 'rgba(15, 23, 42, 0.4)',
+      }}
+    />
+  );
+}
+
 interface PatientChatProps {
   backendUrl: string;
 }
@@ -519,15 +682,18 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
                       {isRecording ? <MicOff size={20} color="white" /> : <Mic size={20} color="#a855f7" />}
                     </button>
                     
-                    <input 
-                      type="text" 
-                      className="input-text" 
-                      style={styles.chatInput} 
-                      value={inputValue}
-                      onChange={e => setInputValue(e.target.value)}
-                      placeholder={isRecording ? "Listening..." : "Describe symptoms or type here..."}
-                      disabled={isRecording}
-                    />
+                    {isRecording ? (
+                      <AudioWaveformVisualizer isRecording={isRecording} />
+                    ) : (
+                      <input 
+                        type="text" 
+                        className="input-text" 
+                        style={styles.chatInput} 
+                        value={inputValue}
+                        onChange={e => setInputValue(e.target.value)}
+                        placeholder="Describe symptoms or type here..."
+                      />
+                    )}
                     
                     <button type="submit" className="btn" disabled={!inputValue.trim() || isLoading}>
                       <Send size={18} />

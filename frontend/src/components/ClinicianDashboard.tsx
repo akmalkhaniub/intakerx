@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Play, CheckCircle2, AlertTriangle, ShieldCheck, HelpCircle, Edit3, ArrowRight, RotateCw, RefreshCw } from 'lucide-react';
+import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw } from 'lucide-react';
 
 interface ClinicianDashboardProps {
   backendUrl: string;

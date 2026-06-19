@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { HeartPulse, ShieldAlert, ClipboardList } from 'lucide-react';
+import { HeartPulse, ShieldAlert, ClipboardList, PhoneCall } from 'lucide-react';
 import PatientChat from './components/PatientChat';
 import ClinicianDashboard from './components/ClinicianDashboard';
 import ObservabilityPanel from './components/ObservabilityPanel';
+import TelephonySimulator from './components/TelephonySimulator';
 
 const BACKEND_URL = 'http://localhost:5001';
 
-type AppTab = 'patient' | 'clinician' | 'observability';
+type AppTab = 'patient' | 'clinician' | 'observability' | 'telephony';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('patient');
@@ -46,6 +47,14 @@ export default function App() {
             <ShieldAlert size={16} />
             Safety & Evals
           </button>
+          
+          <button 
+            className={`tab-btn ${activeTab === 'telephony' ? 'active' : ''}`}
+            onClick={() => setActiveTab('telephony')}
+          >
+            <PhoneCall size={16} />
+            Voice Simulator
+          </button>
         </nav>
       </header>
 
@@ -54,6 +63,7 @@ export default function App() {
         {activeTab === 'patient' && <PatientChat backendUrl={BACKEND_URL} />}
         {activeTab === 'clinician' && <ClinicianDashboard backendUrl={BACKEND_URL} />}
         {activeTab === 'observability' && <ObservabilityPanel backendUrl={BACKEND_URL} />}
+        {activeTab === 'telephony' && <TelephonySimulator backendUrl={BACKEND_URL} />}
       </main>
     </div>
   );

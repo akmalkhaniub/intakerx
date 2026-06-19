@@ -3,6 +3,7 @@ import { pool } from '../db';
 import { AuthenticatedRequest, authenticateToken, requireRole } from '../middleware/auth';
 import { QueueService } from '../services/queue';
 import { generateFhirBundle, fhirJsonToXml } from '../services/fhir';
+import { GuardrailsService } from '../services/guardrails';
 
 const router = Router();
 
@@ -56,6 +57,51 @@ router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
   } catch (err) {
     console.error('Get stats error:', err);
     res.status(500).json({ error: 'Failed to retrieve stats.' });
+  }
+});
+
+// Live Security Audit / Guardrail sandbox tester
+router.post('/test-guardrail', async (req: AuthenticatedRequest, res: Response) => {
+  const { input } = req.body;
+  if (!input) {
+    res.status(400).json({ error: 'Input text is required for guardrail testing.' });
+    return;
+  }
+
+  const startTime = Date.now();
+
+  try {
+    // 1. Scan for prompt injection (heuristics + AI classifier)
+    const injectionResult = await GuardrailsService.scanInputForInjection(input);
+
+    // 2. Scan for medical advice
+    const medicalAdviceResult = GuardrailsService.scanOutputForMedicalAdvice(input);
+
+    // 3. Scan for emergency red flags
+    const redFlagResult = GuardrailsService.evaluateRedFlags(input);
+
+    const latencyMs = Date.now() - startTime;
+
+    res.json({
+      input,
+      latencyMs,
+      injection: {
+        isBlocked: injectionResult.isBlocked,
+        reason: injectionResult.reason || 'Clear',
+        confidence: injectionResult.confidence,
+      },
+      medicalAdvice: {
+        isBlocked: medicalAdviceResult.isBlocked,
+        cleanOutput: medicalAdviceResult.cleanOutput,
+      },
+      redFlags: {
+        isRedFlag: redFlagResult.isRedFlag,
+        warningMessage: redFlagResult.warningMessage || null,
+      }
+    });
+  } catch (err: any) {
+    console.error('Test guardrail error:', err);
+    res.status(500).json({ error: 'Failed to execute guardrail simulation: ' + err.message });
   }
 });
 
