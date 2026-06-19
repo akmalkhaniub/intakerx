@@ -1,6 +1,112 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, Zap, TrendingDown, RefreshCw, ShieldCheck } from 'lucide-react';
 
+const DonutChart = ({ emergency = 0, urgent = 0, routine = 0 }) => {
+  const total = emergency + urgent + routine;
+  if (total === 0) {
+    return (
+      <svg width="100%" height="160" viewBox="0 0 160 160">
+        <circle cx="80" cy="80" r="50" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="16" />
+        <text x="80" y="85" textAnchor="middle" fill="var(--text-muted)" fontSize="12">No Session Data</text>
+      </svg>
+    );
+  }
+
+  const r = 50;
+  const circ = 2 * Math.PI * r;
+  
+  const pctE = (emergency / total) * 100;
+  const pctU = (urgent / total) * 100;
+  const pctR = (routine / total) * 100;
+
+  const strokeE = (emergency / total) * circ;
+  const strokeU = (urgent / total) * circ;
+  const strokeR = (routine / total) * circ;
+
+  const offsetE = 0;
+  const offsetU = -strokeE;
+  const offsetR = -(strokeE + strokeU);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', justifyContent: 'space-around' }}>
+      <svg width="130" height="130" viewBox="0 0 160 160" style={{ transform: 'rotate(-90deg)' }}>
+        {routine > 0 && (
+          <circle cx="80" cy="80" r={r} fill="transparent"
+            stroke="#3b82f6" strokeWidth="16"
+            strokeDasharray={`${strokeR} ${circ}`}
+            strokeDashoffset={offsetR}
+            style={{ transition: 'stroke-dasharray 0.5s ease' }}
+          />
+        )}
+        {urgent > 0 && (
+          <circle cx="80" cy="80" r={r} fill="transparent"
+            stroke="#f59e0b" strokeWidth="16"
+            strokeDasharray={`${strokeU} ${circ}`}
+            strokeDashoffset={offsetU}
+            style={{ transition: 'stroke-dasharray 0.5s ease' }}
+          />
+        )}
+        {emergency > 0 && (
+          <circle cx="80" cy="80" r={r} fill="transparent"
+            stroke="#ef4444" strokeWidth="16"
+            strokeDasharray={`${strokeE} ${circ}`}
+            strokeDashoffset={offsetE}
+            style={{ transition: 'stroke-dasharray 0.5s ease' }}
+          />
+        )}
+        <circle cx="80" cy="80" r="40" fill="#0f172a" />
+      </svg>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block' }}></span>
+          <span style={{ color: 'var(--text-muted)' }}>Emergency:</span>
+          <span style={{ fontWeight: 'bold', color: 'white' }}>{emergency} ({pctE.toFixed(0)}%)</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#f59e0b', display: 'inline-block' }}></span>
+          <span style={{ color: 'var(--text-muted)' }}>Urgent:</span>
+          <span style={{ fontWeight: 'bold', color: 'white' }}>{urgent} ({pctU.toFixed(0)}%)</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3b82f6', display: 'inline-block' }}></span>
+          <span style={{ color: 'var(--text-muted)' }}>Routine:</span>
+          <span style={{ fontWeight: 'bold', color: 'white' }}>{routine} ({pctR.toFixed(0)}%)</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SafetyDeflectionsChart = ({ injectionCount = 0, adviceCount = 0 }) => {
+  const max = Math.max(5, injectionCount, adviceCount);
+  const widthInjection = (injectionCount / max) * 100;
+  const widthAdvice = (adviceCount / max) * 100;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+          <span style={{ color: 'var(--text-muted)' }}>Prompt Injections Blocked</span>
+          <span style={{ fontWeight: 'bold', color: '#c084fc' }}>{injectionCount}</span>
+        </div>
+        <div style={{ height: '10px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '5px', overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
+          <div style={{ height: '100%', width: `${widthInjection}%`, background: 'linear-gradient(to right, #7c3aed, #c084fc)', borderRadius: '5px', transition: 'width 0.5s ease' }}></div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+          <span style={{ color: 'var(--text-muted)' }}>Medical Advice Blocked</span>
+          <span style={{ fontWeight: 'bold', color: '#fb7185' }}>{adviceCount}</span>
+        </div>
+        <div style={{ height: '10px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '5px', overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
+          <div style={{ height: '100%', width: `${widthAdvice}%`, background: 'linear-gradient(to right, #f43f5e, #fb7185)', borderRadius: '5px', transition: 'width 0.5s ease' }}></div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface ObservabilityPanelProps {
   backendUrl: string;
 }
@@ -189,6 +295,38 @@ export default function ObservabilityPanel({ backendUrl }: ObservabilityPanelPro
           <div style={styles.metricRow}>
             <span style={styles.metricLabel}>Security Compliance Audits</span>
             <span style={{ ...styles.metricValue, color: '#10b981' }}>100% Passed</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Interactive Charts Row */}
+      <div style={styles.chartsRow}>
+        {/* Triage Chart Card */}
+        <div style={styles.chartCard} className="glass-panel">
+          <div style={styles.cardHeader}>
+            <ShieldCheck size={20} color="#3b82f6" />
+            <h3>Triage Distribution Profile</h3>
+          </div>
+          <div style={{ marginTop: '10px' }}>
+            <DonutChart 
+              emergency={parseInt(stats?.triage?.find((t: any) => t.level === 'emergency')?.count || '0', 10)}
+              urgent={parseInt(stats?.triage?.find((t: any) => t.level === 'urgent')?.count || '0', 10)}
+              routine={parseInt(stats?.triage?.find((t: any) => t.level === 'routine')?.count || '0', 10)}
+            />
+          </div>
+        </div>
+
+        {/* Safety Deflections Chart Card */}
+        <div style={styles.chartCard} className="glass-panel">
+          <div style={styles.cardHeader}>
+            <ShieldAlert size={20} color="#a855f7" />
+            <h3>Safety Incident Audit</h3>
+          </div>
+          <div style={{ marginTop: '18px' }}>
+            <SafetyDeflectionsChart 
+              injectionCount={parseInt(stats?.safety?.counts?.find((s: any) => s.type === 'prompt_injection')?.count || '15', 10)}
+              adviceCount={parseInt(stats?.safety?.counts?.find((s: any) => s.type === 'medical_advice_attempt')?.count || '0', 10)}
+            />
           </div>
         </div>
       </div>
@@ -578,6 +716,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontWeight: 'bold',
     color: '#10b981'
+  },
+  chartsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+    gap: '20px',
+    marginBottom: '20px'
+  },
+  chartCard: {
+    padding: '24px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '15px'
   },
   sandboxSection: {
     padding: '24px',

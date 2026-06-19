@@ -74,6 +74,12 @@ export async function bootstrap() {
       );
     `);
 
+    // Column updates
+    await migrationPool.query(`
+      ALTER TABLE intake_sessions 
+      ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(50) DEFAULT 'en-US';
+    `);
+
     // Create messages table
     await migrationPool.query(`
       CREATE TABLE IF NOT EXISTS messages (

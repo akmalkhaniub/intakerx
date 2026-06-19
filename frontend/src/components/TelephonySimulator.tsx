@@ -204,6 +204,9 @@ export default function TelephonySimulator({ backendUrl }: TelephonySimulatorPro
       if (msg.type === 'agent_speech') {
         setTranscript(prev => [...prev, { sender: 'agent', content: msg.text }]);
         speakGreeting(msg.text);
+      } else if (msg.type === 'barge_in') {
+        setTranscript(prev => [...prev, { sender: 'agent', content: `🚨 CLINICIAN INTERVENTION: ${msg.text}` }]);
+        speakGreeting(`Clinician Intervention. ${msg.text}`);
       } else if (msg.type === 'ready') {
         console.log('[Telephony WS] Session ready.');
       }

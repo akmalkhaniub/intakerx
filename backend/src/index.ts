@@ -12,6 +12,7 @@ import { AIService } from './services/ai';
 import { GuardrailsService } from './services/guardrails';
 import { pool } from './db';
 import { generateSOAPSummary } from './routes/intake';
+import { activeCallSockets } from './activeCalls';
 
 const app = express();
 
@@ -36,6 +37,9 @@ const server = createServer(app);
 // Initialize WebSocket Server
 const wss = new WebSocketServer({ server });
 
+// Active call sockets registry imports from activeCalls
+
+
 wss.on('connection', (ws: WebSocket) => {
   console.log('[WS] New WebSocket connection established.');
 
@@ -53,6 +57,19 @@ wss.on('connection', (ws: WebSocket) => {
         sessionId = message.sessionId;
         patientId = message.patientId;
         currentStep = message.currentStep || 'complaint';
+
+        let patientName = 'Unknown Patient';
+        try {
+          if (patientId) {
+            const pRes = await pool.query('SELECT name FROM patients WHERE id = $1', [patientId]);
+            if (pRes.rows.length > 0) patientName = pRes.rows[0].name;
+          }
+        } catch (e) {}
+
+        if (sessionId) {
+          activeCallSockets.set(sessionId, { ws, patientName, messages: [] });
+        }
+        
         console.log(`[WS] Session registered. SessionId: ${sessionId}, PatientId: ${patientId}`);
         ws.send(JSON.stringify({ type: 'ready', sessionId }));
         return;
@@ -67,6 +84,13 @@ wss.on('connection', (ws: WebSocket) => {
         }
 
         console.log(`[WS] Voice Input: "${text}"`);
+
+        if (sessionId) {
+          const call = activeCallSockets.get(sessionId);
+          if (call) {
+            call.messages.push({ sender: 'patient', content: text, createdAt: new Date().toISOString() });
+          }
+        }
 
         // Check prompt injection
         const injection = await GuardrailsService.scanInputForInjection(text, sessionId);
@@ -84,6 +108,13 @@ wss.on('connection', (ws: WebSocket) => {
              VALUES ($1, $2, $3)`,
             [sessionId, 'agent', blockReply]
           );
+
+          if (sessionId) {
+            const call = activeCallSockets.get(sessionId);
+            if (call) {
+              call.messages.push({ sender: 'agent', content: blockReply, createdAt: new Date().toISOString() });
+            }
+          }
 
           ws.send(JSON.stringify({ type: 'agent_speech', text: blockReply, currentStep }));
           return;
@@ -113,6 +144,13 @@ wss.on('connection', (ws: WebSocket) => {
              WHERE id = $1`,
             [sessionId, `Emergency red flags matched during voice: ${text}`]
           );
+
+          if (sessionId) {
+            const call = activeCallSockets.get(sessionId);
+            if (call) {
+              call.messages.push({ sender: 'agent', content: redFlags.warningMessage, createdAt: new Date().toISOString() });
+            }
+          }
 
           ws.send(JSON.stringify({ 
             type: 'agent_speech', 
@@ -169,6 +207,20 @@ wss.on('connection', (ws: WebSocket) => {
         );
         const patient = patientRes.rows[0];
 
+        // Session preferred language
+        const sessionLangRes = await pool.query(
+          'SELECT preferred_language as "preferredLanguage" FROM intake_sessions WHERE id = $1',
+          [sessionId]
+        );
+        const preferredLanguage = sessionLangRes.rows[0]?.preferredLanguage || 'en-US';
+        const langNames: Record<string, string> = {
+          'en-US': 'English',
+          'es-ES': 'Spanish',
+          'fr-FR': 'French',
+          'zh-CN': 'Chinese (Mandarin)'
+        };
+        const activeLangName = langNames[preferredLanguage] || 'English';
+
         const systemPrompt = `You are IntakeRx, a professional and empathetic clinical intake voice assistant.
 Your objective is to collect a structured patient intake summary for the clinic. 
 Patient Profile:
@@ -189,16 +241,21 @@ AI Guardrails (CRITICAL):
 - Keep the conversation structured, asking 1 question at a time.
 - If the patient describes sudden chest pain, severe difficulty breathing, facial drooping, slurred speech, or throat swelling, stop everything and advise them to hang up and call 911 immediately.
 
+MULTILINGUAL INSTRUCTION:
+- The patient's preferred language is: ${activeLangName} (${preferredLanguage}).
+- You MUST conduct the dialogue and write the "text" property in ${activeLangName}.
+- However, for the JSON "extractedData" fields (symptoms, medications, allergies, triageRationale), you MUST translate them back to English. This is critical for indexing into the clinic's English EHR system.
+
 You MUST respond strictly in the following JSON format:
 {
-  "text": "Your calming, short spoken question to the patient...",
+  "text": "Your calming, short spoken question to the patient (written in ${activeLangName})...",
   "extractedData": {
-    "symptoms": [{"name": "symptom name", "severity": "mild/moderate/severe", "duration": "e.g. 2 days"}],
-    "medications": [{"name": "medication name", "dosage": "dosage string", "frequency": "frequency string"}],
-    "allergies": ["allergy name"],
+    "symptoms": [{"name": "symptom name (translated to English)", "severity": "mild/moderate/severe", "duration": "duration in English, e.g. 2 days"}],
+    "medications": [{"name": "medication name (translated to English)", "dosage": "dosage string in English", "frequency": "frequency string in English"}],
+    "allergies": ["allergy name (translated to English)"],
     "currentStep": "complaint" | "history" | "meds" | "allergies" | "insurance" | "review",
     "triageLevel": "routine" | "urgent" | "emergency",
-    "triageRationale": "Brief clinical rationale for assigned level"
+    "triageRationale": "Brief clinical rationale for assigned level (written in English)"
   }
 }`;
 
@@ -318,6 +375,13 @@ You MUST respond strictly in the following JSON format:
           await generateSOAPSummary(sessionId, patientId);
         }
 
+        if (sessionId) {
+          const call = activeCallSockets.get(sessionId);
+          if (call) {
+            call.messages.push({ sender: 'agent', content: aiText, createdAt: new Date().toISOString() });
+          }
+        }
+
         // Send response back to speak
         ws.send(JSON.stringify({
           type: 'agent_speech',
@@ -347,6 +411,9 @@ You MUST respond strictly in the following JSON format:
   });
 
   ws.on('close', () => {
+    if (sessionId) {
+      activeCallSockets.delete(sessionId);
+    }
     console.log('[WS] WebSocket connection closed.');
   });
 });

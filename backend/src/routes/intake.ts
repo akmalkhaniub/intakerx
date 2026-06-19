@@ -7,6 +7,13 @@ import { GuardrailsService } from '../services/guardrails';
 
 const router = Router();
 
+const GREETINGS: Record<string, string> = {
+  'en-US': "Hello! I am IntakeRx, your clinic's AI patient intake assistant. I will help gather your medical history, chief complaint, and basic details before your visit. To start, please describe what symptoms or issues you are experiencing today.",
+  'es-ES': "¡Hola! Soy IntakeRx, el asistente de admisión de pacientes con IA de su clínica. Le ayudaré a recopilar su historial médico, queja principal y detalles básicos antes de su visita. Para comenzar, describa qué síntomas o problemas está experimentando hoy.",
+  'fr-FR': "Bonjour ! Je suis IntakeRx, l'assistant IA d'admission des patients de votre clinique. Je vais vous aider à recueillir vos antécédents médicaux, votre motif de consultation principal et vos informations de base avant votre visite. Pour commencer, veuillez décrire les symptômes ou les problèmes que vous rencontrez aujourd'hui.",
+  'zh-CN': "您好！我是 IntakeRx，我们诊所的 AI 患者接诊助手。在您就诊前，我将帮助收集您的病史、主诉和基本信息。首先，请描述您今天遇到的症状或问题。"
+};
+
 // Create new session
 router.post('/sessions', authenticateToken as any, async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) {
@@ -14,17 +21,18 @@ router.post('/sessions', authenticateToken as any, async (req: AuthenticatedRequ
     return;
   }
 
+  const { preferredLanguage = 'en-US' } = req.body;
   const sessionId = uuidv4();
 
   try {
     await pool.query(
-      `INSERT INTO intake_sessions (id, patient_id, status, current_step)
-       VALUES ($1, $2, $3, $4)`,
-      [sessionId, req.user.id, 'active', 'complaint']
+      `INSERT INTO intake_sessions (id, patient_id, status, current_step, preferred_language)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [sessionId, req.user.id, 'active', 'complaint', preferredLanguage]
     );
 
     // Initial system greeting message
-    const welcomeText = "Hello! I am IntakeRx, your clinic's AI patient intake assistant. I will help gather your medical history, chief complaint, and basic details before your visit. To start, please describe what symptoms or issues you are experiencing today.";
+    const welcomeText = GREETINGS[preferredLanguage] || GREETINGS['en-US'];
     await pool.query(
       `INSERT INTO messages (session_id, sender, content)
        VALUES ($1, $2, $3)`,
@@ -36,6 +44,7 @@ router.post('/sessions', authenticateToken as any, async (req: AuthenticatedRequ
       status: 'active',
       currentStep: 'complaint',
       welcomeMessage: welcomeText,
+      preferredLanguage
     });
   } catch (err) {
     console.error('Create session error:', err);
@@ -95,7 +104,7 @@ router.get('/sessions/:id', authenticateToken as any, async (req: AuthenticatedR
     const sessionRes = await pool.query(
       `SELECT s.id, s.status, s.current_step as "currentStep", s.triage_level as "triageLevel", 
               s.triage_rationale as "triageRationale", s.created_at as "createdAt", s.updated_at as "updatedAt",
-              s.patient_id as "patientId",
+              s.patient_id as "patientId", s.preferred_language as "preferredLanguage",
               p.name as "patientName", p.dob as "patientDob", p.sex as "patientSex",
               p.insurance_provider as "insuranceProvider", p.insurance_policy as "insurancePolicy"
        FROM intake_sessions s
@@ -164,6 +173,7 @@ router.get('/sessions/:id', authenticateToken as any, async (req: AuthenticatedR
         patientSex: session.patientSex,
         insuranceProvider: session.insuranceProvider,
         insurancePolicy: session.insurancePolicy,
+        preferredLanguage: session.preferredLanguage,
       },
       messages: messagesRes.rows,
       symptoms: symptomsRes.rows,
@@ -195,6 +205,7 @@ router.post('/sessions/:id/messages', authenticateToken as any, async (req: Auth
     // 1. Fetch Session Info
     const sessionRes = await pool.query(
       `SELECT s.id, s.status, s.current_step as "currentStep", s.patient_id as "patientId",
+              s.preferred_language as "preferredLanguage",
               p.name as "patientName", p.dob as "patientDob", p.sex as "patientSex"
        FROM intake_sessions s
        JOIN patients p ON s.patient_id = p.id
@@ -328,6 +339,15 @@ router.post('/sessions/:id/messages', authenticateToken as any, async (req: Auth
       content: row.content,
     }));
 
+    const preferredLanguage = session.preferredLanguage || 'en-US';
+    const langNames: Record<string, string> = {
+      'en-US': 'English',
+      'es-ES': 'Spanish',
+      'fr-FR': 'French',
+      'zh-CN': 'Chinese (Mandarin)'
+    };
+    const activeLangName = langNames[preferredLanguage] || 'English';
+
     // System Prompt instructions
     const systemPrompt = `You are IntakeRx, a professional and empathetic clinical intake voice and chat agent.
 Your objective is to collect a structured patient intake summary for the clinic. 
@@ -350,16 +370,21 @@ AI Guardrails (CRITICAL):
 - Keep the conversation structured, asking 1-2 questions at a time.
 - If the patient describes sudden chest pain, severe difficulty breathing, facial drooping, slurred speech, or throat swelling, stop everything and advise them to hang up and call 911 immediately.
 
+MULTILINGUAL INSTRUCTION:
+- The patient's preferred language is: ${activeLangName} (${preferredLanguage}).
+- You MUST conduct the dialogue and write the "text" property in ${activeLangName}.
+- However, for the JSON "extractedData" fields (symptoms, medications, allergies, triageRationale), you MUST translate them back to English. This is critical for indexing into the clinic's English EHR system.
+
 You MUST respond strictly in the following JSON format:
 {
-  "text": "Your calming question or response to be spoken/shown to the patient...",
+  "text": "Your calming question or response to be spoken/shown to the patient (written in ${activeLangName})...",
   "extractedData": {
-    "symptoms": [{"name": "symptom name", "severity": "mild/moderate/severe", "duration": "e.g. 2 days"}],
-    "medications": [{"name": "medication name", "dosage": "dosage string", "frequency": "frequency string"}],
-    "allergies": ["allergy name"],
+    "symptoms": [{"name": "symptom name (translated to English)", "severity": "mild/moderate/severe", "duration": "duration in English, e.g. 2 days"}],
+    "medications": [{"name": "medication name (translated to English)", "dosage": "dosage string in English", "frequency": "frequency string in English"}],
+    "allergies": ["allergy name (translated to English)"],
     "currentStep": "complaint" | "history" | "meds" | "allergies" | "insurance" | "review",
     "triageLevel": "routine" | "urgent" | "emergency",
-    "triageRationale": "Brief clinical rationale for assigned level"
+    "triageRationale": "Brief clinical rationale for assigned level (written in English)"
   }
 }`;
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw } from 'lucide-react';
+import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw, Phone } from 'lucide-react';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -40,6 +40,11 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [interactions, setInteractions] = useState<any[]>([]);
   const [isCheckingInteractions, setIsCheckingInteractions] = useState(false);
 
+  // Active Telephony Call Monitor State
+  const [activeCalls, setActiveCalls] = useState<any[]>([]);
+  const [bargeInText, setBargeInText] = useState('');
+  const [isSendingBargeIn, setIsSendingBargeIn] = useState(false);
+
   // Sync token to storage
   useEffect(() => {
     if (token) {
@@ -68,6 +73,29 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     }
     return () => clearInterval(interval);
   }, [token, selectedSessionId]);
+
+  // Poll active voice telephony calls
+  useEffect(() => {
+    let activeCallInterval: any;
+    if (token) {
+      const fetchActiveCalls = async () => {
+        try {
+          const res = await fetch(`${backendUrl}/api/clinician/active-calls`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setActiveCalls(data.activeCalls || []);
+          }
+        } catch (err) {
+          console.error('Failed to poll active calls:', err);
+        }
+      };
+      fetchActiveCalls();
+      activeCallInterval = setInterval(fetchActiveCalls, 3000);
+    }
+    return () => clearInterval(activeCallInterval);
+  }, [token]);
 
   // Auth Handler
   const handleLogin = async (e: React.FormEvent) => {
@@ -218,6 +246,35 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     }
   };
 
+  // Send clinician override text to active voice session
+  const handleSendBargeIn = async () => {
+    if (!bargeInText.trim() || !selectedSessionId) return;
+    setIsSendingBargeIn(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/active-calls/${selectedSessionId}/barge-in`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ message: bargeInText })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to send barge-in message.');
+      }
+
+      setBargeInText('');
+      // Force refresh of details to show the updated dialogue log
+      await loadSessionDetails(selectedSessionId, false);
+    } catch (err: any) {
+      alert('Barge-in failed: ' + err.message);
+    } finally {
+      setIsSendingBargeIn(false);
+    }
+  };
+
   // FHIR Export Handlers
   const handleExportFhir = async (format: 'json' | 'xml') => {
     setIsExporting(true);
@@ -364,6 +421,41 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                 })
               )}
             </div>
+
+            {/* Active Telephony Live Monitor subpanel */}
+            <div style={styles.activeCallsSection}>
+              <div style={styles.sectionSubHeader}>
+                <span className="pulse-red-dot" style={{ marginRight: '6px' }}></span>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#ef4444' }}>Active Voice Calls ({activeCalls.length})</span>
+              </div>
+              <div style={styles.activeCallsScroll}>
+                {activeCalls.length === 0 ? (
+                  <p style={styles.emptySubListText}>No live phone calls currently.</p>
+                ) : (
+                  activeCalls.map(c => {
+                    const isSelected = selectedSessionId === c.sessionId;
+                    return (
+                      <div 
+                        key={c.sessionId}
+                        onClick={() => loadSessionDetails(c.sessionId)}
+                        style={{
+                          ...styles.activeCallRow,
+                          backgroundColor: isSelected ? 'rgba(168, 85, 247, 0.1)' : 'rgba(255,255,255,0.02)',
+                          borderColor: isSelected ? '#a855f7' : 'var(--glass-border)',
+                        }}
+                        className="pulse-border-purple"
+                      >
+                        <div style={styles.activeCallInfo}>
+                          <span style={styles.activeCallName}>{c.patientName}</span>
+                          <span style={styles.activeCallId}>ID: {c.sessionId.slice(0, 8)}...</span>
+                        </div>
+                        <span style={styles.activeCallStatus}>Live</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Right Panel: Split Workspace details */}
@@ -508,6 +600,113 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                       </div>
                     </div>
 
+                    {/* Vertical Timeline Card */}
+                    {(() => {
+                      const buildTimelineEvents = (symptoms: any[], meds: any[], summaryAllergies: string[]) => {
+                        const events: { title: string; description: string; type: 'symptom' | 'medication' | 'allergy'; daysAgo: number; isRedFlag?: boolean }[] = [];
+
+                        const parseDurationToDays = (dur: string): number => {
+                          if (!dur) return 999;
+                          const match = dur.match(/(\d+)\s*(day|week|month|year|hour)/i);
+                          if (!match) return 999;
+                          const val = parseInt(match[1], 10);
+                          const unit = match[2].toLowerCase();
+                          if (unit.startsWith('hour')) return 0.1;
+                          if (unit.startsWith('day')) return val;
+                          if (unit.startsWith('week')) return val * 7;
+                          if (unit.startsWith('month')) return val * 30;
+                          if (unit.startsWith('year')) return val * 365;
+                          return 999;
+                        };
+
+                        symptoms.forEach(s => {
+                          const daysAgo = parseDurationToDays(s.duration || '');
+                          events.push({
+                            title: `Onset: ${s.name}`,
+                            description: `Severity: ${s.severity} (Duration: ${s.duration || 'Unspecified'})`,
+                            type: 'symptom',
+                            daysAgo,
+                            isRedFlag: s.isRedFlag
+                          });
+                        });
+
+                        meds.forEach(m => {
+                          events.push({
+                            title: `Active Medication: ${m.name}`,
+                            description: `${m.dosage || ''} ${m.frequency || ''}`.trim(),
+                            type: 'medication',
+                            daysAgo: 1000
+                          });
+                        });
+
+                        if (summaryAllergies && Array.isArray(summaryAllergies)) {
+                          summaryAllergies.forEach(a => {
+                            events.push({
+                              title: `Allergy: ${a}`,
+                              description: `Contraindicated allergen group`,
+                              type: 'allergy',
+                              daysAgo: 1001
+                            });
+                          });
+                        }
+
+                        return events.sort((a, b) => a.daysAgo - b.daysAgo);
+                      };
+
+                      const timelineEvents = buildTimelineEvents(
+                        sessionDetail.symptoms || [],
+                        sessionDetail.medications || [],
+                        sessionDetail.summary?.summaryData?.allergies || []
+                      );
+
+                      return (
+                        <div style={styles.timelineCard} className="glass-panel">
+                          <div style={styles.cardHeader}>
+                            <FileText size={18} color="#3b82f6" />
+                            <h3>Patient Intake & History Timeline</h3>
+                          </div>
+                          
+                          <div style={styles.timelineScroll}>
+                            {timelineEvents.length === 0 ? (
+                              <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>No timeline details extracted.</p>
+                            ) : (
+                              <div style={styles.timelineContainer}>
+                                <div style={styles.timelineLine}></div>
+                                
+                                {timelineEvents.map((ev, index) => {
+                                  const isRed = ev.isRedFlag || ev.type === 'allergy';
+                                  return (
+                                    <div key={index} style={styles.timelineItem}>
+                                      <div style={{
+                                        ...styles.timelineNode,
+                                        backgroundColor: isRed ? '#ef4444' : ev.type === 'medication' ? '#a855f7' : '#3b82f6',
+                                        boxShadow: isRed ? '0 0 8px #ef4444' : 'none'
+                                      }}></div>
+                                      
+                                      <div style={styles.timelineContent}>
+                                        <span style={{ 
+                                          ...styles.timelineTitle,
+                                          color: isRed ? '#ef4444' : 'white'
+                                        }}>
+                                          {ev.title}
+                                        </span>
+                                        <span style={styles.timelineDesc}>{ev.description}</span>
+                                        {ev.daysAgo !== 999 && ev.daysAgo < 1000 && (
+                                          <span style={styles.timelineTimeTag}>
+                                            {ev.daysAgo === 0.1 ? 'Hours ago' : ev.daysAgo === 1 ? '1 day ago' : `${ev.daysAgo} days ago`}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* EHR Sync Action Block */}
                     {sessionDetail.summary && (
                       <div style={styles.syncContainer} className="glass-panel">
@@ -616,6 +815,40 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                       );
                     })}
                   </div>
+
+                  {/* Clinician live telephony override barge-in console */}
+                  {(() => {
+                    const isCallLive = activeCalls.some(c => c.sessionId === selectedSessionId);
+                    if (!isCallLive) return null;
+                    return (
+                      <div style={styles.bargeInConsole}>
+                        <div style={styles.bargeInHeader}>
+                          <span className="pulse-red-dot" style={{ marginRight: '6px' }}></span>
+                          <span style={styles.liveLabel}>LIVE TELEPHONY BARGE-IN CONSOLE</span>
+                        </div>
+                        <div style={styles.bargeInRow}>
+                          <input 
+                            type="text" 
+                            placeholder="Speak direct clinician intervention to patient..." 
+                            value={bargeInText}
+                            onChange={e => setBargeInText(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSendBargeIn(); }}
+                            className="input-text"
+                            style={styles.bargeInInput}
+                            disabled={isSendingBargeIn}
+                          />
+                          <button 
+                            onClick={handleSendBargeIn} 
+                            className="btn" 
+                            style={styles.bargeInBtn}
+                            disabled={isSendingBargeIn || !bargeInText.trim()}
+                          >
+                            <Phone size={14} style={{ marginRight: '4px' }} /> Speak
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -1067,5 +1300,171 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '2px 6px',
     borderRadius: '4px',
     width: 'fit-content'
+  },
+  timelineCard: {
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '15px'
+  },
+  timelineScroll: {
+    maxHeight: '260px',
+    overflowY: 'auto',
+    paddingRight: '5px'
+  },
+  timelineContainer: {
+    position: 'relative',
+    paddingLeft: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    textAlign: 'left'
+  },
+  timelineLine: {
+    position: 'absolute',
+    left: '4px',
+    top: '5px',
+    bottom: '5px',
+    width: '2px',
+    backgroundColor: 'var(--glass-border)'
+  },
+  timelineItem: {
+    position: 'relative',
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'flex-start'
+  },
+  timelineNode: {
+    position: 'absolute',
+    left: '-20px',
+    top: '5px',
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    zIndex: 2
+  },
+  timelineContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '3px'
+  },
+  timelineTitle: {
+    fontSize: '13px',
+    fontWeight: 'bold'
+  },
+  timelineDesc: {
+    fontSize: '11px',
+    color: 'var(--text-muted)'
+  },
+  timelineTimeTag: {
+    fontSize: '9px',
+    color: '#3b82f6',
+    background: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: '3px',
+    padding: '1px 4px',
+    width: 'fit-content',
+    marginTop: '2px'
+  },
+  activeCallsSection: {
+    borderTop: '1px solid var(--glass-border)',
+    padding: '16px 20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    maxHeight: '40%',
+    minHeight: '180px',
+    textAlign: 'left'
+  },
+  sectionSubHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '4px'
+  },
+  activeCallsScroll: {
+    flex: 1,
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  },
+  emptySubListText: {
+    fontSize: '11px',
+    color: 'var(--text-muted)',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: '10px',
+    width: '100%'
+  },
+  activeCallRow: {
+    padding: '10px 12px',
+    borderRadius: '6px',
+    border: '1px solid var(--glass-border)',
+    cursor: 'pointer',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    transition: 'all 0.2s ease'
+  },
+  activeCallInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    textAlign: 'left'
+  },
+  activeCallName: {
+    fontSize: '13px',
+    fontWeight: 'bold'
+  },
+  activeCallId: {
+    fontSize: '10px',
+    color: 'var(--text-muted)'
+  },
+  activeCallStatus: {
+    fontSize: '10px',
+    fontWeight: 'bold',
+    color: '#a855f7',
+    background: 'rgba(168, 85, 247, 0.1)',
+    border: '1px solid rgba(168, 85, 247, 0.2)',
+    padding: '2px 6px',
+    borderRadius: '4px'
+  },
+  bargeInConsole: {
+    borderTop: '1px solid var(--glass-border)',
+    padding: '16px',
+    backgroundColor: 'rgba(168, 85, 247, 0.02)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  },
+  bargeInHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    textAlign: 'left'
+  },
+  liveLabel: {
+    fontSize: '11px',
+    fontWeight: 'bold',
+    color: '#ef4444',
+    letterSpacing: '0.5px'
+  },
+  bargeInRow: {
+    display: 'flex',
+    gap: '8px'
+  },
+  bargeInInput: {
+    flex: 1,
+    padding: '8px 12px',
+    fontSize: '13px'
+  },
+  bargeInBtn: {
+    padding: '8px 16px',
+    fontSize: '13px',
+    backgroundColor: '#a855f7',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center'
   }
 };

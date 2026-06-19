@@ -4,6 +4,7 @@ import { AuthenticatedRequest, authenticateToken, requireRole } from '../middlew
 import { QueueService } from '../services/queue';
 import { generateFhirBundle, fhirJsonToXml } from '../services/fhir';
 import { GuardrailsService } from '../services/guardrails';
+import { activeCallSockets } from '../activeCalls';
 
 const router = Router();
 
@@ -313,6 +314,72 @@ router.get('/sessions/:id/interactions', async (req: AuthenticatedRequest, res: 
   } catch (err) {
     console.error('Check interactions error:', err);
     res.status(500).json({ error: 'Failed to evaluate clinical interactions.' });
+  }
+});
+
+// Get all active voice telephony sessions
+router.get('/active-calls', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const calls = Array.from(activeCallSockets.entries()).map(([sessionId, call]) => ({
+      sessionId,
+      patientName: call.patientName,
+      messages: call.messages
+    }));
+    res.json({ activeCalls: calls });
+  } catch (err) {
+    console.error('Get active calls error:', err);
+    res.status(500).json({ error: 'Failed to retrieve active calls.' });
+  }
+});
+
+// Send clinician barge-in message override
+router.post('/active-calls/:id/barge-in', async (req: AuthenticatedRequest, res: Response) => {
+  const sessionId = req.params.id as string;
+  const { message } = req.body;
+
+  if (!message || typeof message !== 'string') {
+    res.status(400).json({ error: 'Barge-in message is required and must be a string.' });
+    return;
+  }
+
+  try {
+    const call = activeCallSockets.get(sessionId);
+    if (!call) {
+      res.status(404).json({ error: 'Active call session not found.' });
+      return;
+    }
+
+    // Send frame to WS client
+    call.ws.send(JSON.stringify({
+      type: 'barge_in',
+      text: message
+    }));
+
+    // Record the message in memory
+    call.messages.push({
+      sender: 'agent',
+      content: `[Barge-in Override]: ${message}`,
+      createdAt: new Date().toISOString()
+    });
+
+    // Save override to database
+    await pool.query(
+      `INSERT INTO messages (session_id, sender, content)
+       VALUES ($1, $2, $3)`,
+      [sessionId, 'agent', `[Barge-in Override]: ${message}`]
+    );
+
+    // Save audit log
+    await pool.query(
+      `INSERT INTO audit_logs (session_id, user_id, action, details)
+       VALUES ($1, $2, $3, $4)`,
+      [sessionId, req.user?.id, 'clinician_barge_in', JSON.stringify({ message })]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Clinician barge-in error:', err);
+    res.status(500).json({ error: 'Failed to execute clinician barge-in.' });
   }
 });
 

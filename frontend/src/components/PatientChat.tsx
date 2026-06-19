@@ -169,6 +169,9 @@ interface PatientChatProps {
 }
 
 export default function PatientChat({ backendUrl }: PatientChatProps) {
+  // Language State
+  const [language, setLanguage] = useState<string>('en-US');
+
   // Authentication State
   const [token, setToken] = useState<string>(localStorage.getItem('intakerx_token') || '');
   const [user, setUser] = useState<any>(JSON.parse(localStorage.getItem('intakerx_user') || 'null'));
@@ -270,7 +273,7 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
       const rec = new SpeechRecognition();
       rec.continuous = false;
       rec.interimResults = false;
-      rec.lang = 'en-US';
+      rec.lang = language;
 
       rec.onstart = () => {
         setIsRecording(true);
@@ -296,7 +299,7 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
 
       recognitionRef.current = rec;
     }
-  }, [ws, sessionId]);
+  }, [ws, sessionId, language]);
 
   // Auth Handlers
   const handleAuthSubmit = async (e: React.FormEvent) => {
@@ -346,7 +349,8 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ preferredLanguage: language })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -463,9 +467,9 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
     // Standard Speech Synthesis configuration
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Choose a calm medical voice if available
+    // Choose a voice that matches the selected language
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Natural') || v.lang.startsWith('en-US'));
+    const preferredVoice = voices.find(v => v.lang.startsWith(language.split('-')[0])) || voices.find(v => v.lang.startsWith('en-US'));
     if (preferredVoice) utterance.voice = preferredVoice;
     
     utterance.rate = 1.05; // Slightly faster for natural latency feel
@@ -578,10 +582,37 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
               </div>
 
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                {!sessionId && (
+                  <select 
+                    value={language} 
+                    onChange={e => setLanguage(e.target.value)} 
+                    style={{
+                      padding: '4px 8px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: '4px',
+                      color: 'white',
+                      fontSize: '12px',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="en-US">English</option>
+                    <option value="es-ES">Español</option>
+                    <option value="fr-FR">Français</option>
+                    <option value="zh-CN">中文 (Mandarin)</option>
+                  </select>
+                )}
+
                 {sessionId && (
-                  <span className={`triage-badge triage-${triageLevel}`}>
-                    Triage: {triageLevel}
-                  </span>
+                  <>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      Language: {language === 'en-US' ? 'EN' : language === 'es-ES' ? 'ES' : language === 'fr-FR' ? 'FR' : 'ZH'}
+                    </span>
+                    <span className={`triage-badge triage-${triageLevel}`}>
+                      Triage: {triageLevel}
+                    </span>
+                  </>
                 )}
                 <button onClick={handleLogout} style={styles.logoutBtn}>Sign Out</button>
               </div>
