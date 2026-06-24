@@ -535,6 +535,47 @@ You MUST respond strictly in the following JSON format:
   }
 });
 
+interface SOAPData {
+  chiefComplaint: string;
+  historyOfPresentIllness: string;
+  pastMedicalHistory?: string;
+  medications: Array<{ name: string; dosage?: string; frequency?: string }>;
+  allergies: string[];
+  insurance?: { provider?: string; policyNumber?: string };
+  triageLevel: 'routine' | 'urgent' | 'emergency';
+  triageRationale: string;
+  redFlagsIdentified: string[];
+}
+
+function validateSOAPData(data: any): data is SOAPData {
+  if (!data || typeof data !== 'object') return false;
+  
+  const requiredStringKeys = ['chiefComplaint', 'historyOfPresentIllness', 'triageLevel', 'triageRationale'];
+  for (const key of requiredStringKeys) {
+    if (typeof data[key] !== 'string' || !data[key].trim()) return false;
+  }
+  
+  if (!Array.isArray(data.medications)) return false;
+  for (const med of data.medications) {
+    if (!med || typeof med !== 'object' || typeof med.name !== 'string' || !med.name.trim()) return false;
+  }
+  
+  if (!Array.isArray(data.allergies)) return false;
+  for (const allergy of data.allergies) {
+    if (typeof allergy !== 'string') return false;
+  }
+  
+  if (!Array.isArray(data.redFlagsIdentified)) return false;
+  for (const flag of data.redFlagsIdentified) {
+    if (typeof flag !== 'string') return false;
+  }
+  
+  const validTriageLevels = ['routine', 'urgent', 'emergency'];
+  if (!validTriageLevels.includes(data.triageLevel)) return false;
+  
+  return true;
+}
+
 // Generate and save a clinical SOAP summary from session history
 async function generateSOAPSummary(sessionId: string, patientId: number) {
   // Check if summary already exists
@@ -548,13 +589,6 @@ async function generateSOAPSummary(sessionId: string, patientId: number) {
   );
   const patient = patientRes.rows[0];
 
-  // Retrieve full transcript
-  const transcriptRes = await pool.query(
-    'SELECT sender, content FROM messages WHERE session_id = $1 ORDER BY created_at ASC',
-    [sessionId]
-  );
-  const transcript = transcriptRes.rows.map(m => `${m.sender}: ${m.content}`).join('\n');
-
   // Retrieve symptoms and meds
   const symptomsRes = await pool.query('SELECT name, severity, duration, is_red_flag FROM symptoms WHERE session_id = $1', [sessionId]);
   const medsRes = await pool.query('SELECT name, dosage, frequency FROM medications WHERE session_id = $1', [sessionId]);
@@ -562,7 +596,17 @@ async function generateSOAPSummary(sessionId: string, patientId: number) {
   const symptomsStr = symptomsRes.rows.map(s => `${s.name} (${s.severity}, duration: ${s.duration || 'unknown'})`).join(', ');
   const medsStr = medsRes.rows.map(m => `${m.name} ${m.dosage || ''} ${m.frequency || ''}`).join(', ');
 
-  const prompt = `You are a clinical summarization AI. Create a high-fidelity clinician SOAP pre-visit summary from the following patient intake details.
+  let soapData: SOAPData;
+
+  try {
+    // Retrieve full transcript
+    const transcriptRes = await pool.query(
+      'SELECT sender, content FROM messages WHERE session_id = $1 ORDER BY created_at ASC',
+      [sessionId]
+    );
+    const transcript = transcriptRes.rows.map(m => `${m.sender}: ${m.content}`).join('\n');
+
+    const prompt = `You are a clinical summarization AI. Create a high-fidelity clinician SOAP pre-visit summary from the following patient intake details.
 Patient: ${patient.name} (DOB: ${patient.dob}, Sex: ${patient.sex})
 Insurance: ${patient.insurance_provider || 'N/A'}, Policy: ${patient.insurance_policy || 'N/A'}
 Extracted Symptoms: ${symptomsStr || 'None'}
@@ -587,47 +631,76 @@ Output raw JSON matching this structure:
   "redFlagsIdentified": ["list of red flag symptoms, if any"]
 }`;
 
-  const summaryText = await AIService.generateText(
-    "You are a medical scribe that creates clinician-friendly SOAP pre-visit summaries from patient intake interviews. Output strict JSON.",
-    [{ role: 'user', content: prompt }],
-    {
-      temperature: 0.1,
-      responseJsonSchema: {
-        type: 'OBJECT',
-        properties: {
-          chiefComplaint: { type: 'STRING' },
-          historyOfPresentIllness: { type: 'STRING' },
-          pastMedicalHistory: { type: 'STRING' },
-          medications: {
-            type: 'ARRAY',
-            items: {
+    const summaryText = await AIService.generateText(
+      "You are a medical scribe that creates clinician-friendly SOAP pre-visit summaries from patient intake interviews. Output strict JSON.",
+      [{ role: 'user', content: prompt }],
+      {
+        temperature: 0.1,
+        responseJsonSchema: {
+          type: 'OBJECT',
+          properties: {
+            chiefComplaint: { type: 'STRING' },
+            historyOfPresentIllness: { type: 'STRING' },
+            pastMedicalHistory: { type: 'STRING' },
+            medications: {
+              type: 'ARRAY',
+              items: {
+                type: 'OBJECT',
+                properties: {
+                  name: { type: 'STRING' },
+                  dosage: { type: 'STRING' },
+                  frequency: { type: 'STRING' }
+                },
+                required: ['name']
+              }
+            },
+            allergies: { type: 'ARRAY', items: { type: 'STRING' } },
+            insurance: {
               type: 'OBJECT',
               properties: {
-                name: { type: 'STRING' },
-                dosage: { type: 'STRING' },
-                frequency: { type: 'STRING' }
-              },
-              required: ['name']
-            }
+                provider: { type: 'STRING' },
+                policyNumber: { type: 'STRING' }
+              }
+            },
+            triageLevel: { type: 'STRING' },
+            triageRationale: { type: 'STRING' },
+            redFlagsIdentified: { type: 'ARRAY', items: { type: 'STRING' } }
           },
-          allergies: { type: 'ARRAY', items: { type: 'STRING' } },
-          insurance: {
-            type: 'OBJECT',
-            properties: {
-              provider: { type: 'STRING' },
-              policyNumber: { type: 'STRING' }
-            }
-          },
-          triageLevel: { type: 'STRING' },
-          triageRationale: { type: 'STRING' },
-          redFlagsIdentified: { type: 'ARRAY', items: { type: 'STRING' } }
-        },
-        required: ['chiefComplaint', 'historyOfPresentIllness', 'medications', 'allergies', 'triageLevel', 'triageRationale', 'redFlagsIdentified']
+          required: ['chiefComplaint', 'historyOfPresentIllness', 'medications', 'allergies', 'triageLevel', 'triageRationale', 'redFlagsIdentified']
+        }
       }
-    }
-  );
+    );
 
-  const soapData = JSON.parse(summaryText.trim());
+    const parsed = JSON.parse(summaryText.trim());
+    if (validateSOAPData(parsed)) {
+      soapData = parsed;
+    } else {
+      throw new Error("Generated SOAP note failed validation schema constraints.");
+    }
+
+  } catch (err: any) {
+    console.warn(`[SOAP Summary Fallback] LLM generation/parsing failed for session ${sessionId}: ${err.message}. Building resilient fallback note...`);
+    
+    const hasRedFlags = symptomsRes.rows.some(s => s.is_red_flag);
+    soapData = {
+      chiefComplaint: symptomsStr ? `Symptoms reported: ${symptomsStr}` : "Patient intake pre-screening",
+      historyOfPresentIllness: `Auto-generated fallback pre-visit note due to structure validation constraints.\nPatient demographic details:\n- Name: ${patient.name}\n- DOB: ${patient.dob}\n- Sex: ${patient.sex}\n\nSymptoms: ${symptomsStr || 'None'}\nMedications: ${medsStr || 'None'}\n\nPlease consult the full chat log in the portal.`,
+      pastMedicalHistory: "See full patient record.",
+      medications: medsRes.rows.map(m => ({
+        name: m.name,
+        dosage: m.dosage || 'unknown',
+        frequency: m.frequency || 'unknown'
+      })),
+      allergies: [],
+      insurance: {
+        provider: patient.insurance_provider || 'N/A',
+        policyNumber: patient.insurance_policy || 'N/A'
+      },
+      triageLevel: hasRedFlags ? 'emergency' : 'routine',
+      triageRationale: "Schema validation fallback triggered due to LLM response failure.",
+      redFlagsIdentified: symptomsRes.rows.filter(s => s.is_red_flag).map(s => s.name)
+    };
+  }
   
   await pool.query(
     `INSERT INTO intake_summaries (session_id, summary_data, status)
@@ -637,4 +710,4 @@ Output raw JSON matching this structure:
 }
 
 export default router;
-export { generateSOAPSummary };
+export { generateSOAPSummary, validateSOAPData, SOAPData };
