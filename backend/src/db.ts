@@ -184,6 +184,19 @@ export async function bootstrap() {
       );
     `);
 
+    // Create session_vitals table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS session_vitals (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        heart_rate INTEGER,
+        spo2 INTEGER,
+        bp_systolic INTEGER,
+        bp_diastolic INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Create interaction_rules table
     await migrationPool.query(`
       CREATE TABLE IF NOT EXISTS interaction_rules (

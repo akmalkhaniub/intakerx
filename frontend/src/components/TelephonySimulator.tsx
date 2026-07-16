@@ -17,6 +17,8 @@ export default function TelephonySimulator({ backendUrl }: TelephonySimulatorPro
   const [callDuration, setCallDuration] = useState(0);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
+  const [liveVitals, setLiveVitals] = useState<any>(null);
+  const [isDistressActive, setIsDistressActive] = useState(false);
   
   // Webhook Test Logger
   const [webhookLogs, setWebhookLogs] = useState<string>('');
@@ -155,6 +157,8 @@ export default function TelephonySimulator({ backendUrl }: TelephonySimulatorPro
   const startCall = async () => {
     setTranscript([]);
     setWsLogs([]);
+    setLiveVitals(null);
+    setIsDistressActive(false);
     setCallStatus('dialing');
 
     // 1. Simulate inbound webhook first
@@ -209,6 +213,8 @@ export default function TelephonySimulator({ backendUrl }: TelephonySimulatorPro
         speakGreeting(`Clinician Intervention. ${msg.text}`);
       } else if (msg.type === 'ready') {
         console.log('[Telephony WS] Session ready.');
+      } else if (msg.type === 'vitals') {
+        setLiveVitals(msg.vitals);
       }
     };
 
@@ -219,6 +225,17 @@ export default function TelephonySimulator({ backendUrl }: TelephonySimulatorPro
     };
 
     wsRef.current = socket;
+  };
+
+  const toggleDistress = () => {
+    const newValue = !isDistressActive;
+    setIsDistressActive(newValue);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'simulate_distress',
+        value: newValue
+      }));
+    }
   };
 
   const speakGreeting = (text: string) => {
@@ -320,6 +337,16 @@ export default function TelephonySimulator({ backendUrl }: TelephonySimulatorPro
             Test Webhook (POST /api/telephony/inbound-call)
           </button>
 
+          {callStatus === 'active' && (
+            <button 
+              onClick={toggleDistress} 
+              className={isDistressActive ? "btn btn-danger" : "btn btn-secondary"} 
+              style={{ width: '100%', marginTop: '10px', fontWeight: 'bold' }}
+            >
+              {isDistressActive ? '🔴 Clear Distress Alarm' : '🚨 Trigger Distress Alarm'}
+            </button>
+          )}
+
           <div style={{ marginTop: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <span style={styles.label}>Inbound Webhook HTTP Audit Log</span>
             <pre style={styles.webhookCodeBlock}>
@@ -372,6 +399,39 @@ export default function TelephonySimulator({ backendUrl }: TelephonySimulatorPro
                       <span style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>ID: {sessionId.slice(0, 8)}...</span>
                     </div>
                   </div>
+
+                  {/* Real-time Telemetry HUD */}
+                  {liveVitals && (
+                    <div style={styles.telemetryOverlay}>
+                      <div style={styles.telemetryStat}>
+                        <span style={styles.telemetryLabel}>HR</span>
+                        <span style={{ 
+                          ...styles.telemetryValue, 
+                          color: liveVitals.heartRate > 130 ? '#ef4444' : '#10b981',
+                        }}>
+                          {liveVitals.heartRate} <span style={{ fontSize: '8px' }}>bpm</span>
+                        </span>
+                      </div>
+                      <div style={styles.telemetryStat}>
+                        <span style={styles.telemetryLabel}>SPO2</span>
+                        <span style={{ 
+                          ...styles.telemetryValue, 
+                          color: liveVitals.spo2 < 92 ? '#ef4444' : '#3b82f6',
+                        }}>
+                          {liveVitals.spo2}%
+                        </span>
+                      </div>
+                      <div style={styles.telemetryStat}>
+                        <span style={styles.telemetryLabel}>BP</span>
+                        <span style={{ 
+                          ...styles.telemetryValue, 
+                          color: liveVitals.bpSystolic > 150 ? '#ef4444' : 'white' 
+                        }}>
+                          {liveVitals.bpSystolic}/{liveVitals.bpDiastolic}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Active Transcript view */}
                   <div style={styles.phoneTranscriptContainer}>
@@ -807,5 +867,28 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(255,255,255,0.01)',
     padding: '8px',
     borderRadius: '4px'
+  },
+  telemetryOverlay: {
+    display: 'flex',
+    justifyContent: 'space-around',
+    background: 'rgba(0, 0, 0, 0.4)',
+    border: '1px solid var(--glass-border)',
+    borderRadius: '8px',
+    padding: '8px 4px',
+    margin: '0 10px 10px 10px'
+  },
+  telemetryStat: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center'
+  },
+  telemetryLabel: {
+    fontSize: '9px',
+    fontWeight: 'bold',
+    color: 'var(--text-muted)'
+  },
+  telemetryValue: {
+    fontSize: '13px',
+    fontWeight: 'bold'
   }
 };

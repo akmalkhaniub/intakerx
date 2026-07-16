@@ -340,11 +340,25 @@ router.get('/phi-logs', async (req: AuthenticatedRequest, res: Response) => {
 // Get all active voice telephony sessions
 router.get('/active-calls', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const calls = Array.from(activeCallSockets.entries()).map(([sessionId, call]) => ({
-      sessionId,
-      patientName: call.patientName,
-      messages: call.messages
-    }));
+    const calls = await Promise.all(
+      Array.from(activeCallSockets.entries()).map(async ([sessionId, call]) => {
+        // Query latest vitals from DB
+        const vitalsRes = await pool.query(
+          `SELECT heart_rate as "heartRate", spo2, bp_systolic as "bpSystolic", bp_diastolic as "bpDiastolic"
+           FROM session_vitals
+           WHERE session_id = $1
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          [sessionId]
+        );
+        return {
+          sessionId,
+          patientName: call.patientName,
+          messages: call.messages,
+          vitals: vitalsRes.rowCount ? vitalsRes.rows[0] : null
+        };
+      })
+    );
     res.json({ activeCalls: calls });
   } catch (err) {
     console.error('Get active calls error:', err);

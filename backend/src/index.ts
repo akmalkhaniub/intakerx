@@ -47,11 +47,19 @@ wss.on('connection', (ws: WebSocket) => {
   let sessionId: string | null = null;
   let patientId: number | null = null;
   let currentStep = 'complaint';
+  let vitalsInterval: any = null;
+  let isDistressSimulated = false;
 
   ws.on('message', async (data: string) => {
     try {
       const message = JSON.parse(data.toString());
       console.log('[WS] Received message:', message.type);
+
+      if (message.type === 'simulate_distress') {
+        isDistressSimulated = message.value;
+        console.log(`[WS] Distress simulation set to: ${isDistressSimulated}`);
+        return;
+      }
 
       // 1. Initialize session for voice chat
       if (message.type === 'start_session') {
@@ -73,6 +81,69 @@ wss.on('connection', (ws: WebSocket) => {
         
         console.log(`[WS] Session registered. SessionId: ${sessionId}, PatientId: ${patientId}`);
         ws.send(JSON.stringify({ type: 'ready', sessionId }));
+
+        // Clear existing vitals interval
+        if (vitalsInterval) clearInterval(vitalsInterval);
+
+        // Start vitals simulation interval (every 3 seconds)
+        vitalsInterval = setInterval(async () => {
+          if (ws.readyState !== WebSocket.OPEN || !sessionId) {
+            clearInterval(vitalsInterval);
+            return;
+          }
+
+          let heartRate = Math.floor(70 + Math.random() * 10);
+          let spo2 = Math.floor(96 + Math.random() * 4);
+          let bpSystolic = Math.floor(115 + Math.random() * 10);
+          let bpDiastolic = Math.floor(75 + Math.random() * 8);
+
+          if (isDistressSimulated) {
+            heartRate = Math.floor(135 + Math.random() * 15);
+            spo2 = Math.floor(85 + Math.random() * 6);
+            bpSystolic = Math.floor(155 + Math.random() * 15);
+            bpDiastolic = Math.floor(95 + Math.random() * 10);
+
+            // Trigger emergency escalation on critical vitals thresholds
+            try {
+              const statusCheck = await pool.query('SELECT status FROM intake_sessions WHERE id = $1', [sessionId]);
+              if (statusCheck.rowCount && statusCheck.rows[0].status !== 'escalated') {
+                await pool.query(
+                  `UPDATE intake_sessions 
+                   SET status = 'escalated', triage_level = 'emergency', 
+                       triage_rationale = 'Emergency: Telemetry alarm triggered due to critical vitals (SpO2 < 92% or Heart Rate > 130 bpm)',
+                       updated_at = NOW()
+                   WHERE id = $1`,
+                  [sessionId]
+                );
+
+                ws.send(JSON.stringify({
+                  type: 'agent_speech',
+                  text: 'EMERGENCY TELEMETRY WARNING: Patient vitals indicate critical distress. Clinician escalation triggered.',
+                  status: 'escalated',
+                  triageLevel: 'emergency'
+                }));
+              }
+            } catch (dbErr) {
+              console.error('[WS] Failed to auto-escalate on distress:', dbErr);
+            }
+          }
+
+          try {
+            await pool.query(
+              `INSERT INTO session_vitals (session_id, heart_rate, spo2, bp_systolic, bp_diastolic)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [sessionId, heartRate, spo2, bpSystolic, bpDiastolic]
+            );
+          } catch (dbErr) {
+            console.error('[WS] Failed to save simulated vitals:', dbErr);
+          }
+
+          ws.send(JSON.stringify({
+            type: 'vitals',
+            vitals: { heartRate, spo2, bpSystolic, bpDiastolic }
+          }));
+        }, 3000);
+
         return;
       }
 
@@ -417,6 +488,9 @@ You MUST respond strictly in the following JSON format:
   ws.on('close', () => {
     if (sessionId) {
       activeCallSockets.delete(sessionId);
+    }
+    if (vitalsInterval) {
+      clearInterval(vitalsInterval);
     }
     console.log('[WS] WebSocket connection closed.');
   });

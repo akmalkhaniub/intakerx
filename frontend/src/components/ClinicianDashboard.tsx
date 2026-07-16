@@ -97,6 +97,33 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     return () => clearInterval(activeCallInterval);
   }, [token]);
 
+  // Handle auditory clinical alarms for telemetry distress
+  useEffect(() => {
+    const playAlertSound = () => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      } catch (e) {
+        console.error('AudioContext alarm error:', e);
+      }
+    };
+
+    const hasAlarm = activeCalls.some(c => c.vitals && (c.vitals.spo2 < 92 || c.vitals.heartRate > 130));
+    if (hasAlarm) {
+      playAlertSound();
+    }
+  }, [activeCalls]);
+
   // Auth Handler
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -434,22 +461,47 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                 ) : (
                   activeCalls.map(c => {
                     const isSelected = selectedSessionId === c.sessionId;
+                    const hasAlarm = c.vitals && (c.vitals.spo2 < 92 || c.vitals.heartRate > 130);
                     return (
                       <div 
                         key={c.sessionId}
                         onClick={() => loadSessionDetails(c.sessionId)}
                         style={{
                           ...styles.activeCallRow,
-                          backgroundColor: isSelected ? 'rgba(168, 85, 247, 0.1)' : 'rgba(255,255,255,0.02)',
-                          borderColor: isSelected ? '#a855f7' : 'var(--glass-border)',
+                          backgroundColor: isSelected 
+                            ? (hasAlarm ? 'rgba(239, 68, 68, 0.1)' : 'rgba(168, 85, 247, 0.1)') 
+                            : 'rgba(255,255,255,0.02)',
+                          borderColor: isSelected 
+                            ? (hasAlarm ? '#ef4444' : '#a855f7') 
+                            : (hasAlarm ? 'rgba(239, 68, 68, 0.4)' : 'var(--glass-border)'),
                         }}
-                        className="pulse-border-purple"
+                        className={hasAlarm ? "pulse-border-red active-telemetry-alarm" : "pulse-border-purple"}
                       >
                         <div style={styles.activeCallInfo}>
                           <span style={styles.activeCallName}>{c.patientName}</span>
                           <span style={styles.activeCallId}>ID: {c.sessionId.slice(0, 8)}...</span>
+                          {c.vitals && (
+                            <div style={{ display: 'flex', gap: '8px', fontSize: '10px', marginTop: '4px' }}>
+                              <span style={{ color: c.vitals.heartRate > 130 ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>
+                                HR: {c.vitals.heartRate}
+                              </span>
+                              <span style={{ color: c.vitals.spo2 < 92 ? '#ef4444' : '#3b82f6', fontWeight: 'bold' }}>
+                                SpO2: {c.vitals.spo2}%
+                              </span>
+                              <span style={{ color: 'var(--text-muted)' }}>
+                                BP: {c.vitals.bpSystolic}/{c.vitals.bpDiastolic}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        <span style={styles.activeCallStatus}>Live</span>
+                        <span style={{
+                          ...styles.activeCallStatus,
+                          backgroundColor: hasAlarm ? 'rgba(239, 68, 68, 0.1)' : 'rgba(168, 85, 247, 0.1)',
+                          borderColor: hasAlarm ? 'rgba(239, 68, 68, 0.2)' : 'rgba(168, 85, 247, 0.2)',
+                          color: hasAlarm ? '#ef4444' : '#a855f7'
+                        }}>
+                          {hasAlarm ? 'ALARM' : 'Live'}
+                        </span>
                       </div>
                     );
                   })
@@ -474,7 +526,35 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                 <p>Select a patient intake session from the list on the left to review logs, edit summaries, and push charts to the EHR system.</p>
               </div>
             ) : (
-              <div style={styles.splitGrid}>
+              <>
+                {(() => {
+                  const liveCall = activeCalls.find(c => c.sessionId === selectedSessionId);
+                  const hasAlert = liveCall?.vitals && (liveCall.vitals.spo2 < 92 || liveCall.vitals.heartRate > 130);
+                  if (!hasAlert) return null;
+                  
+                  return (
+                    <div className="telemetry-emergency-banner animate-pulse" style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid #ef4444',
+                      color: '#ef4444',
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      margin: '0 20px 15px 20px',
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                      textAlign: 'left'
+                    }}>
+                      <span>
+                        🚨 CLINICAL ALERT: TELEMETRY DISTRESS ALARM - CRITICAL METRICS (
+                        {liveCall.vitals.heartRate > 130 ? `HR: ${liveCall.vitals.heartRate} bpm ` : ''}
+                        {liveCall.vitals.spo2 < 92 ? `SpO2: ${liveCall.vitals.spo2}% ` : ''}
+                        ) - IMMEDIATE INTERVENTION REQUIRED
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                <div style={styles.splitGrid}>
                 {/* SOAP Editor workspace */}
                 <div style={styles.soapWorkspace} className="glass-panel">
                   <div style={styles.workspaceHeader}>
@@ -851,7 +931,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                   })()}
                 </div>
               </div>
-            )}
+            </>
+          )}
           </div>
         </div>
       )}

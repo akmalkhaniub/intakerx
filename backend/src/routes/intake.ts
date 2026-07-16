@@ -160,6 +160,15 @@ router.get('/sessions/:id', authenticateToken as any, async (req: AuthenticatedR
       [id]
     );
 
+    // 6. Get vitals history (if exists)
+    const vitalsRes = await pool.query(
+      `SELECT heart_rate as "heartRate", spo2, bp_systolic as "bpSystolic", bp_diastolic as "bpDiastolic", created_at as "createdAt"
+       FROM session_vitals
+       WHERE session_id = $1
+       ORDER BY created_at ASC`,
+      [id]
+    );
+
     res.json({
       session: {
         id: session.id,
@@ -180,6 +189,7 @@ router.get('/sessions/:id', authenticateToken as any, async (req: AuthenticatedR
       symptoms: symptomsRes.rows,
       medications: medsRes.rows,
       summary: summaryRes.rowCount && summaryRes.rowCount > 0 ? summaryRes.rows[0] : null,
+      vitals: vitalsRes.rows,
     });
   } catch (err) {
     console.error('Get session detail error:', err);
