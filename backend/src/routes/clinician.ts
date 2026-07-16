@@ -317,6 +317,26 @@ router.get('/sessions/:id/interactions', async (req: AuthenticatedRequest, res: 
   }
 });
 
+// Get all PHI Redaction compliance audit logs
+router.get('/phi-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT l.id, l.session_id as "sessionId", l.phi_type as "phiType", 
+              l.original_content as "originalContent", l.redacted_content as "redactedContent", 
+              l.created_at as "createdAt", p.name as "patientName"
+       FROM phi_redaction_logs l
+       LEFT JOIN intake_sessions s ON l.session_id = s.id
+       LEFT JOIN patients p ON s.patient_id = p.id
+       ORDER BY l.created_at DESC
+       LIMIT 50`
+    );
+    res.json({ logs: result.rows });
+  } catch (err) {
+    console.error('Get PHI logs error:', err);
+    res.status(500).json({ error: 'Failed to retrieve PHI redaction logs.' });
+  }
+});
+
 // Get all active voice telephony sessions
 router.get('/active-calls', async (req: AuthenticatedRequest, res: Response) => {
   try {

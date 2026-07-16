@@ -172,6 +172,18 @@ export async function bootstrap() {
       );
     `);
 
+    // Create phi_redaction_logs table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS phi_redaction_logs (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        phi_type VARCHAR(50) NOT NULL,
+        original_content TEXT NOT NULL,
+        redacted_content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Create interaction_rules table
     await migrationPool.query(`
       CREATE TABLE IF NOT EXISTS interaction_rules (

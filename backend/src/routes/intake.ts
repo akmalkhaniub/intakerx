@@ -4,6 +4,7 @@ import { pool } from '../db';
 import { AuthenticatedRequest, authenticateToken } from '../middleware/auth';
 import { AIService, ChatMessage } from '../services/ai';
 import { GuardrailsService } from '../services/guardrails';
+import { PHIService } from '../services/phi';
 
 const router = Router();
 
@@ -230,14 +231,17 @@ router.post('/sessions/:id/messages', authenticateToken as any, async (req: Auth
       return;
     }
 
+    // Redact PHI in incoming patient content
+    const redactedContent = await PHIService.redactAndLog(content, id);
+
     // 2. Input Guardrail Layer (Prompt Injection Scanner)
-    const inputGuard = await GuardrailsService.scanInputForInjection(content, id);
+    const inputGuard = await GuardrailsService.scanInputForInjection(redactedContent, id);
     if (inputGuard.isBlocked) {
       // Save patient blocked input
       await pool.query(
-        `INSERT INTO messages (session_id, sender, content, was_flagged, blocked_by_guardrail)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [id, 'patient', content, true, true]
+        `INSERT INTO messages (session_id, sender, content, raw_content, was_flagged, blocked_by_guardrail)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id, 'patient', redactedContent, content, true, true]
       );
 
       // Save standard block reply
@@ -256,13 +260,13 @@ router.post('/sessions/:id/messages', authenticateToken as any, async (req: Auth
     }
 
     // 3. Evaluate Red Flags (Emergency Escalation)
-    const redFlagEval = GuardrailsService.evaluateRedFlags(content);
+    const redFlagEval = GuardrailsService.evaluateRedFlags(redactedContent);
     if (redFlagEval.isRedFlag) {
       // Save patient message
       await pool.query(
-        `INSERT INTO messages (session_id, sender, content, was_flagged)
-         VALUES ($1, $2, $3, $4)`,
-        [id, 'patient', content, true]
+        `INSERT INTO messages (session_id, sender, content, raw_content, was_flagged)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, 'patient', redactedContent, content, true]
       );
 
       // Save escalation reply
@@ -277,7 +281,7 @@ router.post('/sessions/:id/messages', authenticateToken as any, async (req: Auth
         `UPDATE intake_sessions 
          SET status = 'escalated', triage_level = 'emergency', triage_rationale = $2, updated_at = NOW()
          WHERE id = $1`,
-        [id, `Emergency red flags matched: ${content}`]
+        [id, `Emergency red flags matched: ${redactedContent}`]
       );
 
       res.json({
@@ -289,9 +293,9 @@ router.post('/sessions/:id/messages', authenticateToken as any, async (req: Auth
 
     // Save standard patient message
     await pool.query(
-      `INSERT INTO messages (session_id, sender, content)
-       VALUES ($1, $2, $3)`,
-      [id, 'patient', content]
+      `INSERT INTO messages (session_id, sender, content, raw_content)
+       VALUES ($1, $2, $3, $4)`,
+      [id, 'patient', redactedContent, content]
     );
 
     // 4. Retrieve Clinical Protocol context via RAG

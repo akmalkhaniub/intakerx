@@ -13,6 +13,7 @@ import { GuardrailsService } from './services/guardrails';
 import { pool } from './db';
 import { generateSOAPSummary } from './routes/intake';
 import { activeCallSockets } from './activeCalls';
+import { PHIService } from './services/phi';
 
 const app = express();
 
@@ -83,23 +84,26 @@ wss.on('connection', (ws: WebSocket) => {
           return;
         }
 
-        console.log(`[WS] Voice Input: "${text}"`);
+        // Redact PII in user voice speech input
+        const redactedText = await PHIService.redactAndLog(text, sessionId);
+
+        console.log(`[WS] Voice Input: "${text}" (Redacted: "${redactedText}")`);
 
         if (sessionId) {
           const call = activeCallSockets.get(sessionId);
           if (call) {
-            call.messages.push({ sender: 'patient', content: text, createdAt: new Date().toISOString() });
+            call.messages.push({ sender: 'patient', content: redactedText, createdAt: new Date().toISOString() });
           }
         }
 
         // Check prompt injection
-        const injection = await GuardrailsService.scanInputForInjection(text, sessionId);
+        const injection = await GuardrailsService.scanInputForInjection(redactedText, sessionId);
         if (injection.isBlocked) {
           // Log user message
           await pool.query(
-            `INSERT INTO messages (session_id, sender, content, was_flagged, blocked_by_guardrail)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [sessionId, 'patient', text, true, true]
+            `INSERT INTO messages (session_id, sender, content, raw_content, was_flagged, blocked_by_guardrail)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [sessionId, 'patient', redactedText, text, true, true]
           );
 
           const blockReply = "I am sorry, but I cannot perform that action. I am here solely to collect your symptoms. What symptoms are you experiencing?";
@@ -121,13 +125,13 @@ wss.on('connection', (ws: WebSocket) => {
         }
 
         // Check red-flags
-        const redFlags = GuardrailsService.evaluateRedFlags(text);
+        const redFlags = GuardrailsService.evaluateRedFlags(redactedText);
         if (redFlags.isRedFlag) {
           // Save patient msg
           await pool.query(
-            `INSERT INTO messages (session_id, sender, content, was_flagged)
-             VALUES ($1, $2, $3, $4)`,
-            [sessionId, 'patient', text, true]
+            `INSERT INTO messages (session_id, sender, content, raw_content, was_flagged)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [sessionId, 'patient', redactedText, text, true]
           );
 
           // Save escalation msg
@@ -142,7 +146,7 @@ wss.on('connection', (ws: WebSocket) => {
             `UPDATE intake_sessions 
              SET status = 'escalated', triage_level = 'emergency', triage_rationale = $2, updated_at = NOW()
              WHERE id = $1`,
-            [sessionId, `Emergency red flags matched during voice: ${text}`]
+            [sessionId, `Emergency red flags matched during voice: ${redactedText}`]
           );
 
           if (sessionId) {
@@ -163,15 +167,15 @@ wss.on('connection', (ws: WebSocket) => {
 
         // Save normal patient message
         await pool.query(
-          `INSERT INTO messages (session_id, sender, content)
-           VALUES ($1, $2, $3)`,
-          [sessionId, 'patient', text]
+          `INSERT INTO messages (session_id, sender, content, raw_content)
+           VALUES ($1, $2, $3, $4)`,
+          [sessionId, 'patient', redactedText, text]
         );
 
         // Fetch protocol embedding similarity RAG context
         let protocolContext = '';
         try {
-          const embedding = await AIService.getEmbedding(text);
+          const embedding = await AIService.getEmbedding(redactedText);
           const vectorStr = '[' + embedding.join(',') + ']';
           const pgVectorResult = await pool.query(
             `SELECT title, content, (embedding <=> $1::vector) as distance 
