@@ -48,6 +48,10 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   // Longitudinal patient history state for SVG trend charting
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
+  // Discharge summary state
+  const [dischargeSummary, setDischargeSummary] = useState<string>('');
+  const [isGeneratingDischarge, setIsGeneratingDischarge] = useState<boolean>(false);
+
   // Sync token to storage
   useEffect(() => {
     if (token) {
@@ -193,6 +197,21 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
       if (data.session.patientId) {
         loadPatientHistory(data.session.patientId);
       }
+
+      // Load discharge summary
+      try {
+        const dischargeRes = await fetch(`${backendUrl}/api/clinician/sessions/${id}/discharge`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (dischargeRes.ok) {
+          const dischargeData = await dischargeRes.json();
+          setDischargeSummary(dischargeData.dischargeSummary || '');
+        } else {
+          setDischargeSummary('');
+        }
+      } catch (e) {
+        setDischargeSummary('');
+      }
     } catch (err: any) {
       console.error(err);
       alert('Error loading session details: ' + err.message);
@@ -230,6 +249,41 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     } catch (err) {
       console.error('Failed to load patient history:', err);
     }
+  };
+
+  const handleGenerateDischarge = async () => {
+    setIsGeneratingDischarge(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/sessions/${selectedSessionId}/discharge`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDischargeSummary(data.dischargeSummary);
+      } else {
+        alert('Failed to generate discharge summary: ' + (data.error || 'Unknown error'));
+      }
+    } catch (err: any) {
+      alert('Generation error: ' + err.message);
+    } finally {
+      setIsGeneratingDischarge(false);
+    }
+  };
+
+  const handleDownloadDischarge = () => {
+    if (!dischargeSummary || !sessionDetail) return;
+    const blob = new Blob([dischargeSummary], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Discharge_Summary_${sessionDetail.session.patientName.replace(/\s+/g, '_')}_${sessionDetail.session.preferredLanguage}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const getSeverityScore = (severity: string | number): number => {
@@ -1022,6 +1076,71 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                             {isExporting && fhirFormat === 'xml' ? 'Exporting...' : 'Export FHIR XML'}
                           </button>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Patient discharge instructions card */}
+                    {sessionDetail.summary && (
+                      <div style={{ ...styles.syncContainer, marginTop: '20px' }} className="glass-panel">
+                        <div style={styles.syncStatusBlock}>
+                          <span>Patient Care Instructions:</span>
+                          <span style={{ 
+                            ...styles.syncStatusBadge,
+                            backgroundColor: dischargeSummary ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                            color: dischargeSummary ? '#10b981' : '#f59e0b',
+                            borderColor: dischargeSummary ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'
+                          }}>
+                            {dischargeSummary ? 'READY' : 'NOT GENERATED'}
+                          </span>
+                        </div>
+
+                        {!dischargeSummary ? (
+                          <button 
+                            onClick={handleGenerateDischarge} 
+                            className="btn" 
+                            disabled={isGeneratingDischarge}
+                            style={{ width: '100%' }}
+                          >
+                            {isGeneratingDischarge 
+                              ? 'Generating translated instructions...' 
+                              : `Generate Post-Visit Discharge Summary (${sessionDetail.session.preferredLanguage || 'en-US'})`}
+                          </button>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div style={{
+                              background: 'rgba(0,0,0,0.25)',
+                              padding: '12px',
+                              borderRadius: '6px',
+                              maxHeight: '180px',
+                              overflowY: 'auto',
+                              fontSize: '12px',
+                              textAlign: 'left',
+                              whiteSpace: 'pre-wrap',
+                              border: '1px solid var(--glass-border)',
+                              fontFamily: 'sans-serif',
+                              color: 'var(--text-main)'
+                            }}>
+                              {dischargeSummary}
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <button 
+                                onClick={handleGenerateDischarge} 
+                                className="btn btn-secondary" 
+                                style={{ flex: 1, fontSize: '12px', padding: '6px 12px' }}
+                                disabled={isGeneratingDischarge}
+                              >
+                                {isGeneratingDischarge ? 'Regenerating...' : 'Regenerate'}
+                              </button>
+                              <button 
+                                onClick={handleDownloadDischarge} 
+                                className="btn" 
+                                style={{ flex: 1, fontSize: '12px', padding: '6px 12px' }}
+                              >
+                                Download Guidelines
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

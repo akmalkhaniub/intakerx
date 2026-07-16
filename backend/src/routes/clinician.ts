@@ -5,6 +5,7 @@ import { QueueService } from '../services/queue';
 import { generateFhirBundle, fhirJsonToXml } from '../services/fhir';
 import { GuardrailsService } from '../services/guardrails';
 import { activeCallSockets } from '../activeCalls';
+import { AIService } from '../services/ai';
 
 const router = Router();
 
@@ -386,6 +387,140 @@ router.get('/patients/:patientId/history', async (req: AuthenticatedRequest, res
   } catch (err) {
     console.error('Get patient history error:', err);
     res.status(500).json({ error: 'Failed to retrieve patient historical data.' });
+  }
+});
+
+// POST /sessions/:id/discharge - Generate and save simplified patient discharge summary
+router.post('/sessions/:id/discharge', async (req: AuthenticatedRequest, res: Response) => {
+  const sessionId = req.params.id as string;
+  try {
+    const sessionRes = await pool.query(
+      `SELECT s.id, s.preferred_language as "preferredLanguage", p.name as "patientName"
+       FROM intake_sessions s
+       JOIN patients p ON s.patient_id = p.id
+       WHERE s.id = $1`,
+      [sessionId]
+    );
+
+    if (sessionRes.rowCount === 0) {
+      res.status(404).json({ error: 'Intake session not found.' });
+      return;
+    }
+
+    const { preferredLanguage, patientName } = sessionRes.rows[0];
+
+    const soapRes = await pool.query(
+      `SELECT summary_data as "summaryData" 
+       FROM intake_summaries 
+       WHERE session_id = $1`,
+      [sessionId]
+    );
+
+    if (soapRes.rowCount === 0) {
+      res.status(400).json({ error: 'Clinical SOAP summary must be generated and confirmed before generating discharge guidelines.' });
+      return;
+    }
+
+    const soapSummary = soapRes.rows[0].summaryData;
+
+    const langLabel = preferredLanguage || 'en-US';
+    const systemPrompt = `You are a compassionate clinical coordinator assistant.
+Your task is to write a post-visit patient discharge summary and care guideline based on the provided clinician SOAP note.
+The patient's preferred language is ${langLabel}. You MUST write the entire response in ${langLabel}.
+Keep it clear, simple, and easy to read for a layperson. Do not use complex medical jargon without explanation.
+Structure the output using exactly the following markdown sections:
+
+# Patient Care Instructions
+
+## 1. What we discussed today
+[Provide a simple, reassuring explanation of their condition and symptoms in layperson terms.]
+
+## 2. Your Home Care Guidelines
+[Provide clear, step-by-step instructions on home care, rest, hydration, and how to manage symptoms.]
+
+## 3. 🚨 WARNINGS & RED FLAGS: When to Seek Emergency Care
+[List critical worsening symptoms or red flags in bullet points where the patient must call 911 or go to the nearest emergency room immediately.]`;
+
+    const userMessage = {
+      role: 'user' as const,
+      content: `Patient Name: ${patientName}
+Preferred Language: ${langLabel}
+SOAP note details:
+${JSON.stringify(soapSummary)}`
+    };
+
+    let dischargeText = '';
+    try {
+      dischargeText = await AIService.generateText(systemPrompt, [userMessage], { temperature: 0.3 });
+    } catch (aiErr) {
+      console.warn('AI discharge generation failed, using structured fallback:', aiErr);
+      if (langLabel.startsWith('es')) {
+        dischargeText = `# Instrucciones de Cuidado del Paciente
+
+## 1. Lo que discutimos hoy (es-ES)
+Hemos revisado sus síntomas clínicos de ${soapSummary.chiefComplaint || 'queja principal'}. Sus antecedentes e historial médico han sido registrados de forma segura.
+
+## 2. Pautas de Cuidado en el Hogar
+- Descanse lo suficiente y mantenga una hidratación adecuada.
+- Tome los medicamentos recetados por su proveedor médico de acuerdo con las instrucciones.
+- Controle sus síntomas de cerca y manténgase en contacto con el consultorio si no mejoran.
+
+## 3. 🚨 ADVERTENCIAS Y SEÑALES DE PELIGRO
+- Si experimenta dolor en el pecho, dificultad severa para respirar o fiebre alta persistente, llame al 911 o acuda a la sala de emergencias de inmediato.`;
+      } else {
+        dischargeText = `# Patient Care Instructions
+
+## 1. What we discussed today
+We reviewed your clinical symptoms of ${soapSummary.chiefComplaint || 'chief complaint'}. Your intake history and timeline have been logged securely.
+
+## 2. Your Home Care Guidelines
+- Ensure you get plenty of rest and stay well hydrated.
+- Take any prescribed medications exactly as directed by your healthcare provider.
+- Monitor your symptoms closely and contact our clinic if they do not improve.
+
+## 3. 🚨 WARNINGS & RED FLAGS: When to Seek Emergency Care
+- If you experience sudden chest pain, severe shortness of breath, or high fever, call 911 or go to the nearest emergency room immediately.`;
+      }
+    }
+
+    await pool.query(
+      `INSERT INTO discharge_summaries (session_id, discharge_summary, preferred_language)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (session_id) 
+       DO UPDATE SET discharge_summary = $2, preferred_language = $3`,
+      [sessionId, dischargeText, langLabel]
+    );
+
+    res.json({
+      dischargeSummary: dischargeText,
+      preferredLanguage: langLabel
+    });
+  } catch (err) {
+    console.error('Generate discharge summary error:', err);
+    res.status(500).json({ error: 'Failed to generate discharge summary.' });
+  }
+});
+
+// GET /sessions/:id/discharge - Retrieve existing discharge summary
+router.get('/sessions/:id/discharge', async (req: AuthenticatedRequest, res: Response) => {
+  const sessionId = req.params.id as string;
+  try {
+    const result = await pool.query(
+      `SELECT discharge_summary as "dischargeSummary", preferred_language as "preferredLanguage", created_at as "createdAt"
+       FROM discharge_summaries
+       WHERE session_id = $1`,
+      [sessionId]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: 'Discharge summary not found for this session.' });
+      return;
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Get discharge summary error:', err);
+    res.status(500).json({ error: 'Failed to retrieve discharge summary.' });
   }
 });
 

@@ -197,6 +197,17 @@ export async function bootstrap() {
       );
     `);
 
+    // Create discharge_summaries table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS discharge_summaries (
+        id SERIAL PRIMARY KEY,
+        session_id UUID UNIQUE REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        discharge_summary TEXT NOT NULL,
+        preferred_language VARCHAR(50) DEFAULT 'en-US',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Create interaction_rules table
     await migrationPool.query(`
       CREATE TABLE IF NOT EXISTS interaction_rules (
