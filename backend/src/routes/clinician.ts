@@ -337,6 +337,58 @@ router.get('/phi-logs', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// Get historical sessions and symptom severity scores for a patient
+router.get('/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  const patientId = parseInt(req.params.patientId as string, 10);
+  if (isNaN(patientId)) {
+    res.status(400).json({ error: 'Valid Patient ID is required.' });
+    return;
+  }
+
+  try {
+    const sessionsRes = await pool.query(
+      `SELECT id, status, triage_level as "triageLevel", created_at as "createdAt"
+       FROM intake_sessions
+       WHERE patient_id = $1
+       ORDER BY created_at ASC`,
+      [patientId]
+    );
+
+    const history = await Promise.all(
+      sessionsRes.rows.map(async (s) => {
+        const symptomsRes = await pool.query(
+          `SELECT name, severity, duration, is_red_flag as "isRedFlag"
+           FROM symptoms
+           WHERE session_id = $1`,
+          [s.id]
+        );
+        
+        const vitalsRes = await pool.query(
+          `SELECT heart_rate as "heartRate", spo2, bp_systolic as "bpSystolic", bp_diastolic as "bpDiastolic"
+           FROM session_vitals
+           WHERE session_id = $1
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          [s.id]
+        );
+
+        return {
+          sessionId: s.id,
+          triageLevel: s.triageLevel,
+          createdAt: s.createdAt,
+          symptoms: symptomsRes.rows,
+          vitals: vitalsRes.rowCount ? vitalsRes.rows[0] : null
+        };
+      })
+    );
+
+    res.json({ history });
+  } catch (err) {
+    console.error('Get patient history error:', err);
+    res.status(500).json({ error: 'Failed to retrieve patient historical data.' });
+  }
+});
+
 // Get all active voice telephony sessions
 router.get('/active-calls', async (req: AuthenticatedRequest, res: Response) => {
   try {

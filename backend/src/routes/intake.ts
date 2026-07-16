@@ -172,6 +172,7 @@ router.get('/sessions/:id', authenticateToken as any, async (req: AuthenticatedR
     res.json({
       session: {
         id: session.id,
+        patientId: session.patientId,
         status: session.status,
         currentStep: session.currentStep,
         triageLevel: session.triageLevel,

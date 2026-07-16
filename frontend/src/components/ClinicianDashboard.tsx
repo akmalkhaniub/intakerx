@@ -45,6 +45,9 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [bargeInText, setBargeInText] = useState('');
   const [isSendingBargeIn, setIsSendingBargeIn] = useState(false);
 
+  // Longitudinal patient history state for SVG trend charting
+  const [patientHistory, setPatientHistory] = useState<any[]>([]);
+
   // Sync token to storage
   useEffect(() => {
     if (token) {
@@ -185,6 +188,11 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
 
       // Load active interactions
       await loadInteractions(id);
+
+      // Load patient history for symptom tracking charts
+      if (data.session.patientId) {
+        loadPatientHistory(data.session.patientId);
+      }
     } catch (err: any) {
       console.error(err);
       alert('Error loading session details: ' + err.message);
@@ -208,6 +216,36 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     } finally {
       setIsCheckingInteractions(false);
     }
+  };
+
+  const loadPatientHistory = async (patientId: number) => {
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/patients/${patientId}/history`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPatientHistory(data.history || []);
+      }
+    } catch (err) {
+      console.error('Failed to load patient history:', err);
+    }
+  };
+
+  const getSeverityScore = (severity: string | number): number => {
+    if (typeof severity === 'number') return severity;
+    if (!severity) return 0;
+    const lower = String(severity).toLowerCase();
+    if (lower === 'severe' || lower === 'high') return 9;
+    if (lower === 'moderate' || lower === 'medium') return 6;
+    if (lower === 'mild' || lower === 'low') return 3;
+    const num = parseInt(lower, 10);
+    return isNaN(num) ? 1 : num;
+  };
+
+  const getSessionMaxSeverity = (session: any): number => {
+    if (!session.symptoms || session.symptoms.length === 0) return 0;
+    return Math.max(...session.symptoms.map((s: any) => getSeverityScore(s.severity)));
   };
 
   // SOAP Save
@@ -782,6 +820,154 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                                 })}
                               </div>
                             )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Longitudinal Symptom Severity Trend Chart */}
+                    {(() => {
+                      if (patientHistory.length < 2) {
+                        return (
+                          <div style={styles.timelineCard} className="glass-panel">
+                            <div style={styles.cardHeader}>
+                              <FileText size={18} color="#a855f7" />
+                              <h3>Longitudinal Symptom Severity Trend</h3>
+                            </div>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', margin: '20px 0', textAlign: 'center' }}>
+                              Additional historical sessions required to chart trend (Current: {patientHistory.length}).
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      const width = 360;
+                      const height = 155;
+                      const paddingLeft = 30;
+                      const paddingRight = 15;
+                      const paddingTop = 15;
+                      const paddingBottom = 25;
+
+                      const chartWidth = width - paddingLeft - paddingRight;
+                      const chartHeight = height - paddingTop - paddingBottom;
+
+                      const points = patientHistory.map((h) => {
+                        const maxSev = getSessionMaxSeverity(h);
+                        const date = new Date(h.createdAt);
+                        const label = `${date.getMonth() + 1}/${date.getDate()}`;
+                        return { maxSev, label, h };
+                      });
+
+                      const maxVal = 10;
+                      const minVal = 0;
+
+                      const coords = points.map((p, idx) => {
+                        const x = paddingLeft + (idx / (points.length - 1)) * chartWidth;
+                        const y = paddingTop + chartHeight - ((p.maxSev - minVal) / (maxVal - minVal)) * chartHeight;
+                        return { x, y, label: p.label, maxSev: p.maxSev, h: p.h };
+                      });
+
+                      let pathD = '';
+                      coords.forEach((c, idx) => {
+                        if (idx === 0) {
+                          pathD += `M ${c.x} ${c.y}`;
+                        } else {
+                          pathD += ` L ${c.x} ${c.y}`;
+                        }
+                      });
+
+                      let areaD = pathD;
+                      if (coords.length > 0) {
+                        areaD += ` L ${coords[coords.length - 1].x} ${paddingTop + chartHeight}`;
+                        areaD += ` L ${coords[0].x} ${paddingTop + chartHeight} Z`;
+                      }
+
+                      return (
+                        <div style={styles.timelineCard} className="glass-panel">
+                          <div style={styles.cardHeader}>
+                            <FileText size={18} color="#a855f7" />
+                            <h3>Longitudinal Symptom Severity Trend</h3>
+                          </div>
+
+                          <div style={{ marginTop: '10px', position: 'relative' }}>
+                            <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+                              <defs>
+                                <linearGradient id="line-gradient" x1="0" y1="0" x2="1" y2="0">
+                                  <stop offset="0%" stopColor="#3b82f6" />
+                                  <stop offset="100%" stopColor="#a855f7" />
+                                </linearGradient>
+                                <linearGradient id="area-gradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="rgba(168, 85, 247, 0.2)" />
+                                  <stop offset="100%" stopColor="rgba(168, 85, 247, 0.0)" />
+                                </linearGradient>
+                              </defs>
+
+                              {[0, 2.5, 5, 7.5, 10].map((v) => {
+                                const y = paddingTop + chartHeight - (v / 10) * chartHeight;
+                                return (
+                                  <g key={v}>
+                                    <line 
+                                      x1={paddingLeft} 
+                                      y1={y} 
+                                      x2={width - paddingRight} 
+                                      y2={y} 
+                                      stroke="rgba(255, 255, 255, 0.05)" 
+                                      strokeWidth="1" 
+                                      strokeDasharray="4"
+                                    />
+                                    <text 
+                                      x={paddingLeft - 8} 
+                                      y={y + 3} 
+                                      fill="rgba(255, 255, 255, 0.3)" 
+                                      fontSize="8" 
+                                      textAnchor="end"
+                                    >
+                                      {v}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+
+                              <path d={areaD} fill="url(#area-gradient)" />
+
+                              <path 
+                                d={pathD} 
+                                fill="none" 
+                                stroke="url(#line-gradient)" 
+                                strokeWidth="2.5" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                              />
+
+                              {coords.map((c, idx) => (
+                                <g key={idx}>
+                                  <circle 
+                                    cx={c.x} 
+                                    cy={c.y} 
+                                    r="4.5" 
+                                    fill="#a855f7" 
+                                    stroke="#0f172a" 
+                                    strokeWidth="1.5" 
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                  <title>
+                                    {`Session: ${c.label}\nMax Severity: ${c.maxSev}/10\nSymptoms: ${c.h.symptoms.map((s: any) => s.name).join(', ') || 'None'}\n${c.h.vitals ? `Vitals: HR=${c.h.vitals.heartRate} bpm, SpO2=${c.h.vitals.spo2}%` : 'No vitals logged'}`}
+                                  </title>
+                                  <text 
+                                    x={c.x} 
+                                    y={paddingTop + chartHeight + 14} 
+                                    fill="rgba(255,255,255,0.4)" 
+                                    fontSize="8" 
+                                    textAnchor="middle"
+                                  >
+                                    {c.label}
+                                  </text>
+                                </g>
+                              ))}
+                            </svg>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '9px', marginTop: '6px', textAlign: 'center', fontStyle: 'italic' }}>
+                              * Hover over data nodes to review symptoms and vitals.
+                            </p>
                           </div>
                         </div>
                       );
