@@ -6,6 +6,7 @@ import { generateFhirBundle, fhirJsonToXml } from '../services/fhir';
 import { GuardrailsService } from '../services/guardrails';
 import { activeCallSockets } from '../activeCalls';
 import { AIService } from '../services/ai';
+import { CDSService } from '../services/cds';
 
 const router = Router();
 
@@ -521,6 +522,18 @@ router.get('/sessions/:id/discharge', async (req: AuthenticatedRequest, res: Res
   } catch (err) {
     console.error('Get discharge summary error:', err);
     res.status(500).json({ error: 'Failed to retrieve discharge summary.' });
+  }
+});
+
+// GET /sessions/:id/care-gaps - Analyze patient file and return care gaps alerts
+router.get('/sessions/:id/care-gaps', async (req: AuthenticatedRequest, res: Response) => {
+  const sessionId = req.params.id as string;
+  try {
+    const alerts = await CDSService.analyzeSession(sessionId);
+    res.json({ alerts });
+  } catch (err) {
+    console.error('CDS Care Gaps analysis error:', err);
+    res.status(500).json({ error: 'Failed to perform care gaps analysis.' });
   }
 });
 

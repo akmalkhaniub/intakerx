@@ -208,6 +208,32 @@ export async function bootstrap() {
       );
     `);
 
+    // Create clinical_guidelines table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS clinical_guidelines (
+        id SERIAL PRIMARY KEY,
+        condition_name VARCHAR(255) NOT NULL,
+        recommended_protocol TEXT NOT NULL,
+        required_meds VARCHAR(255)[] DEFAULT '{}',
+        contraindicated_meds VARCHAR(255)[] DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Seed clinical_guidelines if empty
+    const guidelinesCheck = await migrationPool.query('SELECT COUNT(*) FROM clinical_guidelines');
+    if (parseInt(guidelinesCheck.rows[0].count, 10) === 0) {
+      console.log('Seeding clinical guidelines...');
+      await migrationPool.query(`
+        INSERT INTO clinical_guidelines (condition_name, recommended_protocol, required_meds, contraindicated_meds)
+        VALUES
+          ('Hypertension', 'Initiate ACE inhibitor (Lisinopril) or ARB (Losartan). Contraindicated with NSAIDs due to decreased efficacy and increased renal risk.', ARRAY['Lisinopril', 'Losartan', 'Amlodipine'], ARRAY['Ibuprofen', 'Naproxen']),
+          ('Diabetes', 'Initiate Metformin first-line unless contraindicated. Monitor HbA1c every 3-6 months. Discontinue Contrast Dye 48h before/after imaging.', ARRAY['Metformin', 'Glipizide', 'Insulin'], ARRAY['Contrast Dye']),
+          ('Heart Failure', 'Initiate Beta-Blocker (Metoprolol) or ACE inhibitor (Lisinopril). Avoid NSAIDs (Ibuprofen, Naproxen) due to fluid retention hazard.', ARRAY['Metoprolol', 'Carvedilol', 'Lisinopril'], ARRAY['Ibuprofen', 'Naproxen'])
+      `);
+      console.log('Clinical guidelines seeded.');
+    }
+
     // Create interaction_rules table
     await migrationPool.query(`
       CREATE TABLE IF NOT EXISTS interaction_rules (

@@ -52,6 +52,9 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [dischargeSummary, setDischargeSummary] = useState<string>('');
   const [isGeneratingDischarge, setIsGeneratingDischarge] = useState<boolean>(false);
 
+  // Care gaps state
+  const [careGaps, setCareGaps] = useState<any[]>([]);
+
   // Sync token to storage
   useEffect(() => {
     if (token) {
@@ -211,6 +214,21 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
         }
       } catch (e) {
         setDischargeSummary('');
+      }
+
+      // Load care gaps alerts
+      try {
+        const gapsRes = await fetch(`${backendUrl}/api/clinician/sessions/${id}/care-gaps`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (gapsRes.ok) {
+          const gapsData = await gapsRes.json();
+          setCareGaps(gapsData.alerts || []);
+        } else {
+          setCareGaps([]);
+        }
+      } catch (e) {
+        setCareGaps([]);
       }
     } catch (err: any) {
       console.error(err);
@@ -723,6 +741,51 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                               </div>
                             );
                           })}
+                        </div>
+                      )}
+
+                      {/* Care Gaps Alerts */}
+                      {careGaps.length > 0 && (
+                        <div style={{ marginTop: '12px', borderTop: '1px solid var(--glass-border)', paddingTop: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                            <ShieldCheck size={16} color="#f59e0b" />
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#f59e0b' }}>Protocol Care Gaps ({careGaps.length})</span>
+                          </div>
+                          <div style={styles.cdsAlertsList}>
+                            {careGaps.map((gap: any, index: number) => (
+                              <div 
+                                key={index} 
+                                style={{
+                                  ...styles.cdsAlertItem,
+                                  borderColor: gap.severity === 'high' ? '#ef4444' : '#f59e0b',
+                                  backgroundColor: gap.severity === 'high' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(245, 158, 11, 0.05)',
+                                  marginBottom: '8px'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ 
+                                    ...styles.cdsAlertBadge, 
+                                    backgroundColor: gap.severity === 'high' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                    color: gap.severity === 'high' ? '#ef4444' : '#f59e0b'
+                                  }}>
+                                    {gap.type.toUpperCase().replace('_', ' ')}
+                                  </span>
+                                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                    CDS Guidelines Match
+                                  </span>
+                                </div>
+                                <div style={{ fontWeight: 'bold', fontSize: '12px', marginTop: '4px', textAlign: 'left', color: 'white' }}>
+                                  {gap.conditionName} Protocol Deviation
+                                </div>
+                                <p style={{ fontSize: '11px', margin: '4px 0 0 0', color: 'var(--text)', textAlign: 'left' }}>
+                                  {gap.message}
+                                </p>
+                                <div style={{ fontSize: '10px', marginTop: '6px', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'left', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '4px' }}>
+                                  Protocol: {gap.recommendedProtocol}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
