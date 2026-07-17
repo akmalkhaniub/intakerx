@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw, Phone } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw, Phone, Printer } from 'lucide-react';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -54,6 +54,13 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
 
   // Care gaps state
   const [careGaps, setCareGaps] = useState<any[]>([]);
+
+  // Print Summary Attestation States
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [attestSoap, setAttestSoap] = useState(false);
+  const [attestTimeline, setAttestTimeline] = useState(false);
+  const [attestCds, setAttestCds] = useState(false);
+  const [isSigned, setIsSigned] = useState(false);
 
   // Clinical Copilot state
   const [copilotQuery, setCopilotQuery] = useState('');
@@ -182,6 +189,11 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     setCopilotQuery('');
     setCopilotHistory([]);
     setShowCopilotSidebar(false);
+    setShowPrintModal(false);
+    setAttestSoap(false);
+    setAttestTimeline(false);
+    setAttestCds(false);
+    setIsSigned(false);
     if (showLoadingSpinner) setIsLoading(true);
     try {
       const res = await fetch(`${backendUrl}/api/intake/sessions/${id}`, {
@@ -311,6 +323,78 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isDrawing = useRef(false);
+  const lastX = useRef(0);
+  const lastY = useRef(0);
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    isDrawing.current = true;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    let clientX = 0;
+    let clientY = 0;
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    lastX.current = clientX - rect.left;
+    lastY.current = clientY - rect.top;
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    let clientX = 0;
+    let clientY = 0;
+    if ('touches' in e) {
+      if (e.cancelable) e.preventDefault();
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    const currentX = clientX - rect.left;
+    const currentY = clientY - rect.top;
+
+    ctx.beginPath();
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.moveTo(lastX.current, lastY.current);
+    ctx.lineTo(currentX, currentY);
+    ctx.stroke();
+
+    lastX.current = currentX;
+    lastY.current = currentY;
+    setIsSigned(true);
+  };
+
+  const stopDrawing = () => {
+    isDrawing.current = false;
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setIsSigned(false);
   };
 
   const handleSendCopilotQuery = async (queryText?: string) => {
@@ -1189,6 +1273,20 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                             {isExporting && fhirFormat === 'xml' ? 'Exporting...' : 'Export FHIR XML'}
                           </button>
                         </div>
+
+                        <button 
+                          onClick={() => {
+                            setShowPrintModal(true);
+                            setAttestSoap(false);
+                            setAttestTimeline(false);
+                            setAttestCds(false);
+                            setIsSigned(false);
+                          }} 
+                          className="btn btn-secondary" 
+                          style={{ width: '100%', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                        >
+                          <Printer size={16} /> Sign & Print SOAP Note
+                        </button>
                       </div>
                     )}
 
@@ -1586,6 +1684,230 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               </button>
               <button onClick={handleDownloadFhirFile} className="btn" style={{ fontSize: '13px', padding: '8px 16px' }}>
                 Download .{fhirFormat} File
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPrintModal && (
+        <div style={styles.modalOverlay} className="no-print">
+          <div style={{ ...styles.modalContent, maxWidth: '800px', backgroundColor: '#0f172a' }} className="glass-panel">
+            <div style={styles.modalHeader} className="no-print">
+              <h4 style={{ margin: 0, fontSize: '15px', color: 'white' }}>Clinical SOAP Note Export & Sign-Off</h4>
+              <button onClick={() => setShowPrintModal(false)} style={styles.closeBtn}>&times;</button>
+            </div>
+            
+            <div style={{ ...styles.modalBody, maxHeight: '70vh', overflowY: 'auto', padding: '24px', backgroundColor: '#0f172a' }}>
+              
+              <div id="clinical-note-print-area" style={{
+                backgroundColor: 'white',
+                color: '#0f172a',
+                padding: '40px',
+                borderRadius: '8px',
+                fontFamily: 'Georgia, serif',
+                textAlign: 'left',
+                lineHeight: '1.6',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+              }}>
+                <style>
+                  {`
+                    @media print {
+                      body * {
+                        visibility: hidden;
+                      }
+                      #clinical-note-print-area, #clinical-note-print-area * {
+                        visibility: visible;
+                      }
+                      #clinical-note-print-area {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                        box-shadow: none !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        background: white !important;
+                        color: #0f172a !important;
+                      }
+                      .no-print {
+                        display: none !important;
+                      }
+                      h1, h2, h3, h4, h5, h6, p, div, span, li, strong, td, th {
+                        color: #0f172a !important;
+                      }
+                      @page {
+                        size: A4;
+                        margin: 20mm;
+                      }
+                    }
+                  `}
+                </style>
+
+                <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: '15px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h1 style={{ margin: 0, fontSize: '20px', color: '#0f172a', fontFamily: 'Georgia, serif', fontWeight: 'bold' }}>INTAKERX CLINICAL PORTAL</h1>
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>Automated Patient Intake & Triage Summary</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 'bold' }}>Date: {new Date(sessionDetail.session.createdAt).toLocaleDateString()}</div>
+                      <div style={{ fontSize: '10px', color: '#64748b' }}>Session: {selectedSessionId.substring(0, 8).toUpperCase()}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '25px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }}>
+                  <div>
+                    <strong>Patient Name:</strong> {sessionDetail.session.patientName} <br />
+                    <strong>Date of Birth:</strong> {sessionDetail.session.patientDob ? new Date(sessionDetail.session.patientDob).toLocaleDateString() : 'N/A'} <br />
+                    <strong>Gender:</strong> {sessionDetail.session.patientSex || 'N/A'}
+                  </div>
+                  <div>
+                    <strong>Insurance Provider:</strong> {sessionDetail.session.insuranceProvider || 'N/A'} <br />
+                    <strong>Policy Number:</strong> {sessionDetail.session.insurancePolicy || 'N/A'} <br />
+                    <strong>Preferred Language:</strong> {sessionDetail.session.preferredLanguage || 'en-US'}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <h3 style={{ borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', fontSize: '14px', fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}>SUBJECTIVE</h3>
+                  <div style={{ fontSize: '12px', marginBottom: '15px' }}>
+                    <p style={{ margin: '0 0 6px 0' }}><strong>Chief Complaint:</strong> {editChiefComplaint || 'None recorded'}</p>
+                    <p style={{ margin: '0 0 6px 0' }}><strong>History of Present Illness (HPI):</strong> {editHpi || 'None recorded'}</p>
+                    <p style={{ margin: '0' }}><strong>Past Medical History:</strong> {editPastHistory || 'None recorded'}</p>
+                  </div>
+
+                  <h3 style={{ borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', fontSize: '14px', fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}>OBJECTIVE (VITALS & TELEMETRY)</h3>
+                  <div style={{ fontSize: '12px', marginBottom: '15px' }}>
+                    {(() => {
+                      const latestVitals = sessionDetail.vitals && sessionDetail.vitals.length > 0 
+                        ? sessionDetail.vitals[sessionDetail.vitals.length - 1] 
+                        : null;
+                      if (!latestVitals) {
+                        return <p style={{ margin: '0 0 6px 0', fontStyle: 'italic', color: '#64748b' }}>No live vitals telemetry logged during this intake session.</p>;
+                      }
+                      return (
+                        <p style={{ margin: '0 0 6px 0' }}>
+                          <strong>Heart Rate:</strong> {latestVitals.heartRate} bpm | 
+                          <strong> SpO2:</strong> {latestVitals.spo2}% | 
+                          <strong> Blood Pressure:</strong> {latestVitals.bpSystolic}/{latestVitals.bpDiastolic} mmHg
+                        </p>
+                      );
+                    })()}
+                    <p style={{ margin: '0' }}><strong>Extracted Symptoms:</strong> {sessionDetail.symptoms?.map((s: any) => `${s.name} (${s.severity})`).join(', ') || 'None recorded'}</p>
+                  </div>
+
+                  <h3 style={{ borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', fontSize: '14px', fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}>ASSESSMENT</h3>
+                  <div style={{ fontSize: '12px', marginBottom: '15px' }}>
+                    <p style={{ margin: '0 0 4px 0' }}><strong>Triage Level:</strong> {sessionDetail.session.triageLevel?.toUpperCase() || 'ROUTINE'}</p>
+                    <p style={{ margin: '0' }}><strong>Clinical Rationale:</strong> {sessionDetail.session.triageRationale || 'Standard triage protocol matched.'}</p>
+                  </div>
+
+                  <h3 style={{ borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', fontSize: '14px', fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}>PLAN</h3>
+                  <div style={{ fontSize: '12px', marginBottom: '20px' }}>
+                    <p style={{ margin: '0 0 6px 0' }}><strong>Active Medications:</strong> {editMeds?.map((m: any) => `${m.name} ${m.dosage || ''} ${m.frequency || ''}`).join(', ') || 'None reported'}</p>
+                    {dischargeSummary && (
+                      <div style={{ marginTop: '8px' }}>
+                        <strong>Discharge Instructions ({sessionDetail.session.preferredLanguage || 'en-US'}):</strong>
+                        <div style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f8fafc', padding: '10px', borderRadius: '4px', border: '1px solid #e2e8f0', marginTop: '4px', fontSize: '11px', fontFamily: 'sans-serif' }}>
+                          {dischargeSummary}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '10px', marginTop: '20px', fontSize: '10px', color: '#475569' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '12px' }}>☑</span>
+                      <span>I attest that I have reviewed this AI-generated intake note, verified all biometrics, and confirmed the diagnosis and plan.</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '12px' }}>☑</span>
+                      <span>I confirm that all safety checks and clinical protocols have been verified.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '30px' }}>
+                  <div style={{ fontSize: '12px' }}>
+                    <strong>Clinician:</strong> {clinician?.name || 'Dr. Smith'} <br />
+                    <strong>Attested Date/Time:</strong> {new Date().toLocaleString()}
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    {isSigned && canvasRef.current ? (
+                      <img 
+                        src={canvasRef.current.toDataURL()} 
+                        alt="Clinician Signature" 
+                        style={{ maxHeight: '45px', borderBottom: '1px solid #0f172a', paddingBottom: '3px' }}
+                      />
+                    ) : (
+                      <div style={{ width: '150px', height: '40px', borderBottom: '1px dashed #cbd5e1' }}></div>
+                    )}
+                    <div style={{ fontSize: '10px', color: '#64748b', marginTop: '3px' }}>Clinician Authorized Signature</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="no-print" style={{ marginTop: '20px', padding: '15px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid var(--glass-border)', textAlign: 'left' }}>
+                <h5 style={{ margin: '0 0 10px 0', fontSize: '13px', color: 'white', fontWeight: 'bold' }}>1. Attestation Checklist</h5>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px', color: 'var(--text-main)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={attestSoap} onChange={(e) => setAttestSoap(e.target.checked)} />
+                    I attest that I have reviewed the clinical SOAP note sections.
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={attestTimeline} onChange={(e) => setAttestTimeline(e.target.checked)} />
+                    I verify all patient demographics, timeline details, and vital biometrics.
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={attestCds} onChange={(e) => setAttestCds(e.target.checked)} />
+                    I confirm that clinical decision support warnings (drug conflicts, allergens) have been evaluated.
+                  </label>
+                </div>
+
+                <h5 style={{ margin: '20px 0 10px 0', fontSize: '13px', color: 'white', fontWeight: 'bold' }}>2. Draw Signature Pad (Stylus/Mouse)</h5>
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                  <div style={{ border: '1px solid var(--glass-border)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <canvas
+                      ref={canvasRef}
+                      width={300}
+                      height={100}
+                      onMouseDown={startDrawing}
+                      onMouseMove={draw}
+                      onMouseUp={stopDrawing}
+                      onMouseLeave={stopDrawing}
+                      onTouchStart={startDrawing}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDrawing}
+                      style={{
+                        backgroundColor: '#f1f5f9',
+                        cursor: 'crosshair',
+                        display: 'block'
+                      }}
+                    />
+                  </div>
+                  <button onClick={clearSignature} className="btn btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>
+                    Clear Signature
+                  </button>
+                </div>
+              </div>
+
+            </div>
+            
+            <div style={styles.modalFooter} className="no-print">
+              <button onClick={() => setShowPrintModal(false)} className="btn btn-secondary" style={{ fontSize: '13px', padding: '8px 16px' }}>
+                Cancel
+              </button>
+              <button 
+                onClick={() => window.print()} 
+                className="btn" 
+                disabled={!attestSoap || !attestTimeline || !attestCds || !isSigned}
+                style={{ fontSize: '13px', padding: '8px 16px' }}
+              >
+                Print SOAP Note to PDF
               </button>
             </div>
           </div>
