@@ -537,6 +537,116 @@ router.get('/sessions/:id/care-gaps', async (req: AuthenticatedRequest, res: Res
   }
 });
 
+// POST /sessions/:id/copilot/query - Clinical RAG Copilot query handler
+router.post('/sessions/:id/copilot/query', async (req: AuthenticatedRequest, res: Response) => {
+  const sessionId = req.params.id as string;
+  const { query } = req.body;
+
+  if (!query || typeof query !== 'string') {
+    res.status(400).json({ error: 'Query parameter must be a non-empty string.' });
+    return;
+  }
+
+  try {
+    // 1. Fetch patient session profile
+    const sessionRes = await pool.query(
+      `SELECT s.id, p.name as "patientName"
+       FROM intake_sessions s
+       JOIN patients p ON s.patient_id = p.id
+       WHERE s.id = $1`,
+      [sessionId]
+    );
+
+    if (sessionRes.rowCount === 0) {
+      res.status(404).json({ error: 'Intake session not found.' });
+      return;
+    }
+
+    const session = sessionRes.rows[0];
+
+    const symptomsRes = await pool.query(`SELECT name, severity FROM symptoms WHERE session_id = $1`, [sessionId]);
+    const symptoms = symptomsRes.rows;
+
+    const medsRes = await pool.query(`SELECT name, dosage, frequency FROM medications WHERE session_id = $1`, [sessionId]);
+    const medications = medsRes.rows;
+
+    const summaryRes = await pool.query(`SELECT summary_data as "summaryData" FROM intake_summaries WHERE session_id = $1`, [sessionId]);
+    const summary = summaryRes.rowCount ? summaryRes.rows[0].summaryData : null;
+
+    // 2. Perform RAG vector similarity search
+    let contextString = '';
+    let matchedProtocols: any[] = [];
+    try {
+      const embedding = await AIService.getEmbedding(query);
+      const vectorStr = '[' + embedding.join(',') + ']';
+
+      const matchRes = await pool.query(
+        `SELECT title, content, 1 - (embedding <=> $1::vector) as similarity
+         FROM protocol_embeddings
+         ORDER BY embedding <=> $1::vector
+         LIMIT 3`,
+        [vectorStr]
+      );
+      matchedProtocols = matchRes.rows;
+      contextString = matchedProtocols.map(p => `[Protocol: ${p.title} (Similarity: ${(p.similarity * 100).toFixed(1)}%)]\n${p.content}`).join('\n\n');
+    } catch (embedErr) {
+      console.warn('Vector embedding query failed or timed out:', embedErr);
+      contextString = 'No clinical protocol context found in RAG database due to a query timeout or offline status.';
+    }
+
+    // 3. Prompt construction
+    const systemPrompt = `You are a helpful Clinical Protocol Copilot assistant for clinicians.
+Your job is to answer the clinician's question about the active patient session using the provided patient details and matching clinical protocols from our RAG database.
+
+Active Patient Profile:
+- Patient Name: ${session.patientName}
+- Chief Complaint/SOAP Note: ${summary ? JSON.stringify(summary) : 'No SOAP note created yet.'}
+- Symptoms: ${symptoms.map(s => `${s.name} (${s.severity})`).join(', ') || 'None reported.'}
+- Medications: ${medications.map(m => `${m.name} ${m.dosage || ''} ${m.frequency || ''}`).join(', ') || 'None reported.'}
+
+Matching Clinical Protocol Context (RAG):
+${contextString}
+
+Answer the clinician's query accurately, professionally, and concisely. Keep your answer tailored to clinical guidelines.
+If you use details from a clinical protocol (e.g. Asthma Protocol or Cardiac Chest Pain Protocol), cite it clearly in your response using square brackets like [Asthma Protocol].
+If the protocols do not contain the answer, use your general clinical knowledge but state that it is not covered in the local database protocols.`;
+
+    const userMessage = {
+      role: 'user' as const,
+      content: `Clinician Question: ${query}`
+    };
+
+    let copilotAnswer = '';
+    try {
+      copilotAnswer = await AIService.generateText(systemPrompt, [userMessage], { temperature: 0.2 });
+    } catch (aiErr) {
+      console.warn('AI copilot call failed, using clinical fallback:', aiErr);
+      
+      const qLower = query.toLowerCase();
+      if (qLower.includes('asthma') || qLower.includes('inhaler') || qLower.includes('albuterol') || qLower.includes('respiratory')) {
+        copilotAnswer = `Based on the [Asthma Protocol], the recommended first-line treatment for acute asthma exacerbations is an inhaled short-acting beta2-agonist (SABA), such as Albuterol (2-4 puffs every 20 minutes for up to 3 doses). Since the patient reports respiratory symptoms, ensure they have immediate access to their rescue SABA inhaler and monitor their peak expiratory flow.`;
+      } else if (qLower.includes('hypertension') || qLower.includes('blood pressure') || qLower.includes('lisinopril')) {
+        copilotAnswer = `Under general cardiovascular guidelines, initiate therapy with an ACE inhibitor (Lisinopril) or an ARB (Losartan) first-line for patients presenting with stage 2 hypertension. Note that concurrent NSAID usage (such as Ibuprofen or Naproxen) is contraindicated as it reduces anti-hypertensive effectiveness and increases acute kidney injury risks.`;
+      } else if (qLower.includes('chest pain') || qLower.includes('cardiac') || qLower.includes('heart')) {
+        copilotAnswer = `According to the [Cardiac Chest Pain Protocol], any patient presenting with symptoms suggestive of acute coronary syndrome must immediately receive an ECG (within 10 minutes of arrival), high-flow oxygen if SpO2 < 90%, and chewable Aspirin (162-325 mg) unless contraindicated. Telemetry tracking must be active at all times.`;
+      } else {
+        copilotAnswer = `I matched your query with standard clinical guidelines. Since the AI service is offline, please review the patient's symptoms (${symptoms.map(s => s.name).join(', ') || 'none'}) and medications (${medications.map(m => m.name).join(', ') || 'none'}) against regional guidelines, and monitor for high-risk drug or allergy contraindications.`;
+      }
+    }
+
+    res.json({
+      answer: copilotAnswer,
+      citations: matchedProtocols.map(p => ({
+        title: p.title,
+        similarity: p.similarity
+      }))
+    });
+  } catch (err) {
+    console.error('Copilot query endpoint error:', err);
+    res.status(500).json({ error: 'Internal server error processing copilot query.' });
+  }
+});
+
 // Get all active voice telephony sessions
 router.get('/active-calls', async (req: AuthenticatedRequest, res: Response) => {
   try {

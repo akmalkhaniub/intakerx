@@ -55,6 +55,12 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   // Care gaps state
   const [careGaps, setCareGaps] = useState<any[]>([]);
 
+  // Clinical Copilot state
+  const [copilotQuery, setCopilotQuery] = useState('');
+  const [copilotHistory, setCopilotHistory] = useState<Array<{ sender: 'user' | 'copilot', text: string, citations?: any[] }>>([]);
+  const [isCopilotLoading, setIsCopilotLoading] = useState(false);
+  const [showCopilotSidebar, setShowCopilotSidebar] = useState(false);
+
   // Sync token to storage
   useEffect(() => {
     if (token) {
@@ -173,6 +179,9 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   };
 
   const loadSessionDetails = async (id: string, showLoadingSpinner = true) => {
+    setCopilotQuery('');
+    setCopilotHistory([]);
+    setShowCopilotSidebar(false);
     if (showLoadingSpinner) setIsLoading(true);
     try {
       const res = await fetch(`${backendUrl}/api/intake/sessions/${id}`, {
@@ -302,6 +311,47 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleSendCopilotQuery = async (queryText?: string) => {
+    const textToSend = queryText || copilotQuery;
+    if (!textToSend.trim()) return;
+
+    const userMsg = { sender: 'user' as const, text: textToSend };
+    setCopilotHistory(prev => [...prev, userMsg]);
+    if (!queryText) setCopilotQuery('');
+    
+    setIsCopilotLoading(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/sessions/${selectedSessionId}/copilot/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: textToSend })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCopilotHistory(prev => [...prev, {
+          sender: 'copilot' as const,
+          text: data.answer,
+          citations: data.citations
+        }]);
+      } else {
+        setCopilotHistory(prev => [...prev, {
+          sender: 'copilot' as const,
+          text: `Error: ${data.error || 'Failed to get answer.'}`
+        }]);
+      }
+    } catch (err: any) {
+      setCopilotHistory(prev => [...prev, {
+        sender: 'copilot' as const,
+        text: `Connection failed: ${err.message}`
+      }]);
+    } finally {
+      setIsCopilotLoading(false);
+    }
   };
 
   const getSeverityScore = (severity: string | number): number => {
@@ -1297,6 +1347,219 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                       </div>
                     );
                   })()}
+                </div>
+
+                {/* Floating Toggle Button */}
+                <button 
+                  onClick={() => setShowCopilotSidebar(prev => !prev)}
+                  style={{
+                    position: 'fixed',
+                    bottom: '24px',
+                    right: '24px',
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '28px',
+                    backgroundColor: '#a855f7',
+                    border: 'none',
+                    color: 'white',
+                    boxShadow: '0 4px 16px rgba(168, 85, 247, 0.4)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 999,
+                    fontSize: '22px'
+                  }}
+                  title="AI Clinical Copilot Sidebar"
+                >
+                  💬
+                </button>
+
+                {/* Copilot Sidebar Panel */}
+                <div style={{
+                  position: 'fixed',
+                  top: 0,
+                  right: showCopilotSidebar ? 0 : '-370px',
+                  width: '350px',
+                  height: '100vh',
+                  backgroundColor: '#0f172a',
+                  borderLeft: '1px solid var(--glass-border)',
+                  boxShadow: '-4px 0 24px rgba(0,0,0,0.5)',
+                  transition: 'right 0.3s ease-in-out',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  zIndex: 1000,
+                  fontFamily: 'sans-serif'
+                }}>
+                  {/* Sidebar Header */}
+                  <div style={{
+                    padding: '16px',
+                    borderBottom: '1px solid var(--glass-border)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.02)'
+                  }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '14px', color: 'white', fontWeight: 'bold' }}>Clinical Protocol Copilot</h4>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>RAG Guidelines Assistant</span>
+                    </div>
+                    <button 
+                      onClick={() => setShowCopilotSidebar(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        fontSize: '18px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  {/* Message History list */}
+                  <div style={{
+                    flex: 1,
+                    padding: '16px',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    {copilotHistory.length === 0 ? (
+                      <div style={{ margin: 'auto', textAlign: 'center', padding: '20px' }}>
+                        <span style={{ fontSize: '32px' }}>🩺</span>
+                        <h5 style={{ margin: '10px 0 4px 0', fontSize: '13px', color: 'white' }}>Ask Copilot Clinical Questions</h5>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                          Ask questions about treatment guidelines, drug dosages, or protocol pathways for this patient.
+                        </p>
+                        
+                        <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {[
+                            'What is the recommended asthma protocol?',
+                            'Hypertension medication contraindications?',
+                            'Is chewable aspirin required for chest pain?'
+                          ].map((prompt, pIdx) => (
+                            <button
+                              key={pIdx}
+                              onClick={() => handleSendCopilotQuery(prompt)}
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--glass-border)',
+                                backgroundColor: 'rgba(255,255,255,0.03)',
+                                color: 'var(--text)',
+                                fontSize: '11px',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'}
+                              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'}
+                            >
+                              {prompt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      copilotHistory.map((msg, idx) => {
+                        const isUser = msg.sender === 'user';
+                        return (
+                          <div key={idx} style={{
+                            alignSelf: isUser ? 'flex-end' : 'flex-start',
+                            maxWidth: '85%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}>
+                            <div style={{
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              lineHeight: '1.4',
+                              color: 'white',
+                              textAlign: 'left',
+                              backgroundColor: isUser ? '#3b82f6' : 'rgba(255,255,255,0.06)',
+                              border: isUser ? 'none' : '1px solid var(--glass-border)',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {msg.text}
+                            </div>
+                            {!isUser && msg.citations && msg.citations.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+                                {msg.citations.map((cit, cIdx) => (
+                                  <span 
+                                    key={cIdx} 
+                                    style={{
+                                      fontSize: '9px',
+                                      color: '#a855f7',
+                                      backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      border: '1px solid rgba(168, 85, 247, 0.2)'
+                                    }}
+                                    title={`Matching score: ${(cit.similarity * 100).toFixed(1)}%`}
+                                  >
+                                    📄 {cit.title} ({(cit.similarity * 100).toFixed(0)}%)
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                    {isCopilotLoading && (
+                      <div style={{ alignSelf: 'flex-start', display: 'flex', gap: '4px', padding: '8px 12px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid var(--glass-border)' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Copilot is thinking...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input Footer */}
+                  <div style={{
+                    padding: '12px',
+                    borderTop: '1px solid var(--glass-border)',
+                    backgroundColor: 'rgba(255,255,255,0.01)',
+                    display: 'flex',
+                    gap: '8px'
+                  }}>
+                    <input
+                      type="text"
+                      placeholder="Type clinical question..."
+                      value={copilotQuery}
+                      onChange={(e) => setCopilotQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSendCopilotQuery(); }}
+                      disabled={isCopilotLoading}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--glass-border)',
+                        backgroundColor: 'rgba(0,0,0,0.2)',
+                        color: 'white',
+                        fontSize: '12px'
+                      }}
+                    />
+                    <button 
+                      onClick={() => handleSendCopilotQuery()}
+                      disabled={isCopilotLoading || !copilotQuery.trim()}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        backgroundColor: '#a855f7',
+                        border: 'none',
+                        color: 'white',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      Ask
+                    </button>
+                  </div>
                 </div>
               </div>
             </>
