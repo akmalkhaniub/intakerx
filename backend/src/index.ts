@@ -33,7 +33,7 @@ app.get('/health', (req, res) => {
 });
 
 // Create HTTP server
-const server = createServer(app);
+export const server = createServer(app);
 
 // Initialize WebSocket Server
 const wss = new WebSocketServer({ server });
