@@ -39,6 +39,9 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   // Clinical Decision Support State
   const [interactions, setInteractions] = useState<any[]>([]);
   const [isCheckingInteractions, setIsCheckingInteractions] = useState(false);
+  const [cdsTab, setCdsTab] = useState<'alerts' | 'graph'>('alerts');
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   // Active Telephony Call Monitor State
   const [activeCalls, setActiveCalls] = useState<any[]>([]);
@@ -194,6 +197,9 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     setAttestTimeline(false);
     setAttestCds(false);
     setIsSigned(false);
+    setCdsTab('alerts');
+    setHoveredNodeId(null);
+    setSelectedNodeId(null);
     if (showLoadingSpinner) setIsLoading(true);
     try {
       const res = await fetch(`${backendUrl}/api/intake/sessions/${id}`, {
@@ -608,6 +614,407 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderCDSGraph = () => {
+    if (!sessionDetail) return null;
+
+    // 1. Normalize medications and allergies
+    const graphMeds = editMeds.map((m: any) => {
+      const name = typeof m === 'string' ? m : m.name || '';
+      return { id: `med-${name.toLowerCase().trim()}`, label: name, type: 'med' as const };
+    }).filter(n => n.label.trim() !== '');
+
+    const graphAllergies = editAllergies.map((allergy: any) => {
+      const name = typeof allergy === 'string' ? allergy : allergy.name || '';
+      return { id: `allergy-${name.toLowerCase().trim()}`, label: name, type: 'allergy' as const };
+    }).filter(n => n.label.trim() !== '');
+
+    // Eliminate duplicates by id
+    const seenIds = new Set<string>();
+    const allNodes: Array<{ id: string; label: string; type: 'med' | 'allergy' }> = [];
+    [...graphMeds, ...graphAllergies].forEach(n => {
+      if (!seenIds.has(n.id)) {
+        seenIds.add(n.id);
+        allNodes.push(n);
+      }
+    });
+
+    if (allNodes.length === 0) {
+      return (
+        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+          No active medications or allergies logged for this patient.
+        </div>
+      );
+    }
+
+    // 2. Identify links from interactions list
+    const findMedNode = (itemName: string) => {
+      const itemLower = itemName.toLowerCase().trim();
+      return graphMeds.find(n => n.label.toLowerCase().includes(itemLower) || itemLower.includes(n.label.toLowerCase()));
+    };
+
+    const findAllergyNode = (itemName: string) => {
+      const itemLower = itemName.toLowerCase().trim();
+      return graphAllergies.find(n => n.label.toLowerCase().includes(itemLower) || itemLower.includes(n.label.toLowerCase()));
+    };
+
+    const graphLinks: Array<{ source: string; target: string; alert: any; key: string }> = [];
+    const conflictingNodeIds = new Set<string>();
+
+    interactions.forEach((alert) => {
+      if (alert.ruleType === 'drug_drug') {
+        const srcNode = findMedNode(alert.triggerItem);
+        const tgtNode = findMedNode(alert.conflictItem);
+        if (srcNode && tgtNode) {
+          graphLinks.push({
+            source: srcNode.id,
+            target: tgtNode.id,
+            alert,
+            key: `${srcNode.id}-${tgtNode.id}`
+          });
+          conflictingNodeIds.add(srcNode.id);
+          conflictingNodeIds.add(tgtNode.id);
+        }
+      } else if (alert.ruleType === 'drug_allergy') {
+        const srcNode = findMedNode(alert.triggerItem);
+        const tgtNode = findAllergyNode(alert.conflictItem);
+        if (srcNode && tgtNode) {
+          graphLinks.push({
+            source: srcNode.id,
+            target: tgtNode.id,
+            alert,
+            key: `${srcNode.id}-${tgtNode.id}`
+          });
+          conflictingNodeIds.add(srcNode.id);
+          conflictingNodeIds.add(tgtNode.id);
+        }
+      }
+    });
+
+    // 3. Arrange nodes in a circular layout
+    const CX = 225;
+    const CY = 120;
+    const radius = 75;
+    const nodesWithCoords = allNodes.map((node, idx) => {
+      const angle = (idx / allNodes.length) * 2 * Math.PI - Math.PI / 2; // Start from top
+      const x = CX + radius * Math.cos(angle);
+      const y = CY + radius * Math.sin(angle);
+      const isConflicting = conflictingNodeIds.has(node.id);
+      return { ...node, x, y, isConflicting };
+    });
+
+    const coordsMap: Record<string, { x: number; y: number }> = {};
+    nodesWithCoords.forEach(n => {
+      coordsMap[n.id] = { x: n.x, y: n.y };
+    });
+
+    const isHoverActive = hoveredNodeId !== null;
+    const hoveredNode = nodesWithCoords.find(n => n.id === hoveredNodeId);
+    
+    const connectedToHovered = new Set<string>();
+    if (hoveredNode) {
+      connectedToHovered.add(hoveredNode.id);
+      graphLinks.forEach(l => {
+        if (l.source === hoveredNode.id) connectedToHovered.add(l.target);
+        if (l.target === hoveredNode.id) connectedToHovered.add(l.source);
+      });
+    }
+
+    const getLinkStyle = (link: any) => {
+      const isHigh = link.alert.severity === 'high';
+      const color = isHigh ? '#ef4444' : '#f59e0b';
+      let opacity = 0.85;
+      if (isHoverActive) {
+        const isRelated = link.source === hoveredNodeId || link.target === hoveredNodeId;
+        opacity = isRelated ? 1.0 : 0.15;
+      }
+      return {
+        stroke: color,
+        strokeWidth: isHoverActive && (link.source === hoveredNodeId || link.target === hoveredNodeId) ? 4.5 : 3,
+        opacity,
+        transition: 'all 0.2s ease'
+      };
+    };
+
+    const getNodeStyle = (node: any) => {
+      let opacity = 1.0;
+      if (isHoverActive) {
+        opacity = connectedToHovered.has(node.id) ? 1.0 : 0.25;
+      }
+      return {
+        opacity,
+        transition: 'all 0.25s ease',
+        cursor: 'pointer'
+      };
+    };
+
+    const activeDetailId = selectedNodeId || hoveredNodeId;
+    const activeDetailNode = nodesWithCoords.find(n => n.id === activeDetailId);
+    const activeDetailAlerts = activeDetailNode 
+      ? graphLinks.filter(l => l.source === activeDetailNode.id || l.target === activeDetailNode.id).map(l => l.alert)
+      : [];
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{
+          position: 'relative',
+          backgroundColor: '#090d16',
+          border: '1px solid var(--glass-border)',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          padding: '10px'
+        }}>
+          <svg viewBox="0 0 450 240" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+            <defs>
+              <filter id="glow-red-node" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="glow-amber-node" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <linearGradient id="grad-med-safe" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#1e3a8a" />
+                <stop offset="100%" stopColor="#3b82f6" />
+              </linearGradient>
+              <linearGradient id="grad-allergy-safe" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#581c87" />
+                <stop offset="100%" stopColor="#a855f7" />
+              </linearGradient>
+              <linearGradient id="grad-conflict-high" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#7f1d1d" />
+                <stop offset="100%" stopColor="#ef4444" />
+              </linearGradient>
+              <linearGradient id="grad-conflict-mod" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#78350f" />
+                <stop offset="100%" stopColor="#f59e0b" />
+              </linearGradient>
+            </defs>
+
+            <circle cx={CX} cy={CY} r={radius} fill="none" stroke="rgba(255, 255, 255, 0.03)" strokeWidth="1" strokeDasharray="3 3" />
+            
+            {graphLinks.length === 0 && graphMeds.length > 1 && (
+              <path
+                d={graphMeds.map((m, i) => {
+                  const coord = coordsMap[m.id];
+                  if (!coord) return '';
+                  return `${i === 0 ? 'M' : 'L'} ${coord.x} ${coord.y}`;
+                }).join(' ') + ' Z'}
+                fill="none"
+                stroke="rgba(16, 185, 129, 0.12)"
+                strokeWidth="1.5"
+                strokeDasharray="2 3"
+              />
+            )}
+
+            {graphLinks.map((link) => {
+              const p1 = coordsMap[link.source];
+              const p2 = coordsMap[link.target];
+              if (!p1 || !p2) return null;
+              const style = getLinkStyle(link);
+              const isHigh = link.alert.severity === 'high';
+              const filterId = isHigh ? 'url(#glow-red-node)' : 'url(#glow-amber-node)';
+              return (
+                <g key={link.key}>
+                  <line
+                    x1={p1.x}
+                    y1={p1.y}
+                    x2={p2.x}
+                    y2={p2.y}
+                    stroke={style.stroke}
+                    strokeWidth={style.strokeWidth + 4}
+                    opacity={style.opacity * 0.4}
+                    filter={filterId}
+                  />
+                  <line
+                    x1={p1.x}
+                    y1={p1.y}
+                    x2={p2.x}
+                    y2={p2.y}
+                    stroke={style.stroke}
+                    strokeWidth={style.strokeWidth}
+                    opacity={style.opacity}
+                    strokeDasharray={link.alert.severity === 'high' ? undefined : '5 3'}
+                  />
+                </g>
+              );
+            })}
+
+            {nodesWithCoords.map((node) => {
+              const style = getNodeStyle(node);
+              const isSelected = selectedNodeId === node.id;
+              let gradId = node.type === 'med' ? 'url(#grad-med-safe)' : 'url(#grad-allergy-safe)';
+              let strokeColor = node.type === 'med' ? '#60a5fa' : '#c084fc';
+              let filterUrl = undefined;
+
+              if (node.isConflicting) {
+                const nodeAlerts = graphLinks.filter(l => l.source === node.id || l.target === node.id);
+                const hasHigh = nodeAlerts.some(l => l.alert.severity === 'high');
+                gradId = hasHigh ? 'url(#grad-conflict-high)' : 'url(#grad-conflict-mod)';
+                strokeColor = hasHigh ? '#ef4444' : '#f59e0b';
+                filterUrl = hasHigh ? 'url(#glow-red-node)' : 'url(#glow-amber-node)';
+              }
+
+              return (
+                <g
+                  key={node.id}
+                  transform={`translate(${node.x}, ${node.y})`}
+                  style={style}
+                  onMouseEnter={() => setHoveredNodeId(node.id)}
+                  onMouseLeave={() => setHoveredNodeId(null)}
+                  onClick={() => setSelectedNodeId(isSelected ? null : node.id)}
+                >
+                  {isSelected && (
+                    <circle
+                      r="21"
+                      fill="none"
+                      stroke="#a855f7"
+                      strokeWidth="2"
+                      strokeDasharray="3 2"
+                    />
+                  )}
+                  {node.isConflicting && (
+                    <circle
+                      r="18"
+                      fill="none"
+                      stroke={strokeColor}
+                      strokeWidth="1.5"
+                      className="pulse-red-ring"
+                      opacity="0.6"
+                    />
+                  )}
+                  <circle
+                    r="13"
+                    fill={gradId}
+                    stroke={strokeColor}
+                    strokeWidth={isSelected ? 2.5 : 1.5}
+                    filter={filterUrl}
+                  />
+                  <text
+                    y="3"
+                    fill="white"
+                    fontSize="9px"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                    style={{ userSelect: 'none', pointerEvents: 'none' }}
+                  >
+                    {node.type === 'med' ? '💊' : '🛡️'}
+                  </text>
+                  <text
+                    y={node.y > CY ? 24 : -18}
+                    fill={isSelected ? '#c084fc' : node.isConflicting ? strokeColor : '#94a3b8'}
+                    fontSize="9px"
+                    fontWeight={isSelected || node.isConflicting ? 'bold' : 'normal'}
+                    textAnchor="middle"
+                    style={{ userSelect: 'none', pointerEvents: 'none' }}
+                  >
+                    {node.label.length > 13 ? node.label.substring(0, 11) + '..' : node.label}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+
+          {hoveredNode && (
+            <div style={{
+              position: 'absolute',
+              bottom: '8px',
+              left: '8px',
+              right: '8px',
+              backgroundColor: 'rgba(9, 13, 22, 0.95)',
+              border: `1px solid ${hoveredNode.isConflicting ? '#ef4444' : 'var(--glass-border)'}`,
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '11px',
+              color: 'white',
+              textAlign: 'left',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              pointerEvents: 'none',
+              zIndex: 2,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 'bold', color: hoveredNode.type === 'med' ? '#60a5fa' : '#c084fc' }}>
+                  {hoveredNode.type === 'med' ? 'Medication' : 'Allergen'}: {hoveredNode.label}
+                </span>
+                <span style={{
+                  fontSize: '8px',
+                  padding: '1px 3px',
+                  borderRadius: '2px',
+                  backgroundColor: hoveredNode.isConflicting ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                  color: hoveredNode.isConflicting ? '#ef4444' : '#10b981'
+                }}>
+                  {hoveredNode.isConflicting ? 'WARNING' : 'CLEAR'}
+                </span>
+              </div>
+              <span style={{ color: '#94a3b8', fontSize: '9px' }}>
+                {hoveredNode.isConflicting 
+                  ? `Clinical alert detected. Hover/click for details.`
+                  : 'No active clinical interactions detected.'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {activeDetailNode ? (
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.01)',
+            border: `1px solid ${activeDetailNode.isConflicting ? 'rgba(239, 68, 68, 0.2)' : 'var(--glass-border)'}`,
+            borderRadius: '6px',
+            padding: '10px',
+            textAlign: 'left'
+          }}>
+            <h5 style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'white', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Clinical Record: {activeDetailNode.label}</span>
+              <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                {activeDetailNode.type === 'med' ? 'Medication' : 'Allergen'}
+              </span>
+            </h5>
+            
+            {activeDetailAlerts.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
+                {activeDetailAlerts.map((alert: any, idx: number) => (
+                  <div key={idx} style={{
+                    padding: '6px 8px',
+                    borderLeft: `2.5px solid ${alert.severity === 'high' ? '#ef4444' : '#f59e0b'}`,
+                    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+                    borderRadius: '0 4px 4px 0'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 'bold', marginBottom: '2px' }}>
+                      <span style={{ color: alert.severity === 'high' ? '#ef4444' : '#f59e0b' }}>
+                        {alert.severity.toUpperCase()} RISK
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        {alert.ruleType === 'drug_drug' ? 'Drug-Drug Conflict' : 'Allergen Conflict'}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '10.5px', color: 'var(--text)', lineHeight: '1.4' }}>{alert.description}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ margin: '4px 0 0 0', fontSize: '10.5px', color: '#10b981' }}>
+                🟢 No warning flags matching active clinical rules.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div style={{ padding: '6px', border: '1px dashed var(--glass-border)', borderRadius: '6px', fontSize: '10.5px', color: 'var(--text-muted)' }}>
+            💡 Hint: Hover or click on any node to analyze clinical safety warnings.
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
       {!token ? (
@@ -829,8 +1236,50 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                         <ShieldCheck size={18} color={interactions.length > 0 ? '#f59e0b' : '#10b981'} />
                         <h4 style={{ margin: 0, fontSize: '14px', color: interactions.length > 0 ? '#f59e0b' : '#10b981' }}>Clinical Decision Support Alerts</h4>
                       </div>
+
+                      {/* Tab Navigation for CDS */}
+                      <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '6px', marginBottom: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setCdsTab('alerts')}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: cdsTab === 'alerts' ? '#a855f7' : 'var(--text-muted)',
+                            borderBottom: cdsTab === 'alerts' ? '2.5px solid #a855f7' : 'none',
+                            padding: '4px 6px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            outline: 'none'
+                          }}
+                        >
+                          Alert Logs ({interactions.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCdsTab('graph')}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: cdsTab === 'graph' ? '#a855f7' : 'var(--text-muted)',
+                            borderBottom: cdsTab === 'graph' ? '2.5px solid #a855f7' : 'none',
+                            padding: '4px 6px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            outline: 'none'
+                          }}
+                        >
+                          Live Interaction Map 🌐
+                        </button>
+                      </div>
                       
-                      {isCheckingInteractions ? (
+                      {cdsTab === 'graph' ? (
+                        renderCDSGraph()
+                      ) : isCheckingInteractions ? (
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, textAlign: 'left' }}>Evaluating clinical interactions...</p>
                       ) : interactions.length === 0 ? (
                         <div style={styles.cdsAlertOk}>
