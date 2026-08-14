@@ -51,6 +51,11 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   // Longitudinal patient history state for SVG trend charting
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
+  // Vitals Telemetry Playback Slider State
+  const [playbackIndex, setPlaybackIndex] = useState<number>(0);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
+
   // Discharge summary state
   const [dischargeSummary, setDischargeSummary] = useState<string>('');
   const [isGeneratingDischarge, setIsGeneratingDischarge] = useState<boolean>(false);
@@ -150,6 +155,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     }
   }, [activeCalls]);
 
+  // Vitals Telemetry Playback Slider animation loop
+  useEffect(() => {
+    let timer: any;
+    if (isPlaying && sessionDetail?.vitals && sessionDetail.vitals.length > 0) {
+      const intervalMs = Math.max(100, 1000 / playbackSpeed);
+      timer = setInterval(() => {
+        setPlaybackIndex((prev) => {
+          if (prev >= sessionDetail.vitals.length - 1) {
+            setIsPlaying(false);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, intervalMs);
+    }
+    return () => clearInterval(timer);
+  }, [isPlaying, playbackSpeed, sessionDetail]);
+
   // Auth Handler
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,6 +223,9 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     setCdsTab('alerts');
     setHoveredNodeId(null);
     setSelectedNodeId(null);
+    setPlaybackIndex(0);
+    setIsPlaying(false);
+    setPlaybackSpeed(1);
     if (showLoadingSpinner) setIsLoading(true);
     try {
       const res = await fetch(`${backendUrl}/api/intake/sessions/${id}`, {
@@ -1015,6 +1041,275 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderVitalsPlayback = () => {
+    const vitals = sessionDetail?.vitals || [];
+    if (vitals.length === 0) {
+      return (
+        <div style={styles.timelineCard} className="glass-panel">
+          <div style={styles.cardHeader}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileText size={18} color="#ef4444" />
+              <h3 style={{ margin: 0 }}>Vitals Telemetry Playback</h3>
+            </div>
+          </div>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', margin: '20px 0', textAlign: 'center' }}>
+            No recorded vitals telemetry for this intake session.
+          </p>
+        </div>
+      );
+    }
+
+    const idx = Math.min(playbackIndex, vitals.length - 1);
+    const activeVital = vitals[idx] || { heartRate: 72, spo2: 98, bpSystolic: 120, bpDiastolic: 80, createdAt: new Date() };
+
+    const t0 = new Date(vitals[0].createdAt).getTime();
+    const tActive = new Date(activeVital.createdAt).getTime();
+    const elapsedSeconds = Math.max(0, Math.floor((tActive - t0) / 1000));
+    const pad = (num: number) => String(num).padStart(2, '0');
+    const elapsedLabel = `${Math.floor(elapsedSeconds / 60)}m ${pad(elapsedSeconds % 60)}s`;
+
+    const isHrHigh = activeVital.heartRate > 130;
+    const isHrLow = activeVital.heartRate < 50;
+    const isSpo2Low = activeVital.spo2 < 92;
+    const isBpHigh = activeVital.bpSystolic > 140 || activeVital.bpDiastolic > 90;
+
+    const sparklineWidth = 140;
+    const sparklineHeight = 35;
+    const sparkPoints = vitals.slice(0, idx + 1);
+    
+    let sparklinePathD = '';
+    if (sparkPoints.length > 1) {
+      const hrs = vitals.map((v: any) => v.heartRate);
+      const minHr = Math.min(...hrs);
+      const maxHr = Math.max(...hrs);
+      const hrRange = Math.max(10, maxHr - minHr);
+      
+      sparkPoints.forEach((p: any, i: number) => {
+        const x = (i / (vitals.length - 1)) * sparklineWidth;
+        const y = sparklineHeight - 2 - ((p.heartRate - minHr) / hrRange) * (sparklineHeight - 4);
+        sparklinePathD += `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+      });
+    }
+
+    return (
+      <div style={styles.timelineCard} className="glass-panel">
+        <div style={styles.cardHeader}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FileText size={18} color="#ef4444" />
+            <h3 style={{ margin: 0 }}>Vitals Telemetry Playback</h3>
+          </div>
+          <span style={{
+            fontSize: '10px',
+            backgroundColor: isPlaying ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.05)',
+            color: isPlaying ? '#ef4444' : 'var(--text-muted)',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            border: '1px solid rgba(255,255,255,0.05)',
+            fontWeight: 'bold'
+          }}>
+            {isPlaying ? '● PLAYING' : 'PAUSED'}
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '10px', marginTop: '12px' }}>
+          {/* Heart Rate Display */}
+          <div style={{
+            background: 'rgba(0,0,0,0.15)',
+            borderRadius: '6px',
+            border: `1px solid ${isHrHigh || isHrLow ? 'rgba(239, 68, 68, 0.25)' : 'var(--glass-border)'}`,
+            padding: '8px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            position: 'relative'
+          }}>
+            <span 
+              className={isPlaying ? "pulse-heart-icon" : ""}
+              style={{
+                fontSize: '20px',
+                animation: isPlaying ? `heartbeat ${Math.max(0.3, 60 / activeVital.heartRate)}s infinite ease-in-out` : 'none',
+                display: 'block',
+                marginBottom: '4px'
+              }}
+            >
+              ❤️
+            </span>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', color: isHrHigh || isHrLow ? '#ef4444' : 'white', fontFamily: 'monospace' }}>
+              {activeVital.heartRate} <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'normal' }}>bpm</span>
+            </div>
+            <div style={{ fontSize: '9px', color: isHrHigh || isHrLow ? '#ef4444' : 'var(--text-muted)', marginTop: '2px', textAlign: 'center' }}>
+              {isHrHigh ? 'Tachycardia' : isHrLow ? 'Bradycardia' : 'Normal Pulse'}
+            </div>
+            
+            <style>
+              {`
+                @keyframes heartbeat {
+                  0% { transform: scale(1); }
+                  25% { transform: scale(1.15); }
+                  50% { transform: scale(1); }
+                  75% { transform: scale(1.1); }
+                  100% { transform: scale(1); }
+                }
+              `}
+            </style>
+          </div>
+
+          {/* SpO2 Display */}
+          <div style={{
+            background: 'rgba(0,0,0,0.15)',
+            borderRadius: '6px',
+            border: `1px solid ${isSpo2Low ? 'rgba(239, 68, 68, 0.25)' : 'var(--glass-border)'}`,
+            padding: '8px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center'
+          }}>
+            <span style={{ fontSize: '18px', marginBottom: '4px' }}>🩸</span>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', color: isSpo2Low ? '#ef4444' : '#10b981', fontFamily: 'monospace' }}>
+              {activeVital.spo2}%
+            </div>
+            <div style={{ fontSize: '9px', color: isSpo2Low ? '#ef4444' : 'var(--text-muted)', marginTop: '2px', textAlign: 'center' }}>
+              {isSpo2Low ? '🚨 Hypoxemia' : 'Normal O2'}
+            </div>
+            <div style={{ width: '80%', height: '4px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '2px', marginTop: '6px', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${activeVital.spo2}%`,
+                backgroundColor: isSpo2Low ? '#ef4444' : '#10b981',
+                transition: 'width 0.3s ease'
+              }}></div>
+            </div>
+          </div>
+
+          {/* Blood Pressure Display */}
+          <div style={{
+            background: 'rgba(0,0,0,0.15)',
+            borderRadius: '6px',
+            border: `1px solid ${isBpHigh ? 'rgba(245, 158, 11, 0.25)' : 'var(--glass-border)'}`,
+            padding: '8px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center'
+          }}>
+            <span style={{ fontSize: '18px', marginBottom: '4px' }}>⚡</span>
+            <div style={{ fontSize: '17px', fontWeight: 'bold', color: isBpHigh ? '#f59e0b' : 'white', fontFamily: 'monospace', marginTop: '2px' }}>
+              {activeVital.bpSystolic}/{activeVital.bpDiastolic}
+            </div>
+            <div style={{ fontSize: '9px', color: isBpHigh ? '#f59e0b' : 'var(--text-muted)', marginTop: '4px', textAlign: 'center' }}>
+              {isBpHigh ? 'BP High' : 'BP Normal'}
+            </div>
+          </div>
+        </div>
+
+        {/* Rolling Heart Rate Sparkline & Time Indicator */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', padding: '6px 10px', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.02)' }}>
+          <div style={{ textAlign: 'left' }}>
+            <span style={{ fontSize: '9px', color: 'var(--text-muted)', display: 'block' }}>Playback Time</span>
+            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white', fontFamily: 'monospace' }}>
+              +{elapsedLabel}
+            </span>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            <span style={{ fontSize: '8px', color: 'var(--text-muted)', marginBottom: '2px' }}>Heart Rate Trend</span>
+            <div style={{ width: `${sparklineWidth}px`, height: `${sparklineHeight}px` }}>
+              {sparklinePathD ? (
+                <svg width={sparklineWidth} height={sparklineHeight}>
+                  <path
+                    d={sparklinePathD}
+                    fill="none"
+                    stroke="#ef4444"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <circle
+                    cx={(idx / (vitals.length - 1)) * sparklineWidth}
+                    cy={sparklineHeight - 2 - ((activeVital.heartRate - Math.min(...vitals.map((v: any) => v.heartRate))) / Math.max(10, Math.max(...vitals.map((v: any) => v.heartRate)) - Math.min(...vitals.map((v: any) => v.heartRate)))) * (sparklineHeight - 4)}
+                    r="2.5"
+                    fill="white"
+                    stroke="#ef4444"
+                    strokeWidth="1"
+                  />
+                </svg>
+              ) : (
+                <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Calibrating...</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Timeline Slider Track */}
+        <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <input
+            type="range"
+            min={0}
+            max={vitals.length - 1}
+            value={idx}
+            onChange={(e) => {
+              setPlaybackIndex(parseInt(e.target.value, 10));
+              setIsPlaying(false);
+            }}
+            style={{
+              width: '100%',
+              accentColor: '#ef4444',
+              cursor: 'pointer',
+              height: '4px',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              borderRadius: '2px',
+              border: 'none',
+              outline: 'none'
+            }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)' }}>
+            <span>Start (0s)</span>
+            <span>Index {idx}</span>
+            <span>End ({Math.floor((new Date(vitals[vitals.length - 1].createdAt).getTime() - t0) / 1000)}s)</span>
+          </div>
+        </div>
+
+        {/* Playback Actions */}
+        <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (idx >= vitals.length - 1) {
+                setPlaybackIndex(0);
+              }
+              setIsPlaying(!isPlaying);
+            }}
+            className="btn"
+            style={{ flex: 1, padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+          >
+            {isPlaying ? '⏸ Pause' : '▶ Play'}
+          </button>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', padding: '2px 8px', borderRadius: '6px' }}>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Speed:</span>
+            <select
+              value={playbackSpeed}
+              onChange={(e) => setPlaybackSpeed(parseFloat(e.target.value))}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              <option value="1" style={{ backgroundColor: '#0f172a' }}>1x</option>
+              <option value="2" style={{ backgroundColor: '#0f172a' }}>2x</option>
+              <option value="5" style={{ backgroundColor: '#0f172a' }}>5x</option>
+              <option value="10" style={{ backgroundColor: '#0f172a' }}>10x</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
       {!token ? (
@@ -1672,6 +1967,9 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                         </div>
                       );
                     })()}
+
+                    {/* Vitals Telemetry Playback Slider Card */}
+                    {renderVitalsPlayback()}
 
                     {/* EHR Sync Action Block */}
                     {sessionDetail.summary && (
