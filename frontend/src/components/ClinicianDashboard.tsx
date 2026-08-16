@@ -51,6 +51,11 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   // Longitudinal patient history state for SVG trend charting
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
+  // Security Observability States
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security'>('workspace');
+  const [securityData, setSecurityData] = useState<any>(null);
+  const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
+
   // Vitals Telemetry Playback Slider State
   const [playbackIndex, setPlaybackIndex] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -210,6 +215,31 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
       console.error('Failed to load sessions list:', err);
     }
   };
+
+  const loadSecurityDetails = async () => {
+    setIsLoadingSecurity(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/security-details`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSecurityData(data);
+      }
+    } catch (err) {
+      console.error('Failed to load security details:', err);
+    } finally {
+      setIsLoadingSecurity(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token && currentTab === 'security') {
+      loadSecurityDetails();
+      const interval = setInterval(loadSecurityDetails, 10000); // refresh every 10s
+      return () => clearInterval(interval);
+    }
+  }, [token, currentTab]);
 
   const loadSessionDetails = async (id: string, showLoadingSpinner = true) => {
     setCopilotQuery('');
@@ -1310,6 +1340,227 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderSecurityObservability = () => {
+    if (isLoadingSecurity && !securityData) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, height: '80vh' }}>
+          <RefreshCw className="pulse-red" size={48} color="#a855f7" />
+          <p style={{ marginTop: '15px', color: 'var(--text-muted)' }}>Loading security logs & telemetry metrics...</p>
+        </div>
+      );
+    }
+
+    const metrics = securityData?.metrics || { totalSafetyChecks: 0, deflections: 0, safetyRate: 100, threatLevel: 'LOW' };
+    const classifications = securityData?.classifications || { prompt_injection: 0, pii_leakage: 0, medical_advice: 0, abuse_profanity: 0 };
+    const logs = securityData?.logs || [];
+
+    const isHighThreat = metrics.threatLevel === 'HIGH';
+    const isElevatedThreat = metrics.threatLevel === 'ELEVATED';
+    const threatColor = isHighThreat ? '#ef4444' : isElevatedThreat ? '#f59e0b' : '#10b981';
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        
+        {/* Row 1: Summary Metrics Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
+          <div className="glass-panel" style={{ padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Total Safety Evaluations</span>
+            <span style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', marginTop: '6px', fontFamily: 'monospace' }}>
+              {metrics.totalSafetyChecks}
+            </span>
+            <span style={{ fontSize: '10px', color: '#10b981', marginTop: '4px' }}>🛡️ Input & Output Guardrails Scanned</span>
+          </div>
+
+          <div className="glass-panel" style={{ padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>System Deflections (Blocked)</span>
+            <span style={{ fontSize: '28px', fontWeight: 'bold', color: metrics.deflections > 0 ? '#ef4444' : 'white', marginTop: '6px', fontFamily: 'monospace' }}>
+              {metrics.deflections}
+            </span>
+            <span style={{ fontSize: '10px', color: metrics.deflections > 0 ? '#ef4444' : 'var(--text-muted)', marginTop: '4px' }}>
+              🚨 Jailbreaks & Bypass Deflections
+            </span>
+          </div>
+
+          <div className="glass-panel" style={{ padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Guardrail Compliance Rate</span>
+            <span style={{ fontSize: '28px', fontWeight: 'bold', color: '#10b981', marginTop: '6px', fontFamily: 'monospace' }}>
+              {metrics.safetyRate}%
+            </span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>✓ Percentage of Clean Queries</span>
+          </div>
+
+          <div className="glass-panel" style={{ padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Active Portal Threat Level</span>
+            <span style={{ fontSize: '28px', fontWeight: 'bold', color: threatColor, marginTop: '6px' }}>
+              {metrics.threatLevel}
+            </span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              {isHighThreat ? '⚠️ CRITICAL ALARM STATE' : isElevatedThreat ? '⚡ VIGILANCE REQUIRED' : '🟢 SECURE STATUS'}
+            </span>
+          </div>
+        </div>
+
+        {/* Row 2: Vector Classification Heat Map */}
+        <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+          <h4 style={{ margin: '0 0 12px 0', color: 'white', fontSize: '15px', fontWeight: 'bold' }}>Jailbreak Vector Heat Map & Risk Grid</h4>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', width: '100%' }}>
+            
+            <div style={{
+              background: classifications.prompt_injection > 0 ? 'rgba(239, 68, 68, 0.05)' : 'rgba(255,255,255,0.01)',
+              border: `1px solid ${classifications.prompt_injection > 0 ? 'rgba(239, 68, 68, 0.3)' : 'var(--glass-border)'}`,
+              borderRadius: '8px',
+              padding: '15px',
+              textAlign: 'left',
+              boxShadow: classifications.prompt_injection > 3 ? '0 0 10px rgba(239, 68, 68, 0.1)' : 'none'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>Goal Hijacking</span>
+                <span style={{ fontSize: '10px', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+                  {classifications.prompt_injection > 3 ? 'HIGH' : 'MEDIUM'}
+                </span>
+              </div>
+              <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                System instruction bypass & role overrides.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '15px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Deflections:</span>
+                <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#ef4444', fontFamily: 'monospace' }}>{classifications.prompt_injection}</span>
+              </div>
+            </div>
+
+            <div style={{
+              background: classifications.pii_leakage > 0 ? 'rgba(245, 158, 11, 0.05)' : 'rgba(255,255,255,0.01)',
+              border: `1px solid ${classifications.pii_leakage > 0 ? 'rgba(245, 158, 11, 0.25)' : 'var(--glass-border)'}`,
+              borderRadius: '8px',
+              padding: '15px',
+              textAlign: 'left'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>PII Leakage</span>
+                <span style={{ fontSize: '10px', color: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+                  MEDIUM
+                </span>
+              </div>
+              <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                Unauthorized extraction of SSN, policies or credentials.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '15px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Deflections:</span>
+                <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#f59e0b', fontFamily: 'monospace' }}>{classifications.pii_leakage}</span>
+              </div>
+            </div>
+
+            <div style={{
+              background: classifications.medical_advice > 0 ? 'rgba(245, 158, 11, 0.05)' : 'rgba(255,255,255,0.01)',
+              border: `1px solid ${classifications.medical_advice > 0 ? 'rgba(245, 158, 11, 0.25)' : 'var(--glass-border)'}`,
+              borderRadius: '8px',
+              padding: '15px',
+              textAlign: 'left'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>Scope Deviations</span>
+                <span style={{ fontSize: '10px', color: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+                  MEDIUM
+                </span>
+              </div>
+              <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                Attempts to prompt AI diagnosis or prescriptions.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '15px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Deflections:</span>
+                <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#f59e0b', fontFamily: 'monospace' }}>{classifications.medical_advice}</span>
+              </div>
+            </div>
+
+            <div style={{
+              background: 'rgba(255,255,255,0.01)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: '8px',
+              padding: '15px',
+              textAlign: 'left'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>Abuse & Out-of-Scope</span>
+                <span style={{ fontSize: '10px', color: '#10b981', backgroundColor: 'rgba(16,185,129,0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+                  LOW
+                </span>
+              </div>
+              <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                Offensive dialogue or non-medical queries.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '15px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Deflections:</span>
+                <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981', fontFamily: 'monospace' }}>{classifications.abuse_profanity}</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Row 3: Safety Deflection Log List */}
+        <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', flex: 1 }}>
+          <h4 style={{ margin: '0 0 12px 0', color: 'white', fontSize: '15px', fontWeight: 'bold' }}>Deflected Security Incidents & Guardrail Deflection Logs</h4>
+          
+          <div style={{ width: '100%', overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--text-muted)', height: '35px' }}>
+                  <th style={{ padding: '8px' }}>Timestamp</th>
+                  <th style={{ padding: '8px' }}>Patient Name</th>
+                  <th style={{ padding: '8px' }}>Vector</th>
+                  <th style={{ padding: '8px' }}>Security Classifier Output (Redacted Content)</th>
+                  <th style={{ padding: '8px' }}>Action Taken</th>
+                  <th style={{ padding: '8px', textAlign: 'right' }}>Confidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      No safety deflections logged in this period. System is running securely.
+                    </td>
+                  </tr>
+                ) : (
+                  logs.map((log: any) => {
+                    const dateStr = new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(log.createdAt).toLocaleDateString();
+                    return (
+                      <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', height: '45px', color: 'var(--text-main)' }}>
+                        <td style={{ padding: '8px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{dateStr}</td>
+                        <td style={{ padding: '8px', fontWeight: 'bold', color: 'white' }}>{log.patientName || 'Anonymous Intake'}</td>
+                        <td style={{ padding: '8px' }}>
+                          <span style={{
+                            fontSize: '10px',
+                            backgroundColor: log.eventType === 'prompt_injection' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                            color: log.eventType === 'prompt_injection' ? '#ef4444' : '#f59e0b',
+                            padding: '2px 6px',
+                            borderRadius: '4px'
+                          }}>
+                            {log.eventType.toUpperCase().replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }} title={log.inputContent}>
+                          "{log.inputContent}"
+                        </td>
+                        <td style={{ padding: '8px', color: '#10b981', fontWeight: 'bold' }}>
+                          {log.responseBlocked ? '🛡️ Deflected & Blocked' : '🚨 Flagged & Escalated'}
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', fontFamily: 'monospace', color: 'white' }}>
+                          {((log.confidenceScore || 1) * 100).toFixed(0)}%
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
       {!token ? (
@@ -1340,13 +1591,108 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
           </form>
         </div>
       ) : (
-        /* Clinician Workspace */
-        <div style={styles.workspace}>
+        /* Clinician Portal Layout */
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100vh', overflow: 'hidden' }}>
+          {/* Global Portal Header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 24px',
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(12px)',
+            borderBottom: '1px solid var(--glass-border)',
+            zIndex: 99
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '5px',
+                backgroundColor: '#10b981',
+                boxShadow: '0 0 8px #10b981'
+              }}></span>
+              <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: 'white', letterSpacing: '0.5px' }}>
+                IntakeRx™ <span style={{ fontWeight: 'normal', color: 'var(--text-muted)' }}>Clinician Portal</span>
+              </h2>
+            </div>
+
+            {/* Portal Tab Navigation */}
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('workspace')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'workspace' ? '#a855f7' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'workspace' ? '2.5px solid #a855f7' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🩺 Patient Intake Workspace
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('security')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'security' ? '#a855f7' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'security' ? '2.5px solid #a855f7' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🛡️ Security Observability Center
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Clinician: <strong>{clinician?.email}</strong>
+              </span>
+              <button 
+                type="button"
+                onClick={() => {
+                  setToken('');
+                  setCurrentTab('workspace');
+                }} 
+                style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  color: '#ef4444',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Portal Sign Out
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+            {currentTab === 'security' ? (
+              renderSecurityObservability()
+            ) : (
+              <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}
           <div style={styles.listSection} className="glass-panel">
             <div style={styles.sectionHeader}>
               <h3>Intake Sessions</h3>
-              <button onClick={() => setToken('')} style={styles.signoutLink}>Portal Sign Out</button>
             </div>
             
             <div style={styles.sessionListScroll}>
@@ -2411,6 +2757,9 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
           )}
           </div>
         </div>
+      )}
+      </div>
+      </div>
       )}
 
       {showFhirModal && (

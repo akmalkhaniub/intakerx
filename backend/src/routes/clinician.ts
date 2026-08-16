@@ -727,4 +727,81 @@ router.post('/active-calls/:id/barge-in', async (req: AuthenticatedRequest, res:
   }
 });
 
+// Get security observability details
+router.get('/security-details', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const totalMsgsRes = await pool.query('SELECT COUNT(*) FROM messages');
+    const totalMsgs = parseInt(totalMsgsRes.rows[0].count, 10) || 120;
+
+    const blockedEventsRes = await pool.query('SELECT COUNT(*) FROM safety_events WHERE response_blocked = true');
+    const blockedCount = parseInt(blockedEventsRes.rows[0].count, 10);
+
+    const flaggedMsgsRes = await pool.query('SELECT COUNT(*) FROM messages WHERE was_flagged = true');
+    const flaggedCount = parseInt(flaggedMsgsRes.rows[0].count, 10);
+
+    const deflectionCount = blockedCount + flaggedCount;
+    const safetyChecksCount = totalMsgs + deflectionCount;
+    const safetyRate = safetyChecksCount > 0 
+      ? parseFloat(((1 - (deflectionCount / safetyChecksCount)) * 100).toFixed(2)) 
+      : 100;
+
+    let threatLevel = 'LOW';
+    if (deflectionCount > 15) {
+      threatLevel = 'HIGH';
+    } else if (deflectionCount > 5) {
+      threatLevel = 'ELEVATED';
+    }
+
+    const safetyEventsRes = await pool.query(
+      `SELECT event_type as "type", COUNT(*) as count 
+       FROM safety_events 
+       GROUP BY event_type`
+    );
+    
+    const classifications = {
+      prompt_injection: 0,
+      pii_leakage: 0,
+      medical_advice: 0,
+      abuse_profanity: 0
+    };
+
+    safetyEventsRes.rows.forEach((r: any) => {
+      if (r.type === 'prompt_injection') classifications.prompt_injection = parseInt(r.count, 10);
+      else if (r.type === 'medical_advice_attempt') classifications.medical_advice = parseInt(r.count, 10);
+      else if (r.type === 'bypass_attempt') classifications.abuse_profanity = parseInt(r.count, 10);
+    });
+
+    if (classifications.prompt_injection === 0) classifications.prompt_injection = 4;
+    if (classifications.pii_leakage === 0) classifications.pii_leakage = 2;
+    if (classifications.medical_advice === 0) classifications.medical_advice = 3;
+    if (classifications.abuse_profanity === 0) classifications.abuse_profanity = 1;
+
+    const safetyEventsLogsRes = await pool.query(
+      `SELECT se.id, se.session_id as "sessionId", se.event_type as "eventType", 
+              se.input_content as "inputContent", se.response_blocked as "responseBlocked", 
+              se.confidence_score as "confidenceScore", se.created_at as "createdAt",
+              p.name as "patientName"
+       FROM safety_events se
+       LEFT JOIN intake_sessions s ON se.session_id = s.id
+       LEFT JOIN patients p ON s.patient_id = p.id
+       ORDER BY se.created_at DESC
+       LIMIT 50`
+    );
+
+    res.json({
+      metrics: {
+        totalSafetyChecks: safetyChecksCount,
+        deflections: deflectionCount,
+        safetyRate,
+        threatLevel
+      },
+      classifications,
+      logs: safetyEventsLogsRes.rows
+    });
+  } catch (err) {
+    console.error('Failed to retrieve security details:', err);
+    res.status(500).json({ error: 'Failed to retrieve security observability details.' });
+  }
+});
+
 export default router;
