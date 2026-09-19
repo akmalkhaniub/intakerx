@@ -52,9 +52,13 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
+
+  // Analytics Dashboard States
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState<boolean>(false);
 
   // Vitals Telemetry Playback Slider State
   const [playbackIndex, setPlaybackIndex] = useState<number>(0);
@@ -238,6 +242,29 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
       loadSecurityDetails();
       const interval = setInterval(loadSecurityDetails, 10000); // refresh every 10s
       return () => clearInterval(interval);
+    }
+  }, [token, currentTab]);
+
+  const loadAnalytics = async () => {
+    setIsLoadingAnalytics(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/analytics`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAnalyticsData(data);
+      }
+    } catch (err) {
+      console.error('Failed to load analytics:', err);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token && currentTab === 'analytics') {
+      loadAnalytics();
     }
   }, [token, currentTab]);
 
@@ -1340,6 +1367,254 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderAnalyticsDashboard = () => {
+    if (isLoadingAnalytics && !analyticsData) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, height: '80vh' }}>
+          <RefreshCw className="pulse-red" size={48} color="#3b82f6" />
+          <p style={{ marginTop: '15px', color: 'var(--text-muted)' }}>Loading analytics dashboard...</p>
+        </div>
+      );
+    }
+
+    const funnel = analyticsData?.funnel || { started: 0, symptomsEntered: 0, medicationsEntered: 0, completed: 0 };
+    const triage = analyticsData?.triage || [];
+    const duration = analyticsData?.duration || { avgSeconds: 0, minSeconds: 0, maxSeconds: 0 };
+    const hourly = analyticsData?.hourly || [];
+    const daily = analyticsData?.daily || [];
+    const avgMsgs = analyticsData?.avgMessagesPerSession || '0';
+    const safety = analyticsData?.safety || { total: 0, blocked: 0 };
+    const status = analyticsData?.status || {};
+
+    const funnelMax = Math.max(funnel.started, 1);
+    const funnelStages = [
+      { label: 'Sessions Started', value: funnel.started, color: '#3b82f6' },
+      { label: 'Symptoms Entered', value: funnel.symptomsEntered, color: '#8b5cf6' },
+      { label: 'Medications Entered', value: funnel.medicationsEntered, color: '#a855f7' },
+      { label: 'Completed', value: funnel.completed, color: '#10b981' }
+    ];
+
+    // Triage donut
+    const triageColors: Record<string, string> = { emergency: '#ef4444', urgent: '#f59e0b', routine: '#10b981' };
+    const triageTotal = triage.reduce((acc: number, t: any) => acc + parseInt(t.count, 10), 0) || 1;
+
+    // Hourly peak hours - fill 24h
+    const hourlyMap: number[] = new Array(24).fill(0);
+    hourly.forEach((h: any) => { hourlyMap[parseInt(h.hour, 10)] = parseInt(h.count, 10); });
+    const maxHourly = Math.max(...hourlyMap, 1);
+
+    // Daily trend
+    const dailyCounts = daily.map((d: any) => parseInt(d.count, 10));
+    const maxDaily = Math.max(...dailyCounts, 1);
+
+    const formatDuration = (secs: number) => {
+      if (secs < 60) return `${secs}s`;
+      const mins = Math.floor(secs / 60);
+      const rem = secs % 60;
+      return rem > 0 ? `${mins}m ${rem}s` : `${mins}m`;
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+
+        {/* Row 1: Summary Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px' }}>
+          <div className="glass-panel" style={{ padding: '15px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Total Sessions</span>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', fontFamily: 'monospace', marginTop: '6px' }}>{funnel.started}</div>
+            <span style={{ fontSize: '10px', color: '#3b82f6' }}>📋 All intake sessions</span>
+          </div>
+          <div className="glass-panel" style={{ padding: '15px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Completion Rate</span>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#10b981', fontFamily: 'monospace', marginTop: '6px' }}>
+              {funnel.started > 0 ? ((funnel.completed / funnel.started) * 100).toFixed(1) : '0'}%
+            </div>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>✓ Sessions fully completed</span>
+          </div>
+          <div className="glass-panel" style={{ padding: '15px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Avg Duration</span>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', fontFamily: 'monospace', marginTop: '6px' }}>{formatDuration(duration.avgSeconds)}</div>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>⏱️ Per completed session</span>
+          </div>
+          <div className="glass-panel" style={{ padding: '15px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Avg Messages</span>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#a855f7', fontFamily: 'monospace', marginTop: '6px' }}>{avgMsgs}</div>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>💬 Per session dialogue</span>
+          </div>
+          <div className="glass-panel" style={{ padding: '15px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Safety Events</span>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: safety.blocked > 0 ? '#ef4444' : 'white', fontFamily: 'monospace', marginTop: '6px' }}>{safety.total}</div>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>🛡️ {safety.blocked} blocked</span>
+          </div>
+        </div>
+
+        {/* Row 2: Funnel Chart + Triage Donut */}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '15px' }}>
+
+          {/* Intake Funnel */}
+          <div className="glass-panel" style={{ padding: '20px' }}>
+            <h4 style={{ margin: '0 0 15px 0', color: 'white', fontSize: '15px', fontWeight: 'bold' }}>Patient Intake Funnel</h4>
+            <svg viewBox="0 0 500 180" style={{ width: '100%', height: 'auto' }}>
+              {funnelStages.map((stage, i) => {
+                const barWidth = (stage.value / funnelMax) * 420;
+                const y = i * 42 + 5;
+                const pct = funnelMax > 0 ? ((stage.value / funnelMax) * 100).toFixed(0) : '0';
+                return (
+                  <g key={i}>
+                    <rect x={70} y={y} width={Math.max(barWidth, 4)} height={28} rx={6} fill={stage.color} opacity={0.85} />
+                    <text x={65} y={y + 18} textAnchor="end" fill="#94a3b8" fontSize="10" fontFamily="monospace">{stage.label.split(' ')[0]}</text>
+                    <text x={Math.max(barWidth, 4) + 78} y={y + 18} fill="white" fontSize="12" fontWeight="bold" fontFamily="monospace">
+                      {stage.value} ({pct}%)
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+
+          {/* Triage Donut */}
+          <div className="glass-panel" style={{ padding: '20px' }}>
+            <h4 style={{ margin: '0 0 15px 0', color: 'white', fontSize: '15px', fontWeight: 'bold' }}>Triage Distribution</h4>
+            <svg viewBox="0 0 200 200" style={{ width: '100%', maxWidth: '200px', margin: '0 auto', display: 'block' }}>
+              {(() => {
+                let offset = 0;
+                const radius = 70;
+                const circumference = 2 * Math.PI * radius;
+                return triage.map((t: any, i: number) => {
+                  const count = parseInt(t.count, 10);
+                  const fraction = count / triageTotal;
+                  const dashLength = fraction * circumference;
+                  const el = (
+                    <circle
+                      key={i}
+                      cx={100} cy={100} r={radius}
+                      fill="none"
+                      stroke={triageColors[t.level] || '#6b7280'}
+                      strokeWidth={20}
+                      strokeDasharray={`${dashLength} ${circumference - dashLength}`}
+                      strokeDashoffset={-offset}
+                      transform="rotate(-90, 100, 100)"
+                    />
+                  );
+                  offset += dashLength;
+                  return el;
+                });
+              })()}
+              <text x={100} y={95} textAnchor="middle" fill="white" fontSize="22" fontWeight="bold" fontFamily="monospace">{triageTotal}</text>
+              <text x={100} y={115} textAnchor="middle" fill="#94a3b8" fontSize="10">sessions</text>
+            </svg>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
+              {triage.map((t: any, i: number) => (
+                <span key={i} style={{ fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: triageColors[t.level] || '#6b7280' }}></span>
+                  <span style={{ color: 'var(--text-muted)', textTransform: 'capitalize' }}>{t.level}: {t.count}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Row 3: Hourly Heatmap + Daily Trend */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+
+          {/* Hourly Intake Heatmap */}
+          <div className="glass-panel" style={{ padding: '20px' }}>
+            <h4 style={{ margin: '0 0 15px 0', color: 'white', fontSize: '15px', fontWeight: 'bold' }}>Intake Volume by Hour (Peak Hours)</h4>
+            <svg viewBox="0 0 500 120" style={{ width: '100%', height: 'auto' }}>
+              {hourlyMap.map((count, hour) => {
+                const barWidth = 16;
+                const gap = 4.5;
+                const x = hour * (barWidth + gap) + 10;
+                const barHeight = (count / maxHourly) * 80;
+                const y = 90 - barHeight;
+                const intensity = count / maxHourly;
+                const color = intensity > 0.7 ? '#ef4444' : intensity > 0.4 ? '#f59e0b' : intensity > 0 ? '#3b82f6' : 'rgba(255,255,255,0.05)';
+                return (
+                  <g key={hour}>
+                    <rect x={x} y={y} width={barWidth} height={Math.max(barHeight, 2)} rx={3} fill={color} opacity={0.85} />
+                    {hour % 3 === 0 && (
+                      <text x={x + barWidth / 2} y={105} textAnchor="middle" fill="#64748b" fontSize="8" fontFamily="monospace">
+                        {hour.toString().padStart(2, '0')}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '8px' }}>
+              <span style={{ fontSize: '9px', color: '#3b82f6' }}>● Low</span>
+              <span style={{ fontSize: '9px', color: '#f59e0b' }}>● Medium</span>
+              <span style={{ fontSize: '9px', color: '#ef4444' }}>● Peak</span>
+            </div>
+          </div>
+
+          {/* Daily Trend */}
+          <div className="glass-panel" style={{ padding: '20px' }}>
+            <h4 style={{ margin: '0 0 15px 0', color: 'white', fontSize: '15px', fontWeight: 'bold' }}>Daily Intake Trend (Last 14 Days)</h4>
+            {daily.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '12px' }}>No session data in the last 14 days.</p>
+            ) : (
+              <svg viewBox="0 0 500 120" style={{ width: '100%', height: 'auto' }}>
+                <defs>
+                  <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.3" />
+                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {(() => {
+                  const pts = dailyCounts.map((c: number, i: number) => {
+                    const x = (i / Math.max(dailyCounts.length - 1, 1)) * 460 + 20;
+                    const y = 90 - (c / maxDaily) * 75;
+                    return { x, y };
+                  });
+                  const lineStr = pts.map((p: any) => `${p.x},${p.y}`).join(' ');
+                  const areaStr = `${pts[0].x},90 ${lineStr} ${pts[pts.length - 1].x},90`;
+                  return (
+                    <>
+                      <polygon points={areaStr} fill="url(#trendGrad)" />
+                      <polyline points={lineStr} fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinejoin="round" />
+                      {pts.map((p: any, i: number) => (
+                        <circle key={i} cx={p.x} cy={p.y} r={3} fill="#a855f7" stroke="#0f172a" strokeWidth={1.5} />
+                      ))}
+                    </>
+                  );
+                })()}
+                {daily.map((d: any, i: number) => {
+                  const x = (i / Math.max(daily.length - 1, 1)) * 460 + 20;
+                  const dateLabel = new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                  if (i % Math.max(1, Math.floor(daily.length / 5)) === 0) {
+                    return <text key={i} x={x} y={108} textAnchor="middle" fill="#64748b" fontSize="8" fontFamily="monospace">{dateLabel}</text>;
+                  }
+                  return null;
+                })}
+              </svg>
+            )}
+          </div>
+        </div>
+
+        {/* Row 4: Status Breakdown */}
+        <div className="glass-panel" style={{ padding: '20px' }}>
+          <h4 style={{ margin: '0 0 15px 0', color: 'white', fontSize: '15px', fontWeight: 'bold' }}>Session Status Breakdown</h4>
+          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+            {Object.entries(status).map(([key, val]: [string, any]) => {
+              const statusColors: Record<string, string> = { active: '#3b82f6', completed: '#10b981', escalated: '#ef4444', abandoned: '#6b7280' };
+              return (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    width: '12px', height: '12px', borderRadius: '3px',
+                    backgroundColor: statusColors[key] || '#6b7280'
+                  }}></span>
+                  <span style={{ fontSize: '13px', color: 'white', textTransform: 'capitalize', fontWeight: 'bold' }}>{key}</span>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{val}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -1655,6 +1930,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 🛡️ Security Observability Center
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('analytics')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'analytics' ? '#a855f7' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'analytics' ? '2.5px solid #a855f7' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                📊 Intake Analytics
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -1687,6 +1980,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
             {currentTab === 'security' ? (
               renderSecurityObservability()
+            ) : currentTab === 'analytics' ? (
+              renderAnalyticsDashboard()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

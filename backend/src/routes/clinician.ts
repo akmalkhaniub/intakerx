@@ -804,4 +804,110 @@ router.get('/security-details', async (req: AuthenticatedRequest, res: Response)
   }
 });
 
+// Get analytics dashboard data
+router.get('/analytics', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // 1. Intake Funnel counts by step
+    const totalRes = await pool.query('SELECT COUNT(*) FROM intake_sessions');
+    const total = parseInt(totalRes.rows[0].count, 10);
+
+    const stepsRes = await pool.query(
+      `SELECT current_step as "step", COUNT(*) as count FROM intake_sessions GROUP BY current_step`
+    );
+    const stepMap: Record<string, number> = {};
+    stepsRes.rows.forEach((r: any) => { stepMap[r.step] = parseInt(r.count, 10); });
+
+    const statusRes = await pool.query(
+      `SELECT status, COUNT(*) as count FROM intake_sessions GROUP BY status`
+    );
+    const statusMap: Record<string, number> = {};
+    statusRes.rows.forEach((r: any) => { statusMap[r.status] = parseInt(r.count, 10); });
+
+    // Funnel: started (all) -> symptoms entered -> medications entered -> completed
+    const symptomsEnteredRes = await pool.query(
+      `SELECT COUNT(DISTINCT session_id) FROM symptoms`
+    );
+    const medsEnteredRes = await pool.query(
+      `SELECT COUNT(DISTINCT session_id) FROM medications`
+    );
+    const completedCount = statusMap['completed'] || 0;
+
+    const funnel = {
+      started: total,
+      symptomsEntered: parseInt(symptomsEnteredRes.rows[0].count, 10),
+      medicationsEntered: parseInt(medsEnteredRes.rows[0].count, 10),
+      completed: completedCount
+    };
+
+    // 2. Triage distribution
+    const triageRes = await pool.query(
+      `SELECT triage_level as "level", COUNT(*) as count 
+       FROM intake_sessions 
+       WHERE triage_level IS NOT NULL 
+       GROUP BY triage_level`
+    );
+
+    // 3. Average session duration (completed sessions only)
+    const durationRes = await pool.query(
+      `SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) as "avgSeconds",
+              MIN(EXTRACT(EPOCH FROM (updated_at - created_at))) as "minSeconds",
+              MAX(EXTRACT(EPOCH FROM (updated_at - created_at))) as "maxSeconds"
+       FROM intake_sessions 
+       WHERE status = 'completed' AND updated_at IS NOT NULL`
+    );
+    const avgDuration = parseFloat(durationRes.rows[0]?.avgSeconds || '0');
+    const minDuration = parseFloat(durationRes.rows[0]?.minSeconds || '0');
+    const maxDuration = parseFloat(durationRes.rows[0]?.maxSeconds || '0');
+
+    // 4. Sessions per hour (for peak hours heatmap)
+    const hourlyRes = await pool.query(
+      `SELECT EXTRACT(HOUR FROM created_at) as "hour", COUNT(*) as count
+       FROM intake_sessions
+       GROUP BY EXTRACT(HOUR FROM created_at)
+       ORDER BY "hour"`
+    );
+
+    // 5. Sessions per day (last 14 days trend)
+    const dailyRes = await pool.query(
+      `SELECT DATE(created_at) as "date", COUNT(*) as count
+       FROM intake_sessions
+       WHERE created_at >= NOW() - INTERVAL '14 days'
+       GROUP BY DATE(created_at)
+       ORDER BY "date"`
+    );
+
+    // 6. Messages per session (avg)
+    const msgCountRes = await pool.query(
+      `SELECT AVG(msg_count) as "avgMessages" FROM (
+         SELECT session_id, COUNT(*) as msg_count FROM messages GROUP BY session_id
+       ) sub`
+    );
+
+    // 7. Safety event totals
+    const safetyTotalRes = await pool.query('SELECT COUNT(*) FROM safety_events');
+    const safetyBlockedRes = await pool.query('SELECT COUNT(*) FROM safety_events WHERE response_blocked = true');
+
+    res.json({
+      funnel,
+      triage: triageRes.rows,
+      duration: {
+        avgSeconds: Math.round(avgDuration),
+        minSeconds: Math.round(minDuration),
+        maxSeconds: Math.round(maxDuration)
+      },
+      hourly: hourlyRes.rows,
+      daily: dailyRes.rows,
+      avgMessagesPerSession: parseFloat(msgCountRes.rows[0]?.avgMessages || '0').toFixed(1),
+      safety: {
+        total: parseInt(safetyTotalRes.rows[0].count, 10),
+        blocked: parseInt(safetyBlockedRes.rows[0].count, 10)
+      },
+      status: statusMap
+    });
+  } catch (err) {
+    console.error('Failed to retrieve analytics:', err);
+    res.status(500).json({ error: 'Failed to retrieve analytics data.' });
+  }
+});
+
 export default router;
