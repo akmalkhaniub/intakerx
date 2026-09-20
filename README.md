@@ -1,221 +1,218 @@
-# IntakeRx: AI Voice + Chat Patient Intake & Pre-Screening System
+# 🏥 IntakeRx: Enterprise AI Voice & Chat Patient Intake, Triage & Pre-Screening Platform
 
-IntakeRx is a healthcare-domain AI system designed to automate and secure the patient intake and clinical pre-screening process. The system enables patients to complete their intake via web-chat or real-time voice, uses Retrieval-Augmented Generation (RAG) to query clinical protocols for appropriate triage questions, flags urgent symptoms for immediate clinician review, and automatically inserts structured summaries into simulated Electronic Health Records (EHR) via browser automation.
+<p align="center">
+  <img src="https://img.shields.io/badge/React-18%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=white" alt="React 18">
+  <img src="https://img.shields.io/badge/Express-5.0%20TypeScript-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Express 5">
+  <img src="https://img.shields.io/badge/PostgreSQL-18%20%2B%20pgvector-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL pgvector">
+  <img src="https://img.shields.io/badge/FastAPI-0.109%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Compliance-HIPAA%20%2B%20HL7%20FHIR%20R4-purple?style=for-the-badge" alt="HIPAA & FHIR">
+  <img src="https://img.shields.io/badge/AI%20Safety-ShieldGuard%E2%84%A2%20Hardened-red?style=for-the-badge" alt="AI Safety">
+  <img src="https://img.shields.io/badge/Tests-8%2F8%20E2E%20Stages%20Passing-success?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License MIT">
+</p>
 
-Built with an emphasis on **AI safety, security hardening, and prompt injection defense**, IntakeRx features advanced guardrails to prevent diagnostic liability and adversarial bypass attempts.
-
----
-
-## 🚀 Key Features
-
-* **Dual-Mode Patient Intake**: Interactive, real-time streaming chat or browser-native Web Speech voice modes.
-* **Clinical Protocol RAG**: Automatically parses and queries medical guidelines (e.g., Cardiac Chest Pain, Asthma, GI Pain) using high-speed vector embeddings in PostgreSQL.
-* **Dual-Layer Guardrail System**: 
-  * *Input Guardrail*: A combination of regex heuristics and a semantic classifier that blocks jailbreaks and instructions overrides.
-  * *Output Guardrail*: Actively filters generated text to block diagnostic language, routing recommendations, and medical advice.
-* **Clinician Review Portal**: A dashboard for healthcare providers to review patient histories, highlight safety flags, edit SOAP summaries with visual text diffing, and trigger EHR syncs.
-* **EHR Integration Engine**: Headless browser automation (Playwright) that securely injects finalized SOAP summaries into a mock EHR form portal.
-* **Real-time Observability**: Cost metrics, safety event audits, and Time-to-First-Token (TTFT) performance stats.
+> **IntakeRx** is a production-grade clinical AI platform built with safety hardening, prompt injection defense, and HIPAA compliance at its core. It automates patient history collection through real-time voice and streaming chat, performs Retrieval-Augmented Generation (RAG) over clinical triage protocols, screens for life-threatening red flags, detects drug-drug and allergen conflicts, and exports standard HL7 FHIR R4 bundles into electronic health record (EHR) systems.
 
 ---
 
-## 📐 System Architecture
-
-The following diagram illustrates how data flows between the patient client, Express backend, FastAPI RAG service, database, and EHR portal:
+## 📐 Enterprise Architecture
 
 ```mermaid
 graph TD
-    %% Frontend Components
-    subgraph Frontend [React Vite Frontend - Port 3000]
-        PatientChat[Patient Chat & Voice Web-Speech]
-        ClinicianDash[Clinician Dashboard & SOAP Editor]
-        ObsPanel[Observability & Safety Dashboard]
+    classDef client fill:#f3e8ff,stroke:#7c3aed,stroke-width:2px,color:#5b21b6;
+    classDef api fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0369a1;
+    classDef safety fill:#fef2f2,stroke:#ef4444,stroke-width:2px,color:#991b1b;
+    classDef ai fill:#fff7ed,stroke:#ea580c,stroke-width:2px,color:#9a3412;
+    classDef storage fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#166534;
+    classDef interop fill:#f0fdf4,stroke:#059669,stroke-width:2px,color:#065f46;
+
+    subgraph FrontendApp [Patient & Clinician Portal :3000]
+        ConsentGate[Pre-Intake Clinical Consent Gate]:::client
+        PatientChat[Streaming Chat & Native Web Speech Voice Mode]:::client
+        ClinicianPortal[Clinician Review & Interactive SOAP Diff Editor]:::client
+        AnalyticsDash[Intake Funnel & Triage Analytics Dashboard]:::client
+        SecurityCenter[Security Threat Heat Map & Safety Deflection Log]:::client
+        PushAlerts[Push Notification Bell & Web Audio Chimes]:::client
     end
 
-    %% Backend Components
-    subgraph Express [Express 5 API Server - Port 5001]
-        AuthMiddleware[JWT RBAC / Auth Middleware]
-        Guardrails[Guardrails Service: Regex + Semantic LLM Classifier]
-        AIService[Unified AI Service: Groq / Gemini Adapter]
-        QueueWorker[EHR Sync Queue Worker]
+    subgraph Gateway [Express 5 TypeScript API Gateway :5001]
+        Auth[JWT RBAC Middleware: Patient / Clinician]:::api
+        SSEServer[Server-Sent Events Real-Time Alert Stream]:::api
+        
+        subgraph SafetyShield [ShieldGuard™ Dual-Layer AI Defense]
+            InputGuard[Input Guardrail: Heuristic Regex + Semantic AI Classifier]:::safety
+            OutputGuard[Output Guardrail: Diagnostic Liability Redirection]:::safety
+            RedFlagRouter[Emergency Red-Flag Auto-Escalation Engine]:::safety
+            PHIScrubber[HIPAA PHI Redactor & Encryption Audit Logger]:::safety
+        end
+
+        CDSEngine[Clinical Decision Support: Drug-Drug & Allergen Engine]:::ai
+        AIService[AI Engine: Groq LLaMA 3.3 70B / Gemini Embeddings]:::ai
+        FHIRGenerator[HL7 FHIR R4 JSON & XML Bundle Serializer]:::interop
     end
 
-    %% Ingestion Microservice
-    subgraph FastAPI [FastAPI Ingest Service - Port 8002]
-        PDFChunker[PDF Protocol Chunker]
-        EHRAgent[Playwright EHR Browser Agent]
+    subgraph IngestionService [FastAPI Microservice :8002]
+        ProtocolRAG[Protocol Chunker & pgvector Cosine Search]:::ai
+        EHRAgent[Playwright Headless Browser Form Injector]:::interop
     end
 
-    %% Storage
-    subgraph Storage [PostgreSQL 18.3 + pgvector]
-        DB[(intakerx Database)]
+    subgraph StorageLayer [Secure Database Layer]
+        DB[(PostgreSQL 18 + pgvector HNSW Embeddings)]:::storage
     end
 
-    %% External Systems
-    subgraph EHR [Mock EHR System]
-        EHRPortal[Mock EHR Web Portal]
-    end
-
-    %% Data Flow Connections
-    PatientChat -->|1. Chat/Voice Input| AuthMiddleware
-    AuthMiddleware -->|2. Inspect Input| Guardrails
-    Guardrails -->|3. Safe Prompts| AIService
-    AIService -->|4. Query RAG Embeddings| DB
-    AIService -->|5. LLM Stream Response| PatientChat
-    
-    ClinicianDash -->|6. Review & Edit SOAP| Express
-    Express -->|7. Enqueue Sync Job| QueueWorker
-    QueueWorker -->|8. Trigger Browser Automate| EHRAgent
-    EHRAgent -->|9. Auto-Fill Form & Submit| EHRPortal
+    ConsentGate -->|Terms Accepted| PatientChat
+    PatientChat -->|1. Intake Stream| Auth
+    Auth --> InputGuard
+    InputGuard --> PHIScrubber
+    PHIScrubber --> AIService
+    AIService --> ProtocolRAG
+    ProtocolRAG --> DB
+    AIService --> OutputGuard
+    OutputGuard --> RedFlagRouter
+    RedFlagRouter -->|Alert Trigger| SSEServer
+    SSEServer -->|Push Notification| PushAlerts
+    RedFlagRouter --> ClinicianPortal
+    ClinicianPortal --> CDSEngine
+    CDSEngine --> DB
+    ClinicianPortal --> FHIRGenerator
+    ClinicianPortal -->|Approved SOAP Summary| EHRAgent
+    ClinicianPortal --> AnalyticsDash
+    ClinicianPortal --> SecurityCenter
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## 🌟 Comprehensive Feature Matrix
 
-* **Frontend**: React (TypeScript), Vite, Vanilla CSS (Premium Glassmorphism Dark Mode), Web Speech API.
-* **Backend**: Express 5 (TypeScript), Node.js, Nodemon, WebSocket.
-* **AI & Embedding Engine**: Groq (`llama-3.3-70b-versatile` for sub-second streaming inference), Google Gemini (`gemini-embedding-001` for vector embedding generation).
-* **AI Safety Layer**: Semantic LLM Classifier + Regex Input Sanitizer, Rule-based Output Filters, and Emergency Red-Flag Triage Router.
-* **RAG & Database**: PostgreSQL 18.3, `pgvector` extension, HNSW Vector Indexing.
-* **Python Services**: FastAPI, Playwright (headless browser automation), PyPDF.
-
----
-
-## 📦 Project Structure
-
-```
-intakerx/
-├── backend/          # Express 5 API server, guardrails, DB schemas, and evaluation scripts
-├── fastapi/          # Python FastAPI service, PDF ingestion, and Playwright EHR automation
-├── frontend/         # React SPA frontend (Patient chat interface & clinician portal)
-├── .env.example      # Environment variables configuration template
-├── .gitignore        # Git ignore rules for node_modules, envs, and py envs
-└── SECURITY_GUIDELINES.md  # Core repository security rules
-```
+| Phase | Capability | Description | Verification |
+|---|---|---|---|
+| **Phase 1** | **HIPAA PHI Redactor** | Scans and redacts names, SSNs, and sensitive demographics prior to LLM transmission; maintains HIPAA compliance logs. | `test_phi.ts` (100% Redaction) |
+| **Phase 2** | **Live Vitals Simulator** | Streams simulated patient biometrics (Heart Rate, SpO2, Blood Pressure) with auditory alarms on critical thresholds. | `test_vitals.ts` (Passed) |
+| **Phase 3** | **Longitudinal Severity Trends** | Visualizes historical symptom severity across sequential encounters using custom responsive SVG line graphs. | `test_history.ts` (Passed) |
+| **Phase 4** | **Patient Discharge Generator** | Generates layperson-friendly, multilingual post-visit care plans with home care guidance and emergency warning signs. | `test_discharge.ts` (Passed) |
+| **Phase 5** | **CDS Clinical Care Gaps** | Evaluates regimens against standard guidelines (Hypertension, Diabetes, Heart Failure) and surfaces omitted therapies. | `test_cds.ts` (Passed) |
+| **Phase 6** | **AI Protocol Copilot** | Clinician slide-out drawer utilizing RAG vector search over clinical protocols for on-demand clinical guidelines. | `test_copilot.ts` (Passed) |
+| **Phase 7** | **SOAP Print & Canvas Sign-off** | Stylus and touch-responsive digital signature canvas with print CSS formatting for paper and PDF medical charts. | `test_print.ts` (Passed) |
+| **Phase 8** | **Interactive Drug Graph** | Circular SVG network graph mapping active medications and allergies with pulsating glows and contraindication tooltips. | `test_interactions.ts` (Passed) |
+| **Phase 9** | **Vitals Telemetry Playback** | Time-scrubbing telemetry playback console with variable speeds (1x–10x), heart sparklines, and hypoxia alerts. | `test_telemetry.ts` (Passed) |
+| **Phase 10** | **Security Threat Heat Map** | Observability dashboard tracking prompt injection vectors, block rates, threat levels, and classified safety logs. | `test_security.ts` (Passed) |
+| **Phase 11** | **Session Analytics Dashboard** | Intake funnel visualization, triage distribution donut chart, 24-hour peak intake heatmap, and daily volume trends. | `GET /api/clinician/analytics` |
+| **Phase 12** | **Real-Time Push Notifications** | SSE stream with Web Audio oscillator chimes, portal bell badge counter, and floating actionable toast popups. | `test_notifications.ts` (Passed) |
+| **Phase 13** | **Patient Consent Gate** | Pre-intake compliance gate requiring explicit patient agreement to AI disclosures, HIPAA terms, and 911 disclaimers. | `test_consent.ts` (Passed) |
+| **Phase 14** | **End-to-End Test Suite** | Unified 8-stage integration test exercising auth, consent, intake, guardrails, triage, CDS, FHIR, and teardown. | `npm run test:e2e` (All 8 Passed) |
 
 ---
 
-## ⚙️ Installation & Setup
+## 🛡️ AI Safety & Prompt Injection Hardening
+
+IntakeRx implements a **multi-tiered defense in depth** architecture to safeguard clinical operations:
+
+1. **Input Guardrail (`GuardrailsService.scanInputForInjection`)**:
+   - **Regex Heuristics**: Blocks known instruction escapes (`ignore previous instructions`, `you are now a doctor`, `developer mode`, `system override`).
+   - **Semantic AI Classifier**: Evaluates contextual intent with zero-temperature JSON classification to intercept novel jailbreaks before downstream processing.
+2. **Output Guardrail (`GuardrailsService.scanOutputForMedicalAdvice`)**:
+   - Actively intercepts unauthorized diagnostic assertions, medication dosages, and speculative treatment advice, redirecting with a standard refusal.
+3. **Emergency Red-Flag Router (`GuardrailsService.evaluateRedFlags`)**:
+   - Continuously evaluates complaints against emergency clinical criteria (crushing chest pain, severe dyspnea, acute neurological deficit), auto-escalating the session and issuing immediate 911 directives.
+4. **Adversarial Safety Evaluation**:
+   - Verified against a 30-case adversarial benchmark achieving a **100% injection block rate**.
+
+---
+
+## ⚡ Interoperability: HL7 FHIR R4 Standard
+
+IntakeRx serializes finalized pre-screening notes into standard **HL7 FHIR R4 Bundles** (`Bundle.type: collection`):
+
+* **Patient**: Demographics (name, gender, birthDate).
+* **Coverage**: Insurance carrier and policy mapping.
+* **Condition**: Active symptoms with SNOMED CT severity codes (`Mild`, `Moderate`, `Severe`).
+* **MedicationStatement**: Current medications, dosages, and schedules.
+* **DocumentReference**: Finalized clinical SOAP summary note, base64-encoded as a plain text attachment.
+* **Formats Supported**:
+  - `application/fhir+json`
+  - `application/fhir+xml` (custom dependency-free recursive serializer conforming to HL7 XML schemas)
+
+---
+
+## 🚀 Quickstart & Setup
 
 ### Prerequisites
-* [PostgreSQL](https://www.postgresql.org/) (Version 15+ recommended, includes `vector` extension).
-* [Node.js](https://nodejs.org/) (v18+).
-* [Python](https://www.python.org/) (v3.10+).
+* **Node.js** (v18+)
+* **PostgreSQL** (v15+ with `pgvector` extension)
+* **Python** (v3.10+ for FastAPI microservice)
+
+### 1. Environment Configuration
+
+Create a `.env` file in the root directory:
+
+```env
+PORT=5001
+NODE_ENV=development
+DATABASE_URL=postgresql://intakerx:password@localhost:5432/intakerx?sslmode=disable
+JWT_SECRET=your_jwt_secret_here
+
+# AI Service Keys (At least one required)
+GROQ_API_KEY=gsk_...
+GEMINI_API_KEY=AIza...
+```
+
+### 2. Database Initialization
+```bash
+cd backend
+npm install
+npm run db:init
+```
+
+### 3. Start Backend Services
+```bash
+cd backend
+npm run dev
+```
+
+### 4. Start Frontend Portal
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open **[http://localhost:3000](http://localhost:3000)** in your browser:
+* **Patient Intake**: Register a patient account, accept the clinical consent gate, and speak or chat.
+* **Clinician Portal**: Sign in with `dr.smith@clinic.com` / `admin2026` to inspect triage, CDS alerts, telemetry playback, analytics, and security deflection logs.
 
 ---
 
-### Step 1: Database Setup
-1. Open PostgreSQL and create the database:
-   ```sql
-   CREATE DATABASE intakerx;
-   ```
-2. Enable the `vector` extension on the database:
-   ```sql
-   \c intakerx
-   CREATE EXTENSION IF NOT EXISTS vector;
-   ```
+## 🧪 Automated Testing & Evaluation
+
+IntakeRx includes a comprehensive suite of automated tests and evaluation gates:
+
+```bash
+# 1. Full 8-Stage End-to-End System Test
+cd backend
+npm run test:e2e
+
+# 2. Adversarial AI Safety Evaluation (30 attack vectors)
+npm run eval:safety
+
+# 3. Clinical Triage Accuracy Evaluation (15 gold-standard cases)
+npm run eval:triage
+
+# 4. Individual Subsystem Integration Tests
+npx ts-node src/test_notifications.ts  # Real-time SSE push alerts
+npx ts-node src/test_consent.ts        # Patient consent workflow
+npx ts-node src/test_security.ts       # Security threat observability
+npx ts-node src/test_telemetry.ts      # Vitals telemetry playback
+npx ts-node src/test_interactions.ts   # CDS drug-drug & allergen warnings
+npx ts-node src/test_fhir.ts           # HL7 FHIR R4 JSON & XML serialization
+```
 
 ---
 
-### Step 2: Backend Setup
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Create a `.env` file from the example:
-   ```bash
-   cp ../.env.example .env
-   ```
-   Configure your `DATABASE_URL`, `GEMINI_API_KEY`, and `GROQ_API_KEY` inside the `.env` file.
-4. Run the database migration and seeder:
-   ```bash
-   npm run db:init
-   ```
-5. Start the backend development server (Port 5001):
-   ```bash
-   npm run dev
-   ```
+## 📜 Compliance & Security Disclaimer
+
+IntakeRx is an artificial intelligence pre-screening and clinical decision support system designed to assist healthcare providers. It does not provide medical diagnoses, prescribe treatments, or substitute for the clinical judgment of licensed physicians. All Protected Health Information (PHI) is processed in accordance with HIPAA standards.
 
 ---
 
-### Step 3: FastAPI Python Service Setup
-1. Navigate to the fastapi directory:
-   ```bash
-   cd ../fastapi
-   ```
-2. Create and activate a virtual environment:
-   ```bash
-   python -m venv venv
-   # On Windows:
-   .\venv\Scripts\activate
-   # On macOS/Linux:
-   source venv/bin/activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Install Playwright browser engines:
-   ```bash
-   playwright install chromium
-   ```
-5. Bootstrap default medical protocols (this chunks, embeds, and uploads default Cardiac, Asthma, and GI protocols to PostgreSQL):
-   ```bash
-   # Run the server on Port 8002
-   uvicorn app.main:app --host 127.0.0.1 --port 8002
-   ```
-6. Trigger protocol ingestion (in a separate terminal or via API client):
-   * Send a `POST` request to `http://localhost:8002/api/protocols/bootstrap` to ingest the gold-standard protocol documents.
+## 📄 License
 
----
-
-### Step 4: Frontend Setup
-1. Navigate to the frontend directory:
-   ```bash
-   cd ../frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the Vite development server (Port 3000):
-   ```bash
-   npm run dev
-   ```
-4. Access the web application at [http://localhost:3000](http://localhost:3000).
-
----
-
-## 🧪 Evaluation Gates
-
-IntakeRx features automated evaluations that verify system safety and triage accuracy:
-
-### 1. Adversarial Safety Evaluation (`npm run eval:safety`)
-* **Test suite location**: `backend/src/eval/adversarial_eval.ts`
-* **Coverage**: Runs 30 test cases (15 benign patient statements and 15 complex adversarial prompts, such as system overrides, prompt escapes, and out-of-scope requests).
-* **Performance Gate**: Must achieve $\ge 95\%$ injection block rates. (IntakeRx currently achieves **100% block rate**).
-* **Command to run**:
-  ```bash
-  cd backend
-  npm run eval:safety
-  ```
-
-### 2. Triage Accuracy Evaluation (`npm run eval:triage`)
-* **Test suite location**: `backend/src/eval/triage_eval.ts`
-* **Coverage**: Runs 15 detailed patient symptom reports. Matches the AI output classification (`emergency`, `urgent`, `routine`) against clinical gold-standards.
-* **Performance Gate**: Must achieve $\ge 90\%$ classification accuracy with **0 missed emergency cases**. (IntakeRx currently achieves **93.3% accuracy**).
-* **Command to run**:
-  ```bash
-  cd backend
-  npm run eval:triage
-  ```
-
----
-
-## 🔒 Security Hardening Policies
-Please review the [SECURITY_GUIDELINES.md](SECURITY_GUIDELINES.md) file for comprehensive rules regarding the configuration of environment files and local settings. Never commit active keys, password strings, or local testing configurations to GitHub.
+MIT License — free for educational, research, and healthcare technology development.

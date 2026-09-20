@@ -1,0 +1,25 @@
+[
+  {
+    "id": "IRX-001",
+    "status": "TODO",
+    "priority": 1,
+    "title": "Consolidate Fragmented Test Scripts into Unified Vitest Suite",
+    "description": "Convert `backend/src/test_cds.ts`, `backend/src/test_fhir.ts`, and `backend/src/test_discharge.ts` into a structured Vitest test suite with mock LLM fixtures under `backend/tests/`.",
+    "acceptance_criteria": [
+      "Tests run via npm test in backend",
+      "Validates clinical guardrail blocking and FHIR JSON serialization offline",
+      "Exits with 0"
+    ]
+  },
+  {
+    "id": "IRX-002",
+    "status": "TODO",
+    "priority": 2,
+    "title": "Implement Client-Side PII Scrubbing Middleware",
+    "description": "Add client-side and pre-prompt sanitization regex and named entity filters that redact SSN, credit cards, and direct identifiers with [REDACTED_PII] tokens.",
+    "acceptance_criteria": [
+      "Redacts sensitive regex patterns before LLM API transmission",
+      "Unit tests verify redaction of sample patient inputs"
+    ]
+  }
+]

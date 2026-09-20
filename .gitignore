@@ -47,3 +47,7 @@ lerna-debug.log*
 /playwright-report/
 /blob-report/
 /playwright/.local-browsers/
+
+# Workflows (requires separate OAuth workflow scope)
+.github/
+
