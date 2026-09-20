@@ -9,6 +9,7 @@
     "dev": "nodemon --watch src -e ts --exec ts-node src/index.ts",
     "eval:safety": "ts-node src/eval/adversarial_eval.ts",
     "eval:triage": "ts-node src/eval/triage_eval.ts",
+    "test:e2e": "ts-node src/test_e2e.ts",
     "db:init": "ts-node src/db.ts"
   },
   "dependencies": {
