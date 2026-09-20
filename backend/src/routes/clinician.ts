@@ -7,6 +7,7 @@ import { GuardrailsService } from '../services/guardrails';
 import { activeCallSockets } from '../activeCalls';
 import { AIService } from '../services/ai';
 import { CDSService } from '../services/cds';
+import { notificationBus, ClinicianNotification } from '../notifications';
 
 const router = Router();
 
@@ -908,6 +909,44 @@ router.get('/analytics', async (req: AuthenticatedRequest, res: Response) => {
     console.error('Failed to retrieve analytics:', err);
     res.status(500).json({ error: 'Failed to retrieve analytics data.' });
   }
+});
+
+// SSE endpoint for real-time clinician notifications
+router.get('/notifications/stream', (req: AuthenticatedRequest, res: Response) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+
+  // Send initial connection event
+  res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: new Date().toISOString() })}\n\n`);
+
+  const handler = (notification: ClinicianNotification) => {
+    try {
+      res.write(`data: ${JSON.stringify(notification)}\n\n`);
+    } catch (err) {
+      // Client disconnected
+    }
+  };
+
+  notificationBus.on('notification', handler);
+
+  // Keep-alive ping every 30s
+  const keepAlive = setInterval(() => {
+    try {
+      res.write(`: keep-alive\n\n`);
+    } catch (err) {
+      clearInterval(keepAlive);
+    }
+  }, 30000);
+
+  req.on('close', () => {
+    notificationBus.removeListener('notification', handler);
+    clearInterval(keepAlive);
+    console.log('[SSE] Clinician notification stream closed.');
+  });
 });
 
 export default router;

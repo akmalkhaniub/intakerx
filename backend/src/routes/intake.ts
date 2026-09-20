@@ -5,6 +5,7 @@ import { AuthenticatedRequest, authenticateToken } from '../middleware/auth';
 import { AIService, ChatMessage } from '../services/ai';
 import { GuardrailsService } from '../services/guardrails';
 import { PHIService } from '../services/phi';
+import { notificationBus } from '../notifications';
 
 const router = Router();
 
@@ -263,6 +264,13 @@ router.post('/sessions/:id/messages', authenticateToken as any, async (req: Auth
         [id, 'agent', blockReply]
       );
 
+      notificationBus.push(
+        'guardrail_deflection',
+        'Prompt Injection Deflected',
+        `A safety violation was intercepted: ${inputGuard.reason || 'Pattern matched known jailbreak'}`,
+        { sessionId: id, severity: 'warning' }
+      );
+
       res.json({
         reply: savedReply.rows[0],
         session: { id, status: session.status, currentStep: session.currentStep },
@@ -293,6 +301,13 @@ router.post('/sessions/:id/messages', authenticateToken as any, async (req: Auth
          SET status = 'escalated', triage_level = 'emergency', triage_rationale = $2, updated_at = NOW()
          WHERE id = $1`,
         [id, `Emergency red flags matched: ${redactedContent}`]
+      );
+
+      notificationBus.push(
+        'emergency_triage',
+        'CRITICAL Emergency Triage Alert',
+        `Patient triggered red-flag emergency symptoms: ${redactedContent.slice(0, 100)}`,
+        { sessionId: id, severity: 'critical' }
       );
 
       res.json({
@@ -533,6 +548,20 @@ You MUST respond strictly in the following JSON format:
       } catch (sumErr) {
         console.error('Failed to pre-generate SOAP summary:', sumErr);
       }
+
+      notificationBus.push(
+        'intake_completed',
+        'Intake Ready for Review',
+        `Patient intake #${id.slice(0, 8)} reached ${nextStep} stage. SOAP summary generated.`,
+        { sessionId: id, severity: 'info' }
+      );
+    } else if (isSessionEscalated) {
+      notificationBus.push(
+        'session_escalated',
+        'Session Escalated',
+        `Intake #${id.slice(0, 8)} has been escalated: ${triageRat || 'Urgent/emergency review required.'}`,
+        { sessionId: id, severity: 'warning' }
+      );
     }
 
     res.json({

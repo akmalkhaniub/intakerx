@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw, Phone, Printer } from 'lucide-react';
+import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw, Phone, Printer, Bell } from 'lucide-react';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -59,6 +59,12 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   // Analytics Dashboard States
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState<boolean>(false);
+
+  // Push Notification States
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState<number>(0);
+  const [showNotifMenu, setShowNotifMenu] = useState<boolean>(false);
+  const [activeToast, setActiveToast] = useState<any | null>(null);
 
   // Vitals Telemetry Playback Slider State
   const [playbackIndex, setPlaybackIndex] = useState<number>(0);
@@ -267,6 +273,78 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
       loadAnalytics();
     }
   }, [token, currentTab]);
+
+  // Audio tone generator for incoming push alerts
+  const playNotificationBeep = (severity: string) => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const audioCtx = new AudioCtx();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      if (severity === 'critical') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.35);
+      } else {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      }
+    } catch (e) {
+      // Audio playback silently catches if browser policy blocks autoplay before interaction
+    }
+  };
+
+  // SSE Stream Listener for real-time notifications
+  useEffect(() => {
+    if (!token) return;
+    const streamUrl = `${backendUrl}/api/clinician/notifications/stream?token=${encodeURIComponent(token)}`;
+    const es = new EventSource(streamUrl);
+
+    es.onmessage = (event) => {
+      try {
+        const notif = JSON.parse(event.data);
+        if (notif.type === 'connected') return;
+
+        setNotifications(prev => [notif, ...prev].slice(0, 40));
+        setUnreadNotifsCount(prev => prev + 1);
+        setActiveToast(notif);
+        playNotificationBeep(notif.severity);
+
+        // Auto-refresh sessions list when a notification indicates patient change
+        loadSessionsList();
+      } catch (err) {
+        console.error('Failed to parse SSE notification:', err);
+      }
+    };
+
+    es.onerror = () => {
+      // EventSource automatically retries connections
+    };
+
+    return () => {
+      es.close();
+    };
+  }, [token]);
+
+  // Auto-dismiss floating toast after 5 seconds
+  useEffect(() => {
+    if (!activeToast) return;
+    const timer = setTimeout(() => setActiveToast(null), 5000);
+    return () => clearTimeout(timer);
+  }, [activeToast]);
 
   const loadSessionDetails = async (id: string, showLoadingSpinner = true) => {
     setCopilotQuery('');
@@ -1951,6 +2029,152 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              {/* Push Notification Bell & Dropdown */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNotifMenu(!showNotifMenu);
+                    setUnreadNotifsCount(0);
+                  }}
+                  style={{
+                    position: 'relative',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid var(--glass-border)',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    color: unreadNotifsCount > 0 ? '#ef4444' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s',
+                    outline: 'none'
+                  }}
+                  title="Real-time Clinical Notifications"
+                >
+                  <Bell size={16} />
+                  {unreadNotifsCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      right: '-4px',
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      fontSize: '9px',
+                      fontWeight: 'bold',
+                      borderRadius: '10px',
+                      padding: '1px 5px',
+                      minWidth: '14px',
+                      textAlign: 'center',
+                      boxShadow: '0 0 8px rgba(239, 68, 68, 0.6)'
+                    }}>
+                      {unreadNotifsCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notifications Dropdown */}
+                {showNotifMenu && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '38px',
+                    right: 0,
+                    width: '320px',
+                    maxHeight: '400px',
+                    backgroundColor: '#0f172a',
+                    border: '1px solid var(--glass-border)',
+                    borderRadius: '10px',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    zIndex: 1000,
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      padding: '10px 14px',
+                      borderBottom: '1px solid var(--glass-border)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      backgroundColor: 'rgba(255,255,255,0.02)'
+                    }}>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white' }}>
+                        Notifications ({notifications.length})
+                      </span>
+                      {notifications.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setNotifications([])}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            fontSize: '10px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '6px' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
+                          No active notifications.
+                        </div>
+                      ) : (
+                        notifications.map((n, idx) => {
+                          const badgeBg = n.severity === 'critical' ? 'rgba(239, 68, 68, 0.2)' : n.severity === 'warning' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(59, 130, 246, 0.2)';
+                          const badgeColor = n.severity === 'critical' ? '#ef4444' : n.severity === 'warning' ? '#f59e0b' : '#3b82f6';
+                          return (
+                            <div
+                              key={n.id || idx}
+                              onClick={() => {
+                                if (n.sessionId) {
+                                  loadSessionDetails(n.sessionId);
+                                  setCurrentTab('workspace');
+                                  setShowNotifMenu(false);
+                                }
+                              }}
+                              style={{
+                                padding: '10px',
+                                borderRadius: '6px',
+                                marginBottom: '4px',
+                                backgroundColor: 'rgba(255,255,255,0.02)',
+                                border: '1px solid rgba(255,255,255,0.04)',
+                                cursor: n.sessionId ? 'pointer' : 'default',
+                                textAlign: 'left',
+                                transition: 'background 0.2s'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                                <span style={{
+                                  fontSize: '9px',
+                                  fontWeight: 'bold',
+                                  backgroundColor: badgeBg,
+                                  color: badgeColor,
+                                  padding: '1px 6px',
+                                  borderRadius: '4px'
+                                }}>
+                                  {n.title}
+                                </span>
+                                <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                                  {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                              <p style={{ margin: '3px 0 0 0', fontSize: '11px', color: 'var(--text-main)', lineHeight: '1.3' }}>
+                                {n.message}
+                              </p>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 Clinician: <strong>{clinician?.email}</strong>
               </span>
@@ -1976,6 +2200,72 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               </button>
             </div>
           </div>
+
+          {/* Floating Push Notification Toast */}
+          {activeToast && (
+            <div style={{
+              position: 'fixed',
+              top: '70px',
+              right: '24px',
+              zIndex: 9999,
+              maxWidth: '380px',
+              backgroundColor: '#0f172a',
+              border: `1px solid ${activeToast.severity === 'critical' ? 'rgba(239, 68, 68, 0.6)' : activeToast.severity === 'warning' ? 'rgba(245, 158, 11, 0.6)' : 'rgba(59, 130, 246, 0.6)'}`,
+              borderRadius: '10px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+              padding: '14px 16px',
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'flex-start'
+            }}>
+              <span style={{ fontSize: '20px' }}>
+                {activeToast.severity === 'critical' ? '🚨' : activeToast.severity === 'warning' ? '⚠️' : '🔔'}
+              </span>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    color: activeToast.severity === 'critical' ? '#ef4444' : activeToast.severity === 'warning' ? '#f59e0b' : '#3b82f6'
+                  }}>
+                    {activeToast.title}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveToast(null)}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '14px', cursor: 'pointer', lineHeight: 1 }}
+                  >
+                    &times;
+                  </button>
+                </div>
+                <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-main)', lineHeight: '1.3' }}>
+                  {activeToast.message}
+                </p>
+                {activeToast.sessionId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      loadSessionDetails(activeToast.sessionId);
+                      setCurrentTab('workspace');
+                      setActiveToast(null);
+                    }}
+                    style={{
+                      marginTop: '8px',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: '4px',
+                      color: 'white',
+                      fontSize: '10px',
+                      padding: '3px 8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Inspect Session →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
             {currentTab === 'security' ? (
