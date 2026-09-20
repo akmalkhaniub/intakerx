@@ -197,6 +197,11 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
   const [symptoms, setSymptoms] = useState<any[]>([]);
   const [medications, setMedications] = useState<any[]>([]);
   
+  // Pre-Intake Consent State
+  const [hasConsented, setHasConsented] = useState<boolean | null>(null);
+  const [consentCheckbox, setConsentCheckbox] = useState<boolean>(false);
+  const [isSubmittingConsent, setIsSubmittingConsent] = useState<boolean>(false);
+
   // UI Control State
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -334,10 +339,65 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
   const handleLogout = () => {
     setToken('');
     setUser(null);
+    setHasConsented(null);
+    setConsentCheckbox(false);
     setMessages([]);
     setSymptoms([]);
     setMedications([]);
     window.speechSynthesis.cancel();
+  };
+
+  // Check consent status when token is available
+  useEffect(() => {
+    if (!token) {
+      setHasConsented(null);
+      return;
+    }
+    const checkConsent = async () => {
+      try {
+        const res = await fetch(`${backendUrl}/api/intake/consent-status`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setHasConsented(data.hasConsented);
+        } else {
+          setHasConsented(true);
+        }
+      } catch (err) {
+        setHasConsented(true);
+      }
+    };
+    checkConsent();
+  }, [token]);
+
+  const handleAcceptConsent = async () => {
+    if (!consentCheckbox) return;
+    setIsSubmittingConsent(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/intake/consent`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          consentType: 'ai_intake_disclosure',
+          version: 'v1.0',
+          agreed: true
+        })
+      });
+      if (res.ok) {
+        setHasConsented(true);
+        if (!sessionId) {
+          startNewSession();
+        }
+      }
+    } catch (err) {
+      console.error('Consent error:', err);
+    } finally {
+      setIsSubmittingConsent(false);
+    }
   };
 
   // Session Handlers
@@ -563,6 +623,114 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
           <div style={styles.authFooter}>
             <button onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')} style={styles.switchModeBtn}>
               {authMode === 'login' ? "Don't have an account? Sign up" : 'Already registered? Log in'}
+            </button>
+          </div>
+        </div>
+      ) : hasConsented === false ? (
+        /* Pre-Intake Consent Gate */
+        <div style={{ ...styles.authContainer, maxWidth: '640px' }} className="glass-panel">
+          <div style={styles.authHeader}>
+            <span style={styles.authIcon}><ShieldCheck size={36} color="#10b981" /></span>
+            <h2 style={{ fontSize: '20px', color: 'white', marginTop: '10px' }}>Clinical Pre-Screening Consent</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+              Please review and accept clinic terms before beginning your AI-assisted intake.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', margin: '20px 0', textAlign: 'left' }}>
+            <div style={{
+              padding: '14px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(59, 130, 246, 0.05)',
+              border: '1px solid rgba(59, 130, 246, 0.2)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '16px' }}>🤖</span>
+                <strong style={{ fontSize: '13px', color: 'white' }}>AI-Assisted Clinical Pre-Screening</strong>
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                IntakeRx uses medical artificial intelligence to help transcribe and organize your symptoms before your physician visit. The assistant does <strong>not</strong> diagnose illnesses, prescribe medications, or replace direct clinician care.
+              </p>
+            </div>
+
+            <div style={{
+              padding: '14px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(16, 185, 129, 0.05)',
+              border: '1px solid rgba(16, 185, 129, 0.2)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '16px' }}>🔒</span>
+                <strong style={{ fontSize: '13px', color: 'white' }}>HIPAA Privacy & Encrypted Health Records</strong>
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                Your responses and Protected Health Information (PHI) are encrypted at rest and in transit in full compliance with HIPAA. Summarized notes are shared strictly with your clinic care team.
+              </p>
+            </div>
+
+            <div style={{
+              padding: '14px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(239, 68, 68, 0.05)',
+              border: '1px solid rgba(239, 68, 68, 0.2)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '16px' }}>🚨</span>
+                <strong style={{ fontSize: '13px', color: '#ef4444' }}>Emergency Medical Disclaimer</strong>
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                This portal is for routine pre-screening only. If you are experiencing chest pain, severe shortness of breath, sudden weakness, or any life-threatening emergency, call <strong>911</strong> immediately.
+              </p>
+            </div>
+          </div>
+
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '12px 14px',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(255,255,255,0.03)',
+            border: '1px solid var(--glass-border)',
+            cursor: 'pointer',
+            textAlign: 'left',
+            marginBottom: '16px'
+          }}>
+            <input
+              type="checkbox"
+              checked={consentCheckbox}
+              onChange={e => setConsentCheckbox(e.target.checked)}
+              style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#10b981' }}
+            />
+            <span style={{ fontSize: '12px', color: 'var(--text-main)', lineHeight: '1.4' }}>
+              I have read, understood, and consent to the AI Pre-Screening Disclosure, HIPAA Notice, and Clinical Terms.
+            </span>
+          </label>
+
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="btn btn-secondary"
+              style={{ flex: 1, padding: '12px', fontSize: '13px' }}
+            >
+              Sign Out
+            </button>
+            <button
+              type="button"
+              onClick={handleAcceptConsent}
+              disabled={!consentCheckbox || isSubmittingConsent}
+              className="btn"
+              style={{
+                flex: 2,
+                padding: '12px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                opacity: consentCheckbox ? 1 : 0.5,
+                cursor: consentCheckbox ? 'pointer' : 'not-allowed'
+              }}
+            >
+              {isSubmittingConsent ? 'Recording Consent...' : 'Accept & Begin Clinical Intake →'}
             </button>
           </div>
         </div>

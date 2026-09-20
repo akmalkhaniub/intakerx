@@ -271,6 +271,20 @@ export async function bootstrap() {
       console.log('Clinical interaction rules seeded.');
     }
 
+    // Create consent_records table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS consent_records (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        consent_type VARCHAR(100) NOT NULL,
+        version VARCHAR(20) NOT NULL DEFAULT 'v1.0',
+        agreed BOOLEAN DEFAULT TRUE,
+        ip_address VARCHAR(100),
+        signed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Create index on embeddings for fast retrieval
     await migrationPool.query(`
       CREATE INDEX IF NOT EXISTS protocol_embeddings_vector_idx 

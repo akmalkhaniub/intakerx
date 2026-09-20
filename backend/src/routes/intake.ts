@@ -16,6 +16,78 @@ const GREETINGS: Record<string, string> = {
   'zh-CN': "您好！我是 IntakeRx，我们诊所的 AI 患者接诊助手。在您就诊前，我将帮助收集您的病史、主诉和基本信息。首先，请描述您今天遇到的症状或问题。"
 };
 
+// Check patient consent status
+router.get('/consent-status', authenticateToken as any, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized.' });
+    return;
+  }
+
+  try {
+    const consentRes = await pool.query(
+      `SELECT id, consent_type as "consentType", version, agreed, signed_at as "signedAt"
+       FROM consent_records
+       WHERE patient_id = $1 AND agreed = TRUE
+       ORDER BY signed_at DESC
+       LIMIT 1`,
+      [req.user.id]
+    );
+
+    if (consentRes.rows.length > 0) {
+      res.json({ hasConsented: true, consent: consentRes.rows[0] });
+    } else {
+      res.json({ hasConsented: false });
+    }
+  } catch (err) {
+    console.error('Consent check error:', err);
+    res.status(500).json({ error: 'Failed to verify consent status.' });
+  }
+});
+
+// Record patient consent
+router.post('/consent', authenticateToken as any, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized.' });
+    return;
+  }
+
+  const { sessionId, consentType = 'ai_intake_disclosure', version = 'v1.0', agreed } = req.body;
+
+  if (agreed !== true) {
+    res.status(400).json({ error: 'Consent must be explicitly accepted to proceed.' });
+    return;
+  }
+
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO consent_records (patient_id, session_id, consent_type, version, agreed, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, signed_at as "signedAt"`,
+      [req.user.id, sessionId || null, consentType, version, true, String(clientIp)]
+    );
+
+    // Save audit log
+    await pool.query(
+      `INSERT INTO audit_logs (session_id, user_id, action, ip_address, details)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [sessionId || null, req.user.id, 'patient_consent_signed', String(clientIp), JSON.stringify({ consentType, version })]
+    );
+
+    res.json({
+      success: true,
+      consentId: result.rows[0].id,
+      signedAt: result.rows[0].signedAt,
+      consentType,
+      version
+    });
+  } catch (err) {
+    console.error('Record consent error:', err);
+    res.status(500).json({ error: 'Failed to record consent.' });
+  }
+});
+
 // Create new session
 router.post('/sessions', authenticateToken as any, async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) {
