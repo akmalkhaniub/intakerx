@@ -100,6 +100,12 @@ graph TD
 | **Phase 12** | **Real-Time Push Notifications** | SSE stream with Web Audio oscillator chimes, portal bell badge counter, and floating actionable toast popups. | `test_notifications.ts` (Passed) |
 | **Phase 13** | **Patient Consent Gate** | Pre-intake compliance gate requiring explicit patient agreement to AI disclosures, HIPAA terms, and 911 disclaimers. | `test_consent.ts` (Passed) |
 | **Phase 14** | **End-to-End Test Suite** | Unified 8-stage integration test exercising auth, consent, intake, guardrails, triage, CDS, FHIR, and teardown. | `npm run test:e2e` (All 8 Passed) |
+| **Phase 15** | **Documentation & Setup Overhaul** | Comprehensive architectural specifications, deployment instructions, test documentation, and diagrams. | Verified & Deployed |
+| **Phase 16** | **Interactive EHR Sandbox** | Epic, Cerner, and AthenaHealth sandbox gateway simulator, audit logs, and bidirectional FHIR webhook explorer. | `test_ehr_sandbox.ts` (Passed) |
+| **Phase 17** | **Differential Diagnosis Matrix** | Bayesian clinical likelihood ranker with ICD-10 diagnostic mapping, rule-out workups, and 1-click SOAP insertion. | `test_differential.ts` (Passed) |
+| **Phase 18** | **Anatomical Body Map & Pain Locator** | Interactive SVG anterior/posterior body diagram with 1-10 VAS sliders, quality selector, and radiation logging. | `test_body_map.ts` (Passed) |
+| **Phase 19** | **Ambient Clinical AI Scribe** | Multi-speaker conversational diarization with real-time entity recognition and automated synthesis into SOAP notes. | `test_ambient_scribe.ts` (Passed) |
+| **Phase 20** | **Follow-Up & Remote Monitoring** | Automated post-visit protocols (Day 1, 3, 7, 14), patient check-in surveys, and real-time deterioration alert escalation. | `test_followup.ts` (Passed) |
 
 ---
 
@@ -203,6 +209,11 @@ npx ts-node src/test_security.ts       # Security threat observability
 npx ts-node src/test_telemetry.ts      # Vitals telemetry playback
 npx ts-node src/test_interactions.ts   # CDS drug-drug & allergen warnings
 npx ts-node src/test_fhir.ts           # HL7 FHIR R4 JSON & XML serialization
+npx ts-node src/test_ehr_sandbox.ts    # EHR sandbox & webhook simulator
+npx ts-node src/test_differential.ts   # AI differential diagnosis matrix
+npx ts-node src/test_body_map.ts       # Anatomical body map & pain locator
+npx ts-node src/test_ambient_scribe.ts # Ambient scribe & speaker diarization
+npx ts-node src/test_followup.ts       # Automated post-visit follow-up protocols
 ```
 
 ---
