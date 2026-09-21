@@ -39,7 +39,9 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   // Clinical Decision Support State
   const [interactions, setInteractions] = useState<any[]>([]);
   const [isCheckingInteractions, setIsCheckingInteractions] = useState(false);
-  const [cdsTab, setCdsTab] = useState<'alerts' | 'graph'>('alerts');
+  const [cdsTab, setCdsTab] = useState<'alerts' | 'graph' | 'differential'>('alerts');
+  const [differentialData, setDifferentialData] = useState<any | null>(null);
+  const [isLoadingDifferential, setIsLoadingDifferential] = useState<boolean>(false);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
@@ -474,6 +476,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
 
       // Load active interactions
       await loadInteractions(id);
+      await loadDifferentialDiagnosis(id);
 
       // Load patient history for symptom tracking charts
       if (data.session.patientId) {
@@ -531,6 +534,23 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
       console.error('Failed to load clinical interactions:', err);
     } finally {
       setIsCheckingInteractions(false);
+    }
+  };
+
+  const loadDifferentialDiagnosis = async (sessionId: string) => {
+    setIsLoadingDifferential(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/sessions/${sessionId}/differential-diagnosis`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDifferentialData(data);
+      }
+    } catch (err) {
+      console.error('Failed to load differential diagnosis:', err);
+    } finally {
+      setIsLoadingDifferential(false);
     }
   };
 
@@ -862,6 +882,169 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
           <div style={styles.diffDeleted}>- {original || '(empty)'}</div>
           <div style={styles.diffAdded}>+ {currentValue}</div>
         </div>
+      </div>
+    );
+  };
+
+  const renderDifferentialDiagnosis = () => {
+    if (isLoadingDifferential) {
+      return (
+        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+          <RefreshCw className="pulse-red" size={24} color="#a855f7" style={{ marginBottom: '8px' }} />
+          <div>Computing AI differential diagnosis & clinical reasoning matrix...</div>
+        </div>
+      );
+    }
+
+    const candidates = differentialData?.candidates || [];
+    if (candidates.length === 0) {
+      return (
+        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+          No differential diagnosis candidates computed for this encounter.
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'left', marginTop: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            Ranked by Bayesian probability & clinical feature correlation:
+          </span>
+          <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 'bold' }}>
+            ● RAG Protocol Matching Active
+          </span>
+        </div>
+
+        {candidates.map((c: any) => {
+          const isHighProb = c.probability >= 70;
+          const isMedProb = c.probability >= 40 && c.probability < 70;
+          const probColor = isHighProb ? '#10b981' : isMedProb ? '#f59e0b' : '#64748b';
+          const urgencyColor = c.urgency === 'emergency' ? '#ef4444' : c.urgency === 'urgent' ? '#f59e0b' : '#10b981';
+
+          return (
+            <div
+              key={c.rank}
+              style={{
+                padding: '12px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                border: `1px solid ${isHighProb ? 'rgba(16, 185, 129, 0.3)' : 'var(--glass-border)'}`,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                    color: '#c084fc',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {c.rank}
+                  </span>
+                  <div>
+                    <strong style={{ fontSize: '13px', color: 'white' }}>{c.condition}</strong>
+                    <span style={{
+                      marginLeft: '8px',
+                      fontSize: '10px',
+                      fontFamily: 'monospace',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      color: '#94a3b8',
+                      padding: '2px 6px',
+                      borderRadius: '4px'
+                    }}>
+                      ICD-10: {c.icd10}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    backgroundColor: c.urgency === 'emergency' ? 'rgba(239, 68, 68, 0.2)' : c.urgency === 'urgent' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                    color: urgencyColor
+                  }}>
+                    {c.urgency.toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: probColor, fontFamily: 'monospace' }}>
+                    {c.probability}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Probability Bar */}
+              <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255, 255, 255, 0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ width: `${c.probability}%`, height: '100%', backgroundColor: probColor, borderRadius: '2px', transition: 'width 0.4s' }}></div>
+              </div>
+
+              <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                {c.rationale}
+              </p>
+
+              {/* Supporting Evidence Chips */}
+              {c.supportingEvidence && c.supportingEvidence.length > 0 && (
+                <div>
+                  <span style={{ fontSize: '10px', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Supporting Findings:</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {c.supportingEvidence.map((ev: string, i: number) => (
+                      <span key={i} style={{ fontSize: '9px', backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', padding: '2px 6px', borderRadius: '4px' }}>
+                        ✓ {ev}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Rule-Out Workup Checklist */}
+              {c.ruleOutCriteria && c.ruleOutCriteria.length > 0 && (
+                <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.25)', padding: '8px', borderRadius: '6px' }}>
+                  <span style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 'bold', display: 'block', marginBottom: '3px' }}>
+                    Recommended Confirmatory Workup:
+                  </span>
+                  <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '10px', color: 'var(--text-main)', lineHeight: '1.4' }}>
+                    {c.ruleOutCriteria.map((ro: string, i: number) => (
+                      <li key={i}>{ro}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditHpi(prev => prev + `\n\n[Differential Diagnosis]: ${c.condition} (${c.icd10}) - Probability: ${c.probability}%\n[Plan / Rule-Out Workup]: ${c.ruleOutCriteria.join('; ')}`);
+                  setIsEditing(true);
+                  alert(`Added "${c.condition}" and confirmatory workup into SOAP note!`);
+                }}
+                style={{
+                  alignSelf: 'flex-end',
+                  background: 'rgba(168, 85, 247, 0.1)',
+                  border: '1px solid rgba(168, 85, 247, 0.3)',
+                  color: '#c084fc',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                + Accept into SOAP Note
+              </button>
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -3059,10 +3242,30 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                         >
                           Live Interaction Map 🌐
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setCdsTab('differential')}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: cdsTab === 'differential' ? '#a855f7' : 'var(--text-muted)',
+                            borderBottom: cdsTab === 'differential' ? '2.5px solid #a855f7' : 'none',
+                            padding: '4px 6px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            outline: 'none'
+                          }}
+                        >
+                          🧠 Differential Diagnosis ({differentialData?.candidates?.length || 0})
+                        </button>
                       </div>
                       
                       {cdsTab === 'graph' ? (
                         renderCDSGraph()
+                      ) : cdsTab === 'differential' ? (
+                        renderDifferentialDiagnosis()
                       ) : isCheckingInteractions ? (
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, textAlign: 'left' }}>Evaluating clinical interactions...</p>
                       ) : interactions.length === 0 ? (

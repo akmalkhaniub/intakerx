@@ -9,6 +9,7 @@ import { AIService } from '../services/ai';
 import { CDSService } from '../services/cds';
 import { notificationBus, ClinicianNotification } from '../notifications';
 import { ehrSandboxService } from '../services/ehrSandbox';
+import { DiagnosisService } from '../services/diagnosis';
 
 const router = Router();
 
@@ -318,6 +319,18 @@ router.get('/sessions/:id/interactions', async (req: AuthenticatedRequest, res: 
   } catch (err) {
     console.error('Check interactions error:', err);
     res.status(500).json({ error: 'Failed to evaluate clinical interactions.' });
+  }
+});
+
+// AI Differential Diagnosis & Clinical Reasoning Matrix
+router.get('/sessions/:id/differential-diagnosis', async (req: AuthenticatedRequest, res: Response) => {
+  const id = req.params.id as string;
+  try {
+    const result = await DiagnosisService.generateDifferential(id);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Differential diagnosis error:', err);
+    res.status(500).json({ error: err.message || 'Failed to compute differential diagnosis matrix.' });
   }
 });
 
