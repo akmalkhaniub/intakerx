@@ -291,6 +291,23 @@ export async function bootstrap() {
       ON protocol_embeddings USING hnsw (embedding vector_cosine_ops);
     `);
 
+    // Create followup_schedules table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS followup_schedules (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        scheduled_at TIMESTAMP NOT NULL,
+        interval_days INTEGER NOT NULL DEFAULT 1,
+        survey_type VARCHAR(100) NOT NULL DEFAULT 'symptom_resolution',
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        patient_response JSONB,
+        clinician_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

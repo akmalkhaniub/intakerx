@@ -11,6 +11,7 @@ import { notificationBus, ClinicianNotification } from '../notifications';
 import { ehrSandboxService } from '../services/ehrSandbox';
 import { DiagnosisService } from '../services/diagnosis';
 import { AmbientScribeService } from '../services/ambientScribe';
+import { FollowUpService } from '../services/followUp';
 
 const router = Router();
 
@@ -1024,6 +1025,75 @@ router.post('/sessions/:id/ambient-scribe/clear', (req: AuthenticatedRequest, re
   } catch (err) {
     console.error('Ambient scribe clear error:', err);
     res.status(500).json({ error: 'Failed to clear ambient scribe transcript.' });
+  }
+});
+
+// Follow-Up Tracker: Get all clinic-wide follow-ups
+router.get('/followups/all', async (req: AuthenticatedRequest, res: Response) => {
+  const { status } = req.query;
+  try {
+    const list = await FollowUpService.getAllFollowUps(status as string);
+    res.json(list);
+  } catch (err) {
+    console.error('Fetch all followups error:', err);
+    res.status(500).json({ error: 'Failed to fetch clinic follow-ups.' });
+  }
+});
+
+// Follow-Up Tracker: Get follow-ups for a specific session
+router.get('/sessions/:id/followups', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const list = await FollowUpService.getFollowUpsForSession(id as string);
+    res.json(list);
+  } catch (err) {
+    console.error('Fetch session followups error:', err);
+    res.status(500).json({ error: 'Failed to fetch session follow-ups.' });
+  }
+});
+
+// Follow-Up Tracker: Schedule automated clinical protocol
+router.post('/sessions/:id/followups/protocol', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { protocolType = 'standard_48h' } = req.body;
+  try {
+    const list = await FollowUpService.scheduleProtocol(id as string, protocolType);
+    res.json({ success: true, followups: list });
+  } catch (err) {
+    console.error('Schedule follow-up protocol error:', err);
+    res.status(500).json({ error: 'Failed to schedule follow-up protocol.' });
+  }
+});
+
+// Follow-Up Tracker: Schedule custom follow-up check-in
+router.post('/sessions/:id/followups/custom', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { intervalDays = 3, surveyType = 'symptom_resolution', clinicianNotes } = req.body;
+  try {
+    const item = await FollowUpService.scheduleCustomFollowUp(id as string, Number(intervalDays), surveyType, clinicianNotes);
+    res.json({ success: true, followup: item });
+  } catch (err) {
+    console.error('Schedule custom follow-up error:', err);
+    res.status(500).json({ error: 'Failed to schedule custom follow-up.' });
+  }
+});
+
+// Follow-Up Tracker: Submit or simulate patient check-in response
+router.post('/followups/:id/respond', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { severityChange, symptomsResolved, takingMedsAsPrescribed, adverseEffectsReported, notes } = req.body;
+  try {
+    const result = await FollowUpService.recordPatientResponse(Number(id), {
+      severityChange: severityChange || 'unchanged',
+      symptomsResolved: symptomsResolved ?? true,
+      takingMedsAsPrescribed: takingMedsAsPrescribed ?? true,
+      adverseEffectsReported,
+      notes
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('Record follow-up response error:', err);
+    res.status(500).json({ error: 'Failed to record follow-up response.' });
   }
 });
 

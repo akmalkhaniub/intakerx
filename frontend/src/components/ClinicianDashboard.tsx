@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw, Phone, Printer, Bell } from 'lucide-react';
 import AmbientScribe from './AmbientScribe';
+import FollowUpTracker from './FollowUpTracker';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -55,7 +56,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2437,6 +2438,18 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderFollowUpTracker = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <FollowUpTracker
+          token={token}
+          backendUrl={backendUrl}
+          currentSessionId={selectedSessionId || (sessions.length > 0 ? sessions[0].id : '')}
+        />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -2806,6 +2819,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 🎙️ Ambient AI Scribe
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('followup_tracker')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'followup_tracker' ? '#a855f7' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'followup_tracker' ? '2.5px solid #a855f7' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                📅 Follow-Up Tracker
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3056,6 +3087,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderEhrSandbox()
             ) : currentTab === 'ambient_scribe' ? (
               renderAmbientScribe()
+            ) : currentTab === 'followup_tracker' ? (
+              renderFollowUpTracker()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}
