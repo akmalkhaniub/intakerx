@@ -8,6 +8,7 @@ import { activeCallSockets } from '../activeCalls';
 import { AIService } from '../services/ai';
 import { CDSService } from '../services/cds';
 import { notificationBus, ClinicianNotification } from '../notifications';
+import { ehrSandboxService } from '../services/ehrSandbox';
 
 const router = Router();
 
@@ -908,6 +909,41 @@ router.get('/analytics', async (req: AuthenticatedRequest, res: Response) => {
   } catch (err) {
     console.error('Failed to retrieve analytics:', err);
     res.status(500).json({ error: 'Failed to retrieve analytics data.' });
+  }
+});
+
+// EHR Sandbox: Get recent transactions
+router.get('/ehr/transactions', (req: AuthenticatedRequest, res: Response) => {
+  const transactions = ehrSandboxService.getTransactions();
+  res.json({ transactions });
+});
+
+// EHR Sandbox: Trigger simulated outbound sync
+router.post('/ehr/sync-simulate', async (req: AuthenticatedRequest, res: Response) => {
+  const { sessionId, targetEhr = 'Epic Systems', protocol = 'FHIR_R4' } = req.body;
+  if (!sessionId) {
+    res.status(400).json({ error: 'sessionId is required for EHR sync simulation.' });
+    return;
+  }
+
+  try {
+    const tx = await ehrSandboxService.simulateSync(sessionId, targetEhr, protocol);
+    res.json({ success: true, transaction: tx });
+  } catch (err) {
+    console.error('EHR sync simulation error:', err);
+    res.status(500).json({ error: 'Failed to execute simulated EHR sync.' });
+  }
+});
+
+// EHR Sandbox: Dispatch simulated inbound webhook event
+router.post('/ehr/webhook-simulate', (req: AuthenticatedRequest, res: Response) => {
+  const { eventType = 'bed_assigned', targetEhr } = req.body;
+  try {
+    const tx = ehrSandboxService.simulateWebhook(eventType, targetEhr);
+    res.json({ success: true, transaction: tx });
+  } catch (err) {
+    console.error('EHR webhook simulation error:', err);
+    res.status(500).json({ error: 'Failed to simulate inbound EHR webhook.' });
   }
 });
 

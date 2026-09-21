@@ -52,13 +52,23 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
   // Analytics Dashboard States
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState<boolean>(false);
+
+  // EHR Integration Sandbox States
+  const [ehrTransactions, setEhrTransactions] = useState<any[]>([]);
+  const [isLoadingEhr, setIsLoadingEhr] = useState<boolean>(false);
+  const [selectedEhrTarget, setSelectedEhrTarget] = useState<'Epic Systems' | 'Cerner Millennium' | 'AthenaHealth'>('Epic Systems');
+  const [selectedEhrProtocol, setSelectedEhrProtocol] = useState<'FHIR_R4' | 'HL7_V2'>('FHIR_R4');
+  const [selectedEhrSessionId, setSelectedEhrSessionId] = useState<string>('');
+  const [selectedPayloadModal, setSelectedPayloadModal] = useState<any | null>(null);
+  const [isSyncingEhr, setIsSyncingEhr] = useState<boolean>(false);
+  const [isDispatchingWebhook, setIsDispatchingWebhook] = useState<boolean>(false);
 
   // Push Notification States
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -273,6 +283,87 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
       loadAnalytics();
     }
   }, [token, currentTab]);
+
+  const loadEhrTransactions = async () => {
+    setIsLoadingEhr(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/ehr/transactions`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEhrTransactions(data.transactions || []);
+      }
+    } catch (err) {
+      console.error('Failed to load EHR transactions:', err);
+    } finally {
+      setIsLoadingEhr(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token && currentTab === 'ehr_sandbox') {
+      loadEhrTransactions();
+    }
+  }, [token, currentTab]);
+
+  const handleSimulateEhrSync = async () => {
+    const targetSessionId = selectedEhrSessionId || (sessions.length > 0 ? sessions[0].id : null);
+    if (!targetSessionId) {
+      alert('Please select an active session to sync.');
+      return;
+    }
+
+    setIsSyncingEhr(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/ehr/sync-simulate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sessionId: targetSessionId,
+          targetEhr: selectedEhrTarget,
+          protocol: selectedEhrProtocol
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEhrTransactions(prev => [data.transaction, ...prev]);
+        setSelectedPayloadModal(data.transaction);
+      }
+    } catch (err) {
+      console.error('EHR sync simulation failed:', err);
+    } finally {
+      setIsSyncingEhr(false);
+    }
+  };
+
+  const handleSimulateWebhook = async (eventType: 'bed_assigned' | 'lab_ready' | 'chart_cosigned') => {
+    setIsDispatchingWebhook(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/ehr/webhook-simulate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          eventType,
+          targetEhr: selectedEhrTarget
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEhrTransactions(prev => [data.transaction, ...prev]);
+      }
+    } catch (err) {
+      console.error('Webhook simulation failed:', err);
+    } finally {
+      setIsDispatchingWebhook(false);
+    }
+  };
 
   // Audio tone generator for incoming push alerts
   const playNotificationBeep = (severity: string) => {
@@ -1693,6 +1784,453 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderEhrSandbox = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        {/* Header Title */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: 'white' }}>
+              🔌 Hospital EHR Gateway & Webhook Sandbox
+            </h3>
+            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+              Test bidirectional interoperability transactions across Epic, Cerner, and AthenaHealth using FHIR R4 and HL7 v2 standards.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadEhrTransactions}
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: '6px',
+              color: 'white',
+              fontSize: '12px',
+              padding: '6px 12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <RefreshCw size={13} className={isLoadingEhr ? 'pulse-red' : ''} />
+            Refresh Log
+          </button>
+        </div>
+
+        {/* Row 1: EHR Gateway Status Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
+          <div className="glass-panel" style={{ padding: '16px', borderLeft: '4px solid #3b82f6' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: '14px', color: 'white' }}>Epic Systems</strong>
+              <span style={{ fontSize: '10px', color: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                ● OPERATIONAL
+              </span>
+            </div>
+            <p style={{ margin: '6px 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+              FHIR R4 US Core • SMART-on-FHIR v2 OAuth2
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8', marginTop: '10px' }}>
+              <span>Endpoint: <code>/api/FHIR/R4</code></span>
+              <span>Avg Latency: <strong>142ms</strong></span>
+            </div>
+          </div>
+
+          <div className="glass-panel" style={{ padding: '16px', borderLeft: '4px solid #8b5cf6' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: '14px', color: 'white' }}>Cerner Millennium</strong>
+              <span style={{ fontSize: '10px', color: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                ● CONNECTED
+              </span>
+            </div>
+            <p style={{ margin: '6px 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+              HL7 v2.5 MLLP Gateway • Open Developer FHIR
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8', marginTop: '10px' }}>
+              <span>Port: <code>MLLP:2575</code></span>
+              <span>Avg Latency: <strong>188ms</strong></span>
+            </div>
+          </div>
+
+          <div className="glass-panel" style={{ padding: '16px', borderLeft: '4px solid #ec4899' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: '14px', color: 'white' }}>AthenaHealth Clinicals</strong>
+              <span style={{ fontSize: '10px', color: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                ● OPERATIONAL
+              </span>
+            </div>
+            <p style={{ margin: '6px 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+              RESTful EHR Hooks • Event Subscriptions
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8', marginTop: '10px' }}>
+              <span>Sub: <code>webhook/athena</code></span>
+              <span>Avg Latency: <strong>96ms</strong></span>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Simulation Controls */}
+        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '15px' }}>
+          {/* Outbound Sync Simulator */}
+          <div className="glass-panel" style={{ padding: '18px' }}>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+              📤 Outbound EHR Sync Simulation
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Target Session</label>
+                <select
+                  value={selectedEhrSessionId}
+                  onChange={e => setSelectedEhrSessionId(e.target.value)}
+                  style={{ width: '100%', padding: '7px', borderRadius: '6px', backgroundColor: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid var(--glass-border)', fontSize: '11px' }}
+                >
+                  <option value="">-- Active Encounter --</option>
+                  {sessions.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.patientName || 'Patient'} ({s.id.slice(0, 8)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Target Hospital EHR</label>
+                <select
+                  value={selectedEhrTarget}
+                  onChange={e => setSelectedEhrTarget(e.target.value as any)}
+                  style={{ width: '100%', padding: '7px', borderRadius: '6px', backgroundColor: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid var(--glass-border)', fontSize: '11px' }}
+                >
+                  <option value="Epic Systems">Epic Systems (FHIR R4)</option>
+                  <option value="Cerner Millennium">Cerner Millennium (HL7 v2)</option>
+                  <option value="AthenaHealth">AthenaHealth (REST/FHIR)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>Protocol Format</label>
+                <select
+                  value={selectedEhrProtocol}
+                  onChange={e => setSelectedEhrProtocol(e.target.value as any)}
+                  style={{ width: '100%', padding: '7px', borderRadius: '6px', backgroundColor: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid var(--glass-border)', fontSize: '11px' }}
+                >
+                  <option value="FHIR_R4">HL7 FHIR R4 Bundle (JSON)</option>
+                  <option value="HL7_V2">HL7 v2.5 Pipe-Delimited (MDM)</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSimulateEhrSync}
+              disabled={isSyncingEhr}
+              style={{
+                width: '100%',
+                backgroundColor: '#3b82f6',
+                border: 'none',
+                borderRadius: '6px',
+                color: 'white',
+                padding: '9px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                cursor: isSyncingEhr ? 'not-allowed' : 'pointer',
+                opacity: isSyncingEhr ? 0.7 : 1,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {isSyncingEhr ? 'Transmitting to EHR Gateway...' : '🚀 Transmit Live Pre-Screening Payload'}
+            </button>
+          </div>
+
+          {/* Inbound Webhook Simulator */}
+          <div className="glass-panel" style={{ padding: '18px' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+              📥 Inbound EHR Webhook Dispatcher
+            </h4>
+            <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+              Simulate hospital events transmitted from external EHRs to IntakeRx:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => handleSimulateWebhook('bed_assigned')}
+                disabled={isDispatchingWebhook}
+                style={{
+                  padding: '7px 10px',
+                  backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  color: '#f59e0b',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  textAlign: 'left',
+                  cursor: 'pointer'
+                }}
+              >
+                🚨 Trigger: Emergency Bed Assigned (Room 304-B)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSimulateWebhook('lab_ready')}
+                disabled={isDispatchingWebhook}
+                style={{
+                  padding: '7px 10px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#ef4444',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  textAlign: 'left',
+                  cursor: 'pointer'
+                }}
+              >
+                🧪 Trigger: STAT Troponin I Lab Result (Elevated)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSimulateWebhook('chart_cosigned')}
+                disabled={isDispatchingWebhook}
+                style={{
+                  padding: '7px 10px',
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  color: '#10b981',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  textAlign: 'left',
+                  cursor: 'pointer'
+                }}
+              >
+                ✍️ Trigger: Attending Physician SOAP Co-Sign
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 3: Transaction Audit Log Table */}
+        <div className="glass-panel" style={{ padding: '18px' }}>
+          <h4 style={{ margin: '0 0 14px 0', fontSize: '14px', fontWeight: 'bold', color: 'white' }}>
+            📜 Live Interoperability Transaction Log ({ehrTransactions.length} events)
+          </h4>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '8px' }}>Timestamp</th>
+                  <th style={{ padding: '8px' }}>Target EHR</th>
+                  <th style={{ padding: '8px' }}>Direction</th>
+                  <th style={{ padding: '8px' }}>Protocol</th>
+                  <th style={{ padding: '8px' }}>Message Type</th>
+                  <th style={{ padding: '8px' }}>HTTP Status</th>
+                  <th style={{ padding: '8px' }}>Latency</th>
+                  <th style={{ padding: '8px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ehrTransactions.map(tx => (
+                  <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <td style={{ padding: '8px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                      {new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </td>
+                    <td style={{ padding: '8px', fontWeight: 'bold', color: 'white' }}>
+                      {tx.targetEhr}
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <span style={{
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '9px',
+                        fontWeight: 'bold',
+                        backgroundColor: tx.direction === 'outbound' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                        color: tx.direction === 'outbound' ? '#a855f7' : '#10b981'
+                      }}>
+                        {tx.direction.toUpperCase()}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <span style={{
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '9px',
+                        backgroundColor: 'rgba(255,255,255,0.05)',
+                        color: '#94a3b8',
+                        fontFamily: 'monospace'
+                      }}>
+                        {tx.protocol}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px', color: 'var(--text-main)' }}>
+                      {tx.messageType}
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <span style={{
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '9px',
+                        fontWeight: 'bold',
+                        backgroundColor: tx.httpStatus < 300 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                        color: tx.httpStatus < 300 ? '#10b981' : '#ef4444',
+                        fontFamily: 'monospace'
+                      }}>
+                        {tx.httpStatus} OK
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                      {tx.latencyMs}ms
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPayloadModal(tx)}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(255,255,255,0.06)',
+                          border: '1px solid var(--glass-border)',
+                          color: 'white',
+                          fontSize: '10px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Inspect Payload →
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Payload Inspection Modal */}
+        {selectedPayloadModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}>
+            <div className="glass-panel" style={{
+              width: '100%',
+              maxWidth: '720px',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              backgroundColor: '#0f172a',
+              border: '1px solid var(--glass-border)',
+              borderRadius: '12px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                padding: '16px',
+                borderBottom: '1px solid var(--glass-border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '14px', color: 'white' }}>
+                    Payload Inspector: {selectedPayloadModal.targetEhr}
+                  </h4>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Protocol: {selectedPayloadModal.protocol} • Status: {selectedPayloadModal.httpStatus} • {selectedPayloadModal.direction}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPayloadModal(null)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '18px', cursor: 'pointer' }}
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div style={{ padding: '16px', flex: 1, overflowY: 'auto' }}>
+                <pre style={{
+                  margin: 0,
+                  padding: '14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  color: '#38bdf8',
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  lineHeight: '1.4'
+                }}>
+                  {typeof selectedPayloadModal.payload === 'object'
+                    ? JSON.stringify(selectedPayloadModal.payload, null, 2)
+                    : String(selectedPayloadModal.payload)}
+                </pre>
+              </div>
+
+              <div style={{
+                padding: '12px 16px',
+                borderTop: '1px solid var(--glass-border)',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const text = typeof selectedPayloadModal.payload === 'object'
+                      ? JSON.stringify(selectedPayloadModal.payload, null, 2)
+                      : String(selectedPayloadModal.payload);
+                    navigator.clipboard.writeText(text);
+                    alert('Payload copied to clipboard!');
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                    border: '1px solid var(--glass-border)',
+                    color: 'white',
+                    fontSize: '11px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Copy to Clipboard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPayloadModal(null)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    backgroundColor: '#3b82f6',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -2026,6 +2564,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 📊 Intake Analytics
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('ehr_sandbox')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'ehr_sandbox' ? '#a855f7' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'ehr_sandbox' ? '2.5px solid #a855f7' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🔌 EHR Sandbox & Webhooks
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -2272,6 +2828,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderSecurityObservability()
             ) : currentTab === 'analytics' ? (
               renderAnalyticsDashboard()
+            ) : currentTab === 'ehr_sandbox' ? (
+              renderEhrSandbox()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}
