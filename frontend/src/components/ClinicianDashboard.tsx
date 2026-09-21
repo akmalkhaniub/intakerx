@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw, Phone, Printer, Bell } from 'lucide-react';
+import AmbientScribe from './AmbientScribe';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -54,7 +55,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2414,6 +2415,28 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const handleAcceptAmbientSoap = (soap: any) => {
+    const formatted = `[Ambient AI Scribe Auto-Synthesized Note]\nCHIEF COMPLAINT:\n${soap.subjective}\n\nOBJECTIVE (DIARIZED EXAM):\n${soap.objective}\n\nASSESSMENT:\n${soap.assessment}\n\nPLAN & DIRECTIVES:\n${soap.plan}`;
+    setEditHpi(prev => (prev ? prev + '\n\n' : '') + formatted);
+    setIsEditing(true);
+    setCurrentTab('workspace');
+    alert('Ambient Scribe SOAP note transferred into Clinical Note Editor!');
+  };
+
+  const renderAmbientScribe = () => {
+    const activeSessionId = selectedSessionId || (sessions.length > 0 ? sessions[0].id : 'demo-ambient-session');
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <AmbientScribe
+          sessionId={activeSessionId}
+          token={token}
+          backendUrl={backendUrl}
+          onAcceptSoap={handleAcceptAmbientSoap}
+        />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -2765,6 +2788,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 🔌 EHR Sandbox & Webhooks
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('ambient_scribe')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'ambient_scribe' ? '#a855f7' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'ambient_scribe' ? '2.5px solid #a855f7' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🎙️ Ambient AI Scribe
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3013,6 +3054,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderAnalyticsDashboard()
             ) : currentTab === 'ehr_sandbox' ? (
               renderEhrSandbox()
+            ) : currentTab === 'ambient_scribe' ? (
+              renderAmbientScribe()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

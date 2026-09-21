@@ -10,6 +10,7 @@ import { CDSService } from '../services/cds';
 import { notificationBus, ClinicianNotification } from '../notifications';
 import { ehrSandboxService } from '../services/ehrSandbox';
 import { DiagnosisService } from '../services/diagnosis';
+import { AmbientScribeService } from '../services/ambientScribe';
 
 const router = Router();
 
@@ -957,6 +958,72 @@ router.post('/ehr/webhook-simulate', (req: AuthenticatedRequest, res: Response) 
   } catch (err) {
     console.error('EHR webhook simulation error:', err);
     res.status(500).json({ error: 'Failed to simulate inbound EHR webhook.' });
+  }
+});
+
+// Ambient Scribe: Fetch live or recorded transcript for an encounter
+router.get('/sessions/:id/ambient-scribe', (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const transcript = AmbientScribeService.getTranscript(id as string);
+    res.json(transcript);
+  } catch (err) {
+    console.error('Ambient scribe fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch ambient scribe transcript.' });
+  }
+});
+
+// Ambient Scribe: Append a diarized speaker turn
+router.post('/sessions/:id/ambient-scribe/turn', (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { speaker, text, sentiment } = req.body;
+  if (!speaker || !text) {
+    res.status(400).json({ error: 'speaker and text are required.' });
+    return;
+  }
+  try {
+    const turn = AmbientScribeService.addTurn(id as string, speaker, text, sentiment);
+    res.json({ success: true, turn });
+  } catch (err) {
+    console.error('Ambient scribe turn error:', err);
+    res.status(500).json({ error: 'Failed to append ambient scribe turn.' });
+  }
+});
+
+// Ambient Scribe: Simulate realistic multi-speaker clinical dialogue
+router.post('/sessions/:id/ambient-scribe/simulate', (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { scenario = 'cardiac' } = req.body;
+  try {
+    const transcript = AmbientScribeService.simulateDialogue(id as string, scenario);
+    res.json({ success: true, transcript });
+  } catch (err) {
+    console.error('Ambient scribe simulation error:', err);
+    res.status(500).json({ error: 'Failed to simulate ambient clinical dialogue.' });
+  }
+});
+
+// Ambient Scribe: Synthesize diarized transcript into structured SOAP clinical note
+router.post('/sessions/:id/ambient-scribe/synthesize', (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const soap = AmbientScribeService.synthesizeSOAP(id as string);
+    res.json({ success: true, soap });
+  } catch (err) {
+    console.error('Ambient scribe synthesis error:', err);
+    res.status(500).json({ error: 'Failed to synthesize ambient transcript to SOAP.' });
+  }
+});
+
+// Ambient Scribe: Reset/Clear ambient transcript
+router.post('/sessions/:id/ambient-scribe/clear', (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    AmbientScribeService.clearTranscript(id as string);
+    res.json({ success: true, message: 'Ambient scribe transcript cleared.' });
+  } catch (err) {
+    console.error('Ambient scribe clear error:', err);
+    res.status(500).json({ error: 'Failed to clear ambient scribe transcript.' });
   }
 });
 
