@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Mic, MicOff, AlertTriangle, ShieldCheck, HeartPulse, User, LogIn, FileText, CheckCircle } from 'lucide-react';
+import BodyMap, { PainPoint } from './BodyMap';
 
 interface VisualizerProps {
   isRecording: boolean;
@@ -201,6 +202,10 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
   const [hasConsented, setHasConsented] = useState<boolean | null>(null);
   const [consentCheckbox, setConsentCheckbox] = useState<boolean>(false);
   const [isSubmittingConsent, setIsSubmittingConsent] = useState<boolean>(false);
+
+  // Anatomical Body Map State
+  const [showBodyMap, setShowBodyMap] = useState<boolean>(false);
+  const [recordedPainPoints, setRecordedPainPoints] = useState<PainPoint[]>([]);
 
   // UI Control State
   const [inputValue, setInputValue] = useState('');
@@ -446,6 +451,31 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
       setTriageLevel(data.session.triageLevel);
     } catch (err) {
       console.error('Failed to load session details:', err);
+    }
+  };
+
+  // Record Pain Point from Interactive Body Map
+  const handleSavePainPoint = async (point: PainPoint) => {
+    setRecordedPainPoints(prev => [...prev, point]);
+    if (sessionId && token) {
+      try {
+        await fetch(`${backendUrl}/api/intake/sessions/${sessionId}/pain-point`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            regionName: point.regionName,
+            intensity: point.intensity,
+            quality: point.quality,
+            radiationDetails: point.radiationDetails
+          })
+        });
+        await loadSessionDetails(sessionId);
+      } catch (err) {
+        console.error('Failed to record pain point:', err);
+      }
     }
   };
 
@@ -867,8 +897,44 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
                     </div>
                   </div>
                 ) : (
-                  /* Chat Input Controls */
-                  <form onSubmit={handleSendMessage} style={styles.chatInputBar}>
+                  <>
+                    {/* Pain Mapping Quick Action */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 20px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                      borderTop: '1px solid var(--glass-border)',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowBodyMap(true)}
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(168, 85, 247, 0.15))',
+                          border: '1px solid rgba(239, 68, 68, 0.35)',
+                          borderRadius: '8px',
+                          padding: '6px 14px',
+                          color: '#fca5a5',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        🧍 Pin Pain on Body Map {recordedPainPoints.length > 0 && `(${recordedPainPoints.length} logged)`}
+                      </button>
+                      <span style={{ color: '#94a3b8', fontSize: '11px' }}>
+                        Click to pinpoint anatomical pain & radiation
+                      </span>
+                    </div>
+
+                    {/* Chat Input Controls */}
+                    <form onSubmit={handleSendMessage} style={styles.chatInputBar}>
                     <button 
                       type="button" 
                       onClick={toggleRecording} 
@@ -898,6 +964,7 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
                       <Send size={18} />
                     </button>
                   </form>
+                  </>
                 )}
               </>
             )}
@@ -981,6 +1048,13 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
             </div>
           )}
         </div>
+      )}
+      {showBodyMap && (
+        <BodyMap
+          onSavePainPoint={handleSavePainPoint}
+          onClose={() => setShowBodyMap(false)}
+          existingPoints={recordedPainPoints}
+        />
       )}
     </div>
   );

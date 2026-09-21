@@ -651,6 +651,56 @@ You MUST respond strictly in the following JSON format:
   }
 });
 
+// Record anatomical pain point directly
+router.post('/sessions/:id/pain-point', authenticateToken as any, async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { regionName, intensity, quality, radiationDetails } = req.body;
+
+  if (!regionName || !intensity) {
+    res.status(400).json({ error: 'regionName and intensity are required.' });
+    return;
+  }
+
+  const severity = intensity <= 3 ? 'mild' : intensity <= 6 ? 'moderate' : 'severe';
+  const isRedFlag = intensity >= 8 && (String(regionName).toLowerCase().includes('chest') || String(regionName).toLowerCase().includes('head'));
+  const symptomName = `Pain: ${regionName} (${intensity}/10, ${quality || 'Aching'})${radiationDetails ? ` → ${radiationDetails}` : ''}`;
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO symptoms (session_id, name, severity, duration, is_red_flag)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [id, symptomName, severity, 'acute', isRedFlag]
+    );
+
+    // Also record a message in the chat
+    await pool.query(
+      `INSERT INTO messages (session_id, sender, content)
+       VALUES ($1, $2, $3)`,
+      [id, 'patient', `[Anatomical Pain Mapping]: ${symptomName}`]
+    );
+
+    // If red-flag, update triage
+    if (isRedFlag) {
+      await pool.query(
+        `UPDATE intake_sessions SET triage_level = 'emergency', status = 'escalated', updated_at = NOW() WHERE id = $1`,
+        [id]
+      );
+      notificationBus.push(
+        'emergency_triage',
+        'Severe Pain Mapping Alert',
+        `Patient reported severe pain (${intensity}/10) in ${regionName}. Immediate attention advised.`,
+        { sessionId: id as string, severity: 'critical' }
+      );
+    }
+
+    res.json({ success: true, symptom: result.rows[0], isRedFlag });
+  } catch (err) {
+    console.error('Record pain point error:', err);
+    res.status(500).json({ error: 'Failed to record anatomical pain point.' });
+  }
+});
+
 interface SOAPData {
   chiefComplaint: string;
   historyOfPresentIllness: string;
