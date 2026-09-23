@@ -360,6 +360,25 @@ export async function bootstrap() {
       );
     `);
 
+    // Create patient_wearables_telemetry table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS patient_wearables_telemetry (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        source_device VARCHAR(100) NOT NULL,
+        recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        hrv_ms DOUBLE PRECISION,
+        resting_hr INTEGER,
+        step_count INTEGER,
+        sleep_hours DOUBLE PRECISION,
+        sleep_score INTEGER,
+        nightly_spo2 DOUBLE PRECISION,
+        ecg_classification VARCHAR(100) DEFAULT 'sinus_rhythm',
+        raw_payload JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

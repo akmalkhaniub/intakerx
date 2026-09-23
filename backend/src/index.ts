@@ -8,6 +8,7 @@ import intakeRoutes from './routes/intake';
 import protocolRoutes from './routes/protocols';
 import clinicianRoutes from './routes/clinician';
 import telephonyRoutes from './routes/telephony';
+import portalRoutes from './routes/portal';
 import { AIService } from './services/ai';
 import { GuardrailsService } from './services/guardrails';
 import { pool } from './db';
@@ -26,6 +27,7 @@ app.use('/api/intake', intakeRoutes);
 app.use('/api/protocols', protocolRoutes);
 app.use('/api/clinician', clinicianRoutes);
 app.use('/api/telephony', telephonyRoutes);
+app.use('/api/portal', portalRoutes);
 
 // Base health check
 app.get('/health', (req, res) => {
