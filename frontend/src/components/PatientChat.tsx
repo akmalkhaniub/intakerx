@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Mic, MicOff, AlertTriangle, ShieldCheck, HeartPulse, User, LogIn, FileText, CheckCircle } from 'lucide-react';
+import { Send, Mic, MicOff, AlertTriangle, ShieldCheck, HeartPulse, User, LogIn, FileText, CheckCircle, Camera } from 'lucide-react';
 import BodyMap, { PainPoint } from './BodyMap';
+import ImageAttachmentModal from './ImageAttachmentModal';
 
 interface VisualizerProps {
   isRecording: boolean;
@@ -206,6 +207,9 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
   // Anatomical Body Map State
   const [showBodyMap, setShowBodyMap] = useState<boolean>(false);
   const [recordedPainPoints, setRecordedPainPoints] = useState<PainPoint[]>([]);
+
+  // Medical Image Attachment State
+  const [showImageModal, setShowImageModal] = useState<boolean>(false);
 
   // UI Control State
   const [inputValue, setInputValue] = useState('');
@@ -476,6 +480,32 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
       } catch (err) {
         console.error('Failed to record pain point:', err);
       }
+    }
+  };
+
+  // Upload Medical Photo / Attachment
+  const handleUploadAttachment = async (fileData: {
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    dataUrl: string;
+    caption: string;
+  }) => {
+    if (!sessionId || !token) return;
+    try {
+      const res = await fetch(`${backendUrl}/api/intake/sessions/${sessionId}/attachments`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(fileData)
+      });
+      if (res.ok) {
+        await loadSessionDetails(sessionId);
+      }
+    } catch (err) {
+      console.error('Failed to attach photo:', err);
     }
   };
 
@@ -946,6 +976,19 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
                     >
                       {isRecording ? <MicOff size={20} color="white" /> : <Mic size={20} color="#a855f7" />}
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowImageModal(true)}
+                      style={{
+                        ...styles.micBtn,
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        borderColor: 'var(--glass-border)'
+                      }}
+                      title="Attach Medical Photo / Document"
+                    >
+                      <Camera size={20} color="#a855f7" />
+                    </button>
                     
                     {isRecording ? (
                       <AudioWaveformVisualizer isRecording={isRecording} />
@@ -1054,6 +1097,12 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
           onSavePainPoint={handleSavePainPoint}
           onClose={() => setShowBodyMap(false)}
           existingPoints={recordedPainPoints}
+        />
+      )}
+      {showImageModal && (
+        <ImageAttachmentModal
+          onClose={() => setShowImageModal(false)}
+          onUpload={handleUploadAttachment}
         />
       )}
     </div>

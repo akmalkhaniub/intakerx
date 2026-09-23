@@ -308,6 +308,22 @@ export async function bootstrap() {
       );
     `);
 
+    // Create medical_attachments table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS medical_attachments (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        file_name VARCHAR(255) NOT NULL,
+        mime_type VARCHAR(100) NOT NULL,
+        file_size INTEGER NOT NULL,
+        data_url TEXT NOT NULL,
+        caption TEXT,
+        visual_tags TEXT[] DEFAULT '{}',
+        is_red_flag BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

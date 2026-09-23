@@ -12,6 +12,7 @@ import { ehrSandboxService } from '../services/ehrSandbox';
 import { DiagnosisService } from '../services/diagnosis';
 import { AmbientScribeService } from '../services/ambientScribe';
 import { FollowUpService } from '../services/followUp';
+import { VisualTriageService } from '../services/visualTriage';
 
 const router = Router();
 
@@ -1094,6 +1095,18 @@ router.post('/followups/:id/respond', async (req: AuthenticatedRequest, res: Res
   } catch (err) {
     console.error('Record follow-up response error:', err);
     res.status(500).json({ error: 'Failed to record follow-up response.' });
+  }
+});
+
+// Medical Attachments: Get all photos and visual triage for encounter
+router.get('/sessions/:id/attachments', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const list = await VisualTriageService.getAttachmentsForSession(id as string);
+    res.json(list);
+  } catch (err) {
+    console.error('Clinician get attachments error:', err);
+    res.status(500).json({ error: 'Failed to fetch encounter attachments.' });
   }
 });
 

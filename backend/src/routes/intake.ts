@@ -6,6 +6,7 @@ import { AIService, ChatMessage } from '../services/ai';
 import { GuardrailsService } from '../services/guardrails';
 import { PHIService } from '../services/phi';
 import { notificationBus } from '../notifications';
+import { VisualTriageService } from '../services/visualTriage';
 
 const router = Router();
 
@@ -698,6 +699,44 @@ router.post('/sessions/:id/pain-point', authenticateToken as any, async (req: Au
   } catch (err) {
     console.error('Record pain point error:', err);
     res.status(500).json({ error: 'Failed to record anatomical pain point.' });
+  }
+});
+
+// Upload and attach medical photo with automated visual triage
+router.post('/sessions/:id/attachments', authenticateToken as any, async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { fileName, mimeType, fileSize, dataUrl, caption } = req.body;
+
+  if (!dataUrl || !fileName) {
+    res.status(400).json({ error: 'fileName and dataUrl are required.' });
+    return;
+  }
+
+  try {
+    const result = await VisualTriageService.attachImage(id as string, {
+      fileName: String(fileName),
+      mimeType: String(mimeType || 'image/jpeg'),
+      fileSize: Number(fileSize || 0),
+      dataUrl: String(dataUrl),
+      caption: caption ? String(caption) : undefined
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('Attach image error:', err);
+    res.status(500).json({ error: 'Failed to upload and attach medical image.' });
+  }
+});
+
+// Fetch attachments for a session
+router.get('/sessions/:id/attachments', authenticateToken as any, async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const attachments = await VisualTriageService.getAttachmentsForSession(id as string);
+    res.json(attachments);
+  } catch (err) {
+    console.error('Get attachments error:', err);
+    res.status(500).json({ error: 'Failed to retrieve attachments for session.' });
   }
 });
 

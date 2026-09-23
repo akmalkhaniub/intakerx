@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw, Phone, Printer, Bell } from 'lucide-react';
 import AmbientScribe from './AmbientScribe';
 import FollowUpTracker from './FollowUpTracker';
+import ImageGalleryViewer from './ImageGalleryViewer';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -41,8 +42,9 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   // Clinical Decision Support State
   const [interactions, setInteractions] = useState<any[]>([]);
   const [isCheckingInteractions, setIsCheckingInteractions] = useState(false);
-  const [cdsTab, setCdsTab] = useState<'alerts' | 'graph' | 'differential'>('alerts');
+  const [cdsTab, setCdsTab] = useState<'alerts' | 'graph' | 'differential' | 'photos'>('alerts');
   const [differentialData, setDifferentialData] = useState<any | null>(null);
+  const [attachments, setAttachments] = useState<any[]>([]);
   const [isLoadingDifferential, setIsLoadingDifferential] = useState<boolean>(false);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -479,6 +481,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
       // Load active interactions
       await loadInteractions(id);
       await loadDifferentialDiagnosis(id);
+      await loadAttachments(id);
 
       // Load patient history for symptom tracking charts
       if (data.session.patientId) {
@@ -553,6 +556,20 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
       console.error('Failed to load differential diagnosis:', err);
     } finally {
       setIsLoadingDifferential(false);
+    }
+  };
+
+  const loadAttachments = async (sessionId: string) => {
+    try {
+      const res = await fetch(`${backendUrl}/api/clinician/sessions/${sessionId}/attachments`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAttachments(data);
+      }
+    } catch (err) {
+      console.error('Failed to load attachments:', err);
     }
   };
 
@@ -3336,12 +3353,32 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
                         >
                           🧠 Differential Diagnosis ({differentialData?.candidates?.length || 0})
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setCdsTab('photos')}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: cdsTab === 'photos' ? '#a855f7' : 'var(--text-muted)',
+                            borderBottom: cdsTab === 'photos' ? '2.5px solid #a855f7' : 'none',
+                            padding: '4px 6px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            outline: 'none'
+                          }}
+                        >
+                          📷 Clinical Photos ({attachments.length})
+                        </button>
                       </div>
                       
                       {cdsTab === 'graph' ? (
                         renderCDSGraph()
                       ) : cdsTab === 'differential' ? (
                         renderDifferentialDiagnosis()
+                      ) : cdsTab === 'photos' ? (
+                        <ImageGalleryViewer attachments={attachments} />
                       ) : isCheckingInteractions ? (
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, textAlign: 'left' }}>Evaluating clinical interactions...</p>
                       ) : interactions.length === 0 ? (
