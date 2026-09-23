@@ -214,6 +214,11 @@ npx ts-node src/test_differential.ts   # AI differential diagnosis matrix
 npx ts-node src/test_body_map.ts       # Anatomical body map & pain locator
 npx ts-node src/test_ambient_scribe.ts # Ambient scribe & speaker diarization
 npx ts-node src/test_followup.ts       # Automated post-visit follow-up protocols
+npx ts-node src/test_image_attachments.ts # Multi-modal medical photo & visual triage (Phase 21)
+npx ts-node src/test_clinical_orders.ts   # Smart LOINC/CPT requisitions & FHIR ServiceRequests (Phase 22)
+npx ts-node src/test_telehealth.ts        # Telehealth video consult & live clinical HUD (Phase 23)
+npx ts-node src/test_esi_triage.ts        # Intelligent ESI 1-5 triage & waiting room manager (Phase 24)
+npx ts-node src/test_patient_portal.ts    # Patient health portal & wearables biometric ingestion (Phase 25)
 ```
 
 ---
