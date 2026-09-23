@@ -324,6 +324,23 @@ export async function bootstrap() {
       );
     `);
 
+    // Create clinical_orders table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS clinical_orders (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        order_type VARCHAR(50) NOT NULL,
+        code_system VARCHAR(50) NOT NULL,
+        code VARCHAR(50) NOT NULL,
+        display_name VARCHAR(255) NOT NULL,
+        clinical_indication TEXT NOT NULL,
+        urgency VARCHAR(50) DEFAULT 'routine',
+        patient_prep_instructions TEXT,
+        status VARCHAR(50) DEFAULT 'draft',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

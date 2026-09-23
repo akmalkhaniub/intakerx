@@ -3,6 +3,7 @@ import { FileText, Play, CheckCircle2, ShieldCheck, Edit3, RefreshCw, Phone, Pri
 import AmbientScribe from './AmbientScribe';
 import FollowUpTracker from './FollowUpTracker';
 import ImageGalleryViewer from './ImageGalleryViewer';
+import ClinicalOrderBuilder from './ClinicalOrderBuilder';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -58,7 +59,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2467,6 +2468,19 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderClinicalOrders = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <ClinicalOrderBuilder
+          sessionId={selectedSessionId || (sessions.length > 0 ? sessions[0].id : '')}
+          token={token}
+          backendUrl={backendUrl}
+          patientName={sessionDetail?.patient?.name || 'Encounter Patient'}
+        />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -2854,6 +2868,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 📅 Follow-Up Tracker
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('orders')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'orders' ? '#a855f7' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'orders' ? '2.5px solid #a855f7' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                📋 Smart Orders & LOINC
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3106,6 +3138,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderAmbientScribe()
             ) : currentTab === 'followup_tracker' ? (
               renderFollowUpTracker()
+            ) : currentTab === 'orders' ? (
+              renderClinicalOrders()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

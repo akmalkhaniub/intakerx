@@ -13,6 +13,7 @@ import { DiagnosisService } from '../services/diagnosis';
 import { AmbientScribeService } from '../services/ambientScribe';
 import { FollowUpService } from '../services/followUp';
 import { VisualTriageService } from '../services/visualTriage';
+import { ClinicalOrdersService } from '../services/clinicalOrders';
 
 const router = Router();
 
@@ -1107,6 +1108,71 @@ router.get('/sessions/:id/attachments', async (req: AuthenticatedRequest, res: R
   } catch (err) {
     console.error('Clinician get attachments error:', err);
     res.status(500).json({ error: 'Failed to fetch encounter attachments.' });
+  }
+});
+
+// Clinical Orders: Suggest LOINC/CPT diagnostic orders based on encounter context
+router.get('/sessions/:id/orders/suggestions', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const suggestions = await ClinicalOrdersService.suggestOrders(id as string);
+    res.json(suggestions);
+  } catch (err) {
+    console.error('Suggest orders error:', err);
+    res.status(500).json({ error: 'Failed to generate diagnostic order suggestions.' });
+  }
+});
+
+// Clinical Orders: Get all active orders for session
+router.get('/sessions/:id/orders', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const orders = await ClinicalOrdersService.getOrdersForSession(id as string);
+    res.json(orders);
+  } catch (err) {
+    console.error('Get orders error:', err);
+    res.status(500).json({ error: 'Failed to retrieve clinical orders.' });
+  }
+});
+
+// Clinical Orders: Place an approved order
+router.post('/sessions/:id/orders', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const order = await ClinicalOrdersService.createOrder(id as string, req.body);
+    res.json({ success: true, order });
+  } catch (err) {
+    console.error('Create order error:', err);
+    res.status(500).json({ error: 'Failed to place clinical order.' });
+  }
+});
+
+// Clinical Orders: Place multiple orders in batch
+router.post('/sessions/:id/orders/batch', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { orders } = req.body;
+  if (!Array.isArray(orders)) {
+    res.status(400).json({ error: 'orders array is required.' });
+    return;
+  }
+  try {
+    const created = await ClinicalOrdersService.createBatchOrders(id as string, orders);
+    res.json({ success: true, orders: created });
+  } catch (err) {
+    console.error('Batch create orders error:', err);
+    res.status(500).json({ error: 'Failed to batch create clinical orders.' });
+  }
+});
+
+// Clinical Orders: Export orders as standard FHIR R4 ServiceRequest resources
+router.get('/sessions/:id/orders/fhir', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const bundle = await ClinicalOrdersService.exportFhirServiceRequests(id as string);
+    res.json(bundle);
+  } catch (err) {
+    console.error('Export FHIR orders error:', err);
+    res.status(500).json({ error: 'Failed to export orders as FHIR ServiceRequests.' });
   }
 });
 
