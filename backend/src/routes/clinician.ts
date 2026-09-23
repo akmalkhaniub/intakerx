@@ -14,6 +14,7 @@ import { AmbientScribeService } from '../services/ambientScribe';
 import { FollowUpService } from '../services/followUp';
 import { VisualTriageService } from '../services/visualTriage';
 import { ClinicalOrdersService } from '../services/clinicalOrders';
+import * as TelehealthService from '../services/telehealth';
 
 const router = Router();
 
@@ -1173,6 +1174,95 @@ router.get('/sessions/:id/orders/fhir', async (req: AuthenticatedRequest, res: R
   } catch (err) {
     console.error('Export FHIR orders error:', err);
     res.status(500).json({ error: 'Failed to export orders as FHIR ServiceRequests.' });
+  }
+});
+
+// Telehealth: Start or join virtual consultation room
+router.post('/sessions/:id/telehealth/start', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const clinicianId = req.user?.id ? Number(req.user.id) : undefined;
+    const room = await TelehealthService.getOrCreateTelehealthRoom(id as string, clinicianId);
+    res.json({ success: true, room });
+  } catch (err) {
+    console.error('Start telehealth error:', err);
+    res.status(500).json({ error: 'Failed to start telehealth session.' });
+  }
+});
+
+// Telehealth: Get existing room data
+router.get('/sessions/:id/telehealth', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const room = await TelehealthService.getTelehealthRoom(id as string);
+    if (!room) {
+      res.status(404).json({ error: 'Telehealth room not found.' });
+      return;
+    }
+    res.json(room);
+  } catch (err) {
+    console.error('Get telehealth error:', err);
+    res.status(500).json({ error: 'Failed to retrieve telehealth session.' });
+  }
+});
+
+// Telehealth: Post transcript speech entry with NLP clinical entity parsing
+router.post('/sessions/:id/telehealth/transcript', async (req: AuthenticatedRequest, res: Response) => {
+  const { roomId, speaker, text } = req.body;
+  if (!roomId || !speaker || !text) {
+    res.status(400).json({ error: 'roomId, speaker, and text are required.' });
+    return;
+  }
+  try {
+    const entry = await TelehealthService.addTranscriptEntry(roomId, speaker, text);
+    res.json({ success: true, entry });
+  } catch (err) {
+    console.error('Append telehealth transcript error:', err);
+    res.status(500).json({ error: 'Failed to record transcript entry.' });
+  }
+});
+
+// Telehealth: Update clinician scratchpad notes
+router.post('/sessions/:id/telehealth/notes', async (req: AuthenticatedRequest, res: Response) => {
+  const { roomId, liveNotes } = req.body;
+  if (!roomId || liveNotes === undefined) {
+    res.status(400).json({ error: 'roomId and liveNotes are required.' });
+    return;
+  }
+  try {
+    await TelehealthService.updateLiveNotes(roomId, liveNotes);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Update telehealth notes error:', err);
+    res.status(500).json({ error: 'Failed to update live notes.' });
+  }
+});
+
+// Telehealth: Conclude consultation
+router.post('/sessions/:id/telehealth/end', async (req: AuthenticatedRequest, res: Response) => {
+  const { roomId, finalNotes } = req.body;
+  if (!roomId) {
+    res.status(400).json({ error: 'roomId is required.' });
+    return;
+  }
+  try {
+    const room = await TelehealthService.endTelehealthCall(roomId, finalNotes);
+    res.json({ success: true, room });
+  } catch (err) {
+    console.error('End telehealth error:', err);
+    res.status(500).json({ error: 'Failed to conclude telehealth call.' });
+  }
+});
+
+// Telehealth: Stream live clinical HUD telemetry (vitals, red flags, differential shortlist)
+router.get('/sessions/:id/telehealth/telemetry', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const telemetry = await TelehealthService.getLiveTelemetryHUD(id as string);
+    res.json(telemetry);
+  } catch (err) {
+    console.error('Get live telemetry error:', err);
+    res.status(500).json({ error: 'Failed to retrieve live telemetry HUD.' });
   }
 });
 

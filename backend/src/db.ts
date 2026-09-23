@@ -341,6 +341,25 @@ export async function bootstrap() {
       );
     `);
 
+    // Create telehealth_sessions table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS telehealth_sessions (
+        id SERIAL PRIMARY KEY,
+        room_id VARCHAR(100) UNIQUE NOT NULL,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        host_clinician_id INTEGER,
+        status VARCHAR(50) NOT NULL DEFAULT 'active',
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ended_at TIMESTAMP,
+        duration_seconds INTEGER DEFAULT 0,
+        live_notes TEXT,
+        recording_url TEXT,
+        call_quality JSONB DEFAULT '{"latencyMs": 28, "packetLoss": 0, "resolution": "1080p", "fps": 30}'::jsonb,
+        transcript JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
