@@ -15,6 +15,7 @@ import { FollowUpService } from '../services/followUp';
 import { VisualTriageService } from '../services/visualTriage';
 import { ClinicalOrdersService } from '../services/clinicalOrders';
 import * as TelehealthService from '../services/telehealth';
+import * as EsiTriageService from '../services/esiTriage';
 
 const router = Router();
 
@@ -1263,6 +1264,56 @@ router.get('/sessions/:id/telehealth/telemetry', async (req: AuthenticatedReques
   } catch (err) {
     console.error('Get live telemetry error:', err);
     res.status(500).json({ error: 'Failed to retrieve live telemetry HUD.' });
+  }
+});
+
+// Waiting Room: Get dynamic waiting room queue and statistics
+router.get('/waiting-room', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const queueData = await EsiTriageService.getDynamicWaitingRoomQueue();
+    res.json(queueData);
+  } catch (err) {
+    console.error('Get waiting room queue error:', err);
+    res.status(500).json({ error: 'Failed to retrieve waiting room queue.' });
+  }
+});
+
+// ESI Triage: Evaluate ESI level for specific session
+router.get('/sessions/:id/esi', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const sympRes = await pool.query(
+      `SELECT name, severity, is_red_flag FROM symptoms WHERE session_id = $1`,
+      [id]
+    );
+    const vitRes = await pool.query(
+      `SELECT heart_rate, bp_systolic, bp_diastolic, spo2 
+       FROM session_vitals WHERE session_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [id]
+    );
+    const msgRes = await pool.query(
+      `SELECT content FROM messages WHERE session_id = $1 AND sender = 'patient' LIMIT 3`,
+      [id]
+    );
+
+    const chiefComplaint = msgRes.rows.map(m => m.content).join(' ');
+    const vitals = vitRes.rows[0] ? {
+      heartRate: vitRes.rows[0].heart_rate,
+      bpSystolic: vitRes.rows[0].bp_systolic,
+      bpDiastolic: vitRes.rows[0].bp_diastolic,
+      spo2: vitRes.rows[0].spo2
+    } : undefined;
+
+    const assessment = EsiTriageService.evaluateESI({
+      chiefComplaint,
+      symptoms: sympRes.rows,
+      vitals
+    });
+
+    res.json(assessment);
+  } catch (err) {
+    console.error('Evaluate ESI error:', err);
+    res.status(500).json({ error: 'Failed to evaluate ESI triage level.' });
   }
 });
 
