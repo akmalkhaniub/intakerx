@@ -18,6 +18,7 @@ import * as TelehealthService from '../services/telehealth';
 import * as EsiTriageService from '../services/esiTriage';
 import * as ClinicalTrialsService from '../services/clinicalTrials';
 import * as CaseConferencingService from '../services/caseConferencing';
+import { BillingPriorAuthService } from '../services/billingPriorAuth';
 
 const router = Router();
 
@@ -1401,6 +1402,106 @@ router.post('/conference/:conferenceId/finalize', async (req: AuthenticatedReque
   } catch (err) {
     console.error('Finalize conference error:', err);
     res.status(500).json({ error: 'Failed to finalize case consensus.' });
+  }
+});
+
+// ==========================================
+// Phase 28: Autonomous Prior-Authorization & Claims
+// ==========================================
+
+// Fetch prior authorizations for session
+router.get('/sessions/:id/prior-auths', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const priorAuths = await BillingPriorAuthService.getPriorAuths(id as string);
+    res.json(priorAuths);
+  } catch (err) {
+    console.error('Fetch prior auths error:', err);
+    res.status(500).json({ error: 'Failed to fetch prior authorizations.' });
+  }
+});
+
+// Generate new prior authorization packet
+router.post('/sessions/:id/prior-auths/generate', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { payerName, procedureCpt, diagnosisIcd10, urgency, customJustification, failedTherapies } = req.body;
+  if (!payerName || !procedureCpt || !diagnosisIcd10) {
+    res.status(400).json({ error: 'payerName, procedureCpt, and diagnosisIcd10 are required.' });
+    return;
+  }
+  try {
+    const paPacket = await BillingPriorAuthService.generatePriorAuthPacket({
+      sessionId: id as string,
+      payerName,
+      procedureCpt,
+      diagnosisIcd10,
+      urgency,
+      customJustification,
+      failedTherapies
+    });
+    res.json({ success: true, priorAuth: paPacket });
+  } catch (err) {
+    console.error('Generate prior auth error:', err);
+    res.status(500).json({ error: 'Failed to generate prior authorization.' });
+  }
+});
+
+// Update prior authorization status
+router.patch('/prior-auths/:paId/status', async (req: AuthenticatedRequest, res: Response) => {
+  const { paId } = req.params;
+  const { status, authNumber } = req.body;
+  if (!status) {
+    res.status(400).json({ error: 'status is required.' });
+    return;
+  }
+  try {
+    const updated = await BillingPriorAuthService.updatePriorAuthStatus(Number(paId), status, authNumber);
+    res.json({ success: true, priorAuth: updated });
+  } catch (err) {
+    console.error('Update prior auth status error:', err);
+    res.status(500).json({ error: 'Failed to update prior authorization status.' });
+  }
+});
+
+// Fetch insurance claims for session
+router.get('/sessions/:id/claims', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const claims = await BillingPriorAuthService.getClaims(id as string);
+    res.json(claims);
+  } catch (err) {
+    console.error('Fetch claims error:', err);
+    res.status(500).json({ error: 'Failed to fetch insurance claims.' });
+  }
+});
+
+// Generate / Compile CMS-1500 Claim
+router.post('/sessions/:id/claims/generate', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { paId, placeOfService, additionalLines } = req.body;
+  try {
+    const result = await BillingPriorAuthService.compileCms1500Claim({
+      sessionId: id as string,
+      paId: paId ? Number(paId) : undefined,
+      placeOfService,
+      additionalLines
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('Compile CMS-1500 claim error:', err);
+    res.status(500).json({ error: 'Failed to compile CMS-1500 claim.' });
+  }
+});
+
+// Submit claim to clearinghouse (EDI 837P simulation)
+router.post('/claims/:claimId/submit', async (req: AuthenticatedRequest, res: Response) => {
+  const { claimId } = req.params;
+  try {
+    const submission = await BillingPriorAuthService.submitClaimToClearinghouse(Number(claimId));
+    res.json({ success: true, submission });
+  } catch (err) {
+    console.error('Submit claim error:', err);
+    res.status(500).json({ error: 'Failed to submit claim to clearinghouse.' });
   }
 });
 

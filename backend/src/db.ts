@@ -446,6 +446,51 @@ export async function bootstrap() {
       );
     `);
 
+    // Create prior_authorizations table (Phase 28)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS prior_authorizations (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        payer_name VARCHAR(128) NOT NULL,
+        procedure_cpt VARCHAR(32) NOT NULL,
+        procedure_name VARCHAR(255) NOT NULL,
+        diagnosis_icd10 VARCHAR(32) NOT NULL,
+        diagnosis_name VARCHAR(255) NOT NULL,
+        clinical_justification TEXT NOT NULL,
+        denial_risk_score INTEGER NOT NULL DEFAULT 15,
+        denial_risk_rationale TEXT,
+        packet_data JSONB DEFAULT '{}'::jsonb,
+        status VARCHAR(32) NOT NULL DEFAULT 'draft',
+        auth_number VARCHAR(64),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create insurance_claims table (CMS-1500 EDI-837P compatible) (Phase 28)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS insurance_claims (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        pa_id INTEGER REFERENCES prior_authorizations(id) ON DELETE SET NULL,
+        patient_name VARCHAR(128) NOT NULL,
+        insured_id VARCHAR(64) NOT NULL,
+        payer_id VARCHAR(64) NOT NULL,
+        payer_name VARCHAR(128) NOT NULL,
+        billing_provider VARCHAR(128) NOT NULL,
+        rendering_npi VARCHAR(32) NOT NULL,
+        place_of_service VARCHAR(16) NOT NULL DEFAULT '11',
+        icd10_codes JSONB NOT NULL DEFAULT '[]'::jsonb,
+        service_lines JSONB NOT NULL DEFAULT '[]'::jsonb,
+        total_billed NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+        cms1500_rendered_text TEXT,
+        status VARCHAR(32) NOT NULL DEFAULT 'scrubbed_clean',
+        clearinghouse_batch_id VARCHAR(64),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

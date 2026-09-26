@@ -8,6 +8,7 @@ import TelehealthRoom from './TelehealthRoom';
 import WaitingRoomQueueManager from './WaitingRoomQueueManager';
 import ClinicalTrialMatcher from './ClinicalTrialMatcher';
 import CaseConferenceRoom from './CaseConferenceRoom';
+import PriorAuthClaimBuilder from './PriorAuthClaimBuilder';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -63,7 +64,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2544,6 +2545,20 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderBillingPriorAuth = () => {
+    const activeSessionId = selectedSessionId || (sessions.length > 0 ? sessions[0].id : '');
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <PriorAuthClaimBuilder
+          sessionId={activeSessionId}
+          token={token}
+          backendUrl={backendUrl}
+          patientName={sessionDetail?.patient?.name || 'Encounter Patient'}
+        />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3021,6 +3036,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 👥 MDT Conference
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('billing_prior_auth')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'billing_prior_auth' ? '#38bdf8' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'billing_prior_auth' ? '2.5px solid #38bdf8' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                💳 Prior-Auth & Claims
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3283,6 +3316,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderClinicalTrials()
             ) : currentTab === 'conference' ? (
               renderCaseConference()
+            ) : currentTab === 'billing_prior_auth' ? (
+              renderBillingPriorAuth()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}
