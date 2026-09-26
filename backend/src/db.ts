@@ -417,6 +417,35 @@ export async function bootstrap() {
       );
     `);
 
+    // Create case_conferences table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS case_conferences (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        specialty_focus VARCHAR(100) NOT NULL,
+        status VARCHAR(50) DEFAULT 'open',
+        consensus_summary TEXT,
+        consensus_diagnosis VARCHAR(255),
+        finalized_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create case_conference_notes table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS case_conference_notes (
+        id SERIAL PRIMARY KEY,
+        conference_id INTEGER REFERENCES case_conferences(id) ON DELETE CASCADE,
+        clinician_name VARCHAR(100) NOT NULL,
+        specialty VARCHAR(100) NOT NULL,
+        recommendation TEXT NOT NULL,
+        vote_diagnosis VARCHAR(255),
+        urgency VARCHAR(50) DEFAULT 'routine',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

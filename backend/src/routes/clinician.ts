@@ -17,6 +17,7 @@ import { ClinicalOrdersService } from '../services/clinicalOrders';
 import * as TelehealthService from '../services/telehealth';
 import * as EsiTriageService from '../services/esiTriage';
 import * as ClinicalTrialsService from '../services/clinicalTrials';
+import * as CaseConferencingService from '../services/caseConferencing';
 
 const router = Router();
 
@@ -1344,6 +1345,62 @@ router.post('/trials/matches/:matchId/status', async (req: AuthenticatedRequest,
   } catch (err) {
     console.error('Update trial match status error:', err);
     res.status(500).json({ error: 'Failed to update trial match status.' });
+  }
+});
+
+// Case Conferencing: Get or create active MDT conference for encounter
+router.get('/sessions/:id/conference', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const conference = await CaseConferencingService.getOrCreateConference(id as string);
+    res.json(conference);
+  } catch (err) {
+    console.error('Get case conference error:', err);
+    res.status(500).json({ error: 'Failed to retrieve case conference.' });
+  }
+});
+
+// Case Conferencing: Add specialist contribution note & diagnostic vote
+router.post('/conference/:conferenceId/notes', async (req: AuthenticatedRequest, res: Response) => {
+  const { conferenceId } = req.params;
+  const { clinicianName, specialty, recommendation, voteDiagnosis, urgency } = req.body;
+  if (!clinicianName || !specialty || !recommendation) {
+    res.status(400).json({ error: 'clinicianName, specialty, and recommendation are required.' });
+    return;
+  }
+  try {
+    const note = await CaseConferencingService.addConferenceNote(Number(conferenceId), {
+      clinicianName,
+      specialty,
+      recommendation,
+      voteDiagnosis,
+      urgency
+    });
+    res.json({ success: true, note });
+  } catch (err) {
+    console.error('Add conference note error:', err);
+    res.status(500).json({ error: 'Failed to add specialist recommendation.' });
+  }
+});
+
+// Case Conferencing: Finalize multidisciplinary consensus
+router.post('/conference/:conferenceId/finalize', async (req: AuthenticatedRequest, res: Response) => {
+  const { conferenceId } = req.params;
+  const { consensusDiagnosis, consensusSummary } = req.body;
+  if (!consensusDiagnosis || !consensusSummary) {
+    res.status(400).json({ error: 'consensusDiagnosis and consensusSummary are required.' });
+    return;
+  }
+  try {
+    const finalized = await CaseConferencingService.finalizeConsensus(
+      Number(conferenceId),
+      consensusDiagnosis,
+      consensusSummary
+    );
+    res.json({ success: true, conference: finalized });
+  } catch (err) {
+    console.error('Finalize conference error:', err);
+    res.status(500).json({ error: 'Failed to finalize case consensus.' });
   }
 });
 
