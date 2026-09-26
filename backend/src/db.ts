@@ -509,6 +509,43 @@ export async function bootstrap() {
       );
     `);
 
+    // Create caregiver_proxies table (Phase 30)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS caregiver_proxies (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        proxy_name VARCHAR(128) NOT NULL,
+        relationship VARCHAR(64) NOT NULL,
+        phone VARCHAR(32) NOT NULL,
+        email VARCHAR(128),
+        access_level VARCHAR(32) NOT NULL DEFAULT 'full',
+        consent_verified BOOLEAN DEFAULT TRUE,
+        hipaa_disclosure_acknowledged BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create specialized_triage_assessments table (Phase 30)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS specialized_triage_assessments (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        patient_type VARCHAR(32) NOT NULL,
+        pews_score INTEGER,
+        pews_data JSONB DEFAULT '{}'::jsonb,
+        morse_fall_score INTEGER,
+        morse_data JSONB DEFAULT '{}'::jsonb,
+        frailty_score INTEGER,
+        delirium_detected BOOLEAN DEFAULT FALSE,
+        atypical_presentation_flags JSONB DEFAULT '[]'::jsonb,
+        proxy_id INTEGER REFERENCES caregiver_proxies(id) ON DELETE SET NULL,
+        clinician_recommendations TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

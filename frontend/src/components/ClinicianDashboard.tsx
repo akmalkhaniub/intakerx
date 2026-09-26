@@ -10,6 +10,7 @@ import ClinicalTrialMatcher from './ClinicalTrialMatcher';
 import CaseConferenceRoom from './CaseConferenceRoom';
 import PriorAuthClaimBuilder from './PriorAuthClaimBuilder';
 import DisasterModeBanner from './DisasterModeBanner';
+import SpecializedTriageModule from './SpecializedTriageModule';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -65,7 +66,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2560,6 +2561,22 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderSpecializedTriage = () => {
+    const activeSessionId = selectedSessionId || (sessions.length > 0 ? sessions[0].id : '');
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <SpecializedTriageModule
+          sessionId={activeSessionId}
+          patientId={sessionDetail?.patient?.id}
+          token={token}
+          backendUrl={backendUrl}
+          patientName={sessionDetail?.patient?.name || 'Encounter Patient'}
+          patientDob={sessionDetail?.patient?.dob}
+        />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3062,6 +3079,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 💳 Prior-Auth & Claims
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('specialized_triage')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'specialized_triage' ? '#ec4899' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'specialized_triage' ? '2.5px solid #ec4899' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                👶/🧓 Specialized Triage
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3326,6 +3361,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderCaseConference()
             ) : currentTab === 'billing_prior_auth' ? (
               renderBillingPriorAuth()
+            ) : currentTab === 'specialized_triage' ? (
+              renderSpecializedTriage()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

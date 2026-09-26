@@ -19,6 +19,7 @@ import * as EsiTriageService from '../services/esiTriage';
 import * as ClinicalTrialsService from '../services/clinicalTrials';
 import * as CaseConferencingService from '../services/caseConferencing';
 import { BillingPriorAuthService } from '../services/billingPriorAuth';
+import { SpecializedTriageService } from '../services/specializedTriage';
 
 const router = Router();
 
@@ -1502,6 +1503,82 @@ router.post('/claims/:claimId/submit', async (req: AuthenticatedRequest, res: Re
   } catch (err) {
     console.error('Submit claim error:', err);
     res.status(500).json({ error: 'Failed to submit claim to clearinghouse.' });
+  }
+});
+
+// ==========================================
+// Phase 30: Pediatric & Geriatric Specialized Triage
+// ==========================================
+
+// Get specialized assessment for session
+router.get('/sessions/:id/specialized-triage', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const assessment = await SpecializedTriageService.getAssessment(id as string);
+    res.json(assessment || null);
+  } catch (err) {
+    console.error('Fetch specialized assessment error:', err);
+    res.status(500).json({ error: 'Failed to fetch specialized assessment.' });
+  }
+});
+
+// Record specialized assessment (PEWS / Morse / Delirium / Proxy)
+router.post('/sessions/:id/specialized-triage/assess', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { patientType, pewsCriteria, morseCriteria, geriatricScreen, proxyId, clinicianRecommendations } = req.body;
+  if (!patientType) {
+    res.status(400).json({ error: 'patientType is required (pediatric | geriatric | standard).' });
+    return;
+  }
+  try {
+    const assessment = await SpecializedTriageService.recordAssessment({
+      sessionId: id as string,
+      patientType,
+      pewsCriteria,
+      morseCriteria,
+      geriatricScreen,
+      proxyId: proxyId ? Number(proxyId) : undefined,
+      clinicianRecommendations
+    });
+    res.json({ success: true, assessment });
+  } catch (err) {
+    console.error('Record specialized assessment error:', err);
+    res.status(500).json({ error: 'Failed to record specialized assessment.' });
+  }
+});
+
+// Get caregiver proxies for patient
+router.get('/patients/:patientId/proxies', async (req: AuthenticatedRequest, res: Response) => {
+  const { patientId } = req.params;
+  try {
+    const proxies = await SpecializedTriageService.getCaregiverProxies(Number(patientId));
+    res.json(proxies);
+  } catch (err) {
+    console.error('Fetch proxies error:', err);
+    res.status(500).json({ error: 'Failed to fetch caregiver proxies.' });
+  }
+});
+
+// Register caregiver proxy
+router.post('/patients/:patientId/proxies', async (req: AuthenticatedRequest, res: Response) => {
+  const { patientId } = req.params;
+  const { proxyName, relationship, phone, email, accessLevel } = req.body;
+  if (!proxyName || !relationship || !phone) {
+    res.status(400).json({ error: 'proxyName, relationship, and phone are required.' });
+    return;
+  }
+  try {
+    const proxy = await SpecializedTriageService.registerCaregiverProxy(Number(patientId), {
+      proxyName,
+      relationship,
+      phone,
+      email,
+      accessLevel
+    });
+    res.json({ success: true, proxy });
+  } catch (err) {
+    console.error('Register proxy error:', err);
+    res.status(500).json({ error: 'Failed to register caregiver proxy.' });
   }
 });
 
