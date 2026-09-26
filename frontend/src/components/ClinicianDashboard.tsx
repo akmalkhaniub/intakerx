@@ -6,6 +6,7 @@ import ImageGalleryViewer from './ImageGalleryViewer';
 import ClinicalOrderBuilder from './ClinicalOrderBuilder';
 import TelehealthRoom from './TelehealthRoom';
 import WaitingRoomQueueManager from './WaitingRoomQueueManager';
+import ClinicalTrialMatcher from './ClinicalTrialMatcher';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -61,7 +62,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2513,6 +2514,20 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderClinicalTrials = () => {
+    const activeSessionId = selectedSessionId || (sessions.length > 0 ? sessions[0].id : '');
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <ClinicalTrialMatcher
+          sessionId={activeSessionId}
+          token={token}
+          backendUrl={backendUrl}
+          patientName={sessionDetail?.patient?.name || 'Encounter Patient'}
+        />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -2954,6 +2969,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 ⏱️ ESI Waiting Room
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('trials')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'trials' ? '#38bdf8' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'trials' ? '2.5px solid #38bdf8' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🧬 Clinical Trials
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3212,6 +3245,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderTelehealthConsult()
             ) : currentTab === 'waiting_room' ? (
               renderWaitingRoomQueue()
+            ) : currentTab === 'trials' ? (
+              renderClinicalTrials()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

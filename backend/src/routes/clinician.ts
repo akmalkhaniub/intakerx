@@ -16,6 +16,7 @@ import { VisualTriageService } from '../services/visualTriage';
 import { ClinicalOrdersService } from '../services/clinicalOrders';
 import * as TelehealthService from '../services/telehealth';
 import * as EsiTriageService from '../services/esiTriage';
+import * as ClinicalTrialsService from '../services/clinicalTrials';
 
 const router = Router();
 
@@ -1314,6 +1315,35 @@ router.get('/sessions/:id/esi', async (req: AuthenticatedRequest, res: Response)
   } catch (err) {
     console.error('Evaluate ESI error:', err);
     res.status(500).json({ error: 'Failed to evaluate ESI triage level.' });
+  }
+});
+
+// Clinical Trials: Get or generate trial matches for encounter
+router.get('/sessions/:id/trials/matches', async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const matches = await ClinicalTrialsService.getMatchesForSession(id as string);
+    res.json(matches);
+  } catch (err) {
+    console.error('Get trial matches error:', err);
+    res.status(500).json({ error: 'Failed to evaluate clinical trial matches.' });
+  }
+});
+
+// Clinical Trials: Update match status
+router.post('/trials/matches/:matchId/status', async (req: AuthenticatedRequest, res: Response) => {
+  const { matchId } = req.params;
+  const { status, notes } = req.body;
+  if (!status) {
+    res.status(400).json({ error: 'status is required.' });
+    return;
+  }
+  try {
+    await ClinicalTrialsService.updateMatchStatus(Number(matchId), status, notes);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Update trial match status error:', err);
+    res.status(500).json({ error: 'Failed to update trial match status.' });
   }
 });
 

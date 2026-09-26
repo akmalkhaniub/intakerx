@@ -379,6 +379,44 @@ export async function bootstrap() {
       );
     `);
 
+    // Create clinical_trials table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS clinical_trials (
+        id SERIAL PRIMARY KEY,
+        nct_id VARCHAR(50) UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        phase VARCHAR(50) NOT NULL,
+        sponsor VARCHAR(255) NOT NULL,
+        condition TEXT NOT NULL,
+        status VARCHAR(50) DEFAULT 'RECRUITING',
+        min_age INTEGER DEFAULT 18,
+        max_age INTEGER DEFAULT 85,
+        gender VARCHAR(20) DEFAULT 'ALL',
+        inclusion_criteria TEXT[] DEFAULT '{}',
+        exclusion_criteria TEXT[] DEFAULT '{}',
+        biomarker_requirements JSONB DEFAULT '{}',
+        study_locations TEXT[] DEFAULT '{}',
+        contact_email VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create patient_trial_matches table
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS patient_trial_matches (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        trial_id INTEGER REFERENCES clinical_trials(id) ON DELETE CASCADE,
+        match_score DOUBLE PRECISION NOT NULL,
+        matched_inclusions TEXT[] DEFAULT '{}',
+        matched_exclusions TEXT[] DEFAULT '{}',
+        status VARCHAR(50) DEFAULT 'identified',
+        clinician_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
