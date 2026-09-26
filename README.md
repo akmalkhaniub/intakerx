@@ -106,6 +106,16 @@ graph TD
 | **Phase 18** | **Anatomical Body Map & Pain Locator** | Interactive SVG anterior/posterior body diagram with 1-10 VAS sliders, quality selector, and radiation logging. | `test_body_map.ts` (Passed) |
 | **Phase 19** | **Ambient Clinical AI Scribe** | Multi-speaker conversational diarization with real-time entity recognition and automated synthesis into SOAP notes. | `test_ambient_scribe.ts` (Passed) |
 | **Phase 20** | **Follow-Up & Remote Monitoring** | Automated post-visit protocols (Day 1, 3, 7, 14), patient check-in surveys, and real-time deterioration alert escalation. | `test_followup.ts` (Passed) |
+| **Phase 21** | **Visual Dermatological & Wound Triage** | Multi-modal dermatological image analyzer with Fitzpatrick skin typing, ABCDE melanoma checks, and wound area tracking. | `test_visual_triage.ts` (Passed) |
+| **Phase 22** | **Clinical Order Sets & LOINC/RxNorm** | Pre-bundled order sets for high-frequency presentations with standardized LOINC lab codes, RxNorm meds, and CPT imaging. | `test_clinical_orders.ts` (Passed) |
+| **Phase 23** | **Integrated Telehealth Video Room** | HIPAA-compliant WebRTC telehealth consult suite with live ambient scribe sidebar, screen sharing, and post-call SOAP auto-save. | `test_telehealth.ts` (Passed) |
+| **Phase 24** | **Intelligent Waiting Room & ESI Dynamic Queue** | Dynamic Emergency Severity Index (ESI Level 1-5) sorting engine with real-time wait time forecasts and bed management. | `test_esi_triage.ts` (Passed) |
+| **Phase 25** | **Architecture Hardening & Stress Benchmarking** | High-concurrency throughput stress testing, database connection pooling optimization, and automated health telemetry. | `test_performance_benchmarks.ts` (Passed) |
+| **Phase 26** | **AI Clinical Trial Matching & Protocol Screening** | Autonomous ClinicalTrials.gov matcher querying NCT protocols against patient demographics, ICD-10s, and eligibility criteria. | `test_clinical_trials.ts` (Passed) |
+| **Phase 27** | **Multidisciplinary Team (MDT) Conferencing** | Tumor Board & Complex Case Review room with differential voting breakdown, specialist notes feed, and consensus sign-off. | `test_case_conferencing.ts` (Passed) |
+| **Phase 28** | **Autonomous Prior-Auth & CMS-1500 Generator** | Payer medical policy denial risk scoring, automated Letter of Medical Necessity compiler, and 100% clean CMS-1500 claim scrubber. | `test_billing_prior_auth.ts` (Passed) |
+| **Phase 29** | **Offline-First Field Triage & Disaster Mode** | Local START triage classification engine, offline client queue, idempotent batch sync, and facility-wide Disaster Mode toggle. | `test_offline_sync.ts` (Passed) |
+| **Phase 30** | **Pediatric & Geriatric Specialized Protocols** | PEWS pediatric scoring with rapid response escalation, Morse Fall Risk assessment, atypical delirium screening, and caregiver proxy access. | `test_specialized_triage.ts` (Passed) |
 
 ---
 
