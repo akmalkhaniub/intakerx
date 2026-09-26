@@ -7,6 +7,7 @@ import { GuardrailsService } from '../services/guardrails';
 import { PHIService } from '../services/phi';
 import { notificationBus } from '../notifications';
 import { VisualTriageService } from '../services/visualTriage';
+import { DisasterFieldTriageService } from '../services/disasterFieldTriage';
 
 const router = Router();
 
@@ -913,6 +914,69 @@ Output raw JSON matching this structure:
     [sessionId, JSON.stringify(soapData), 'pending']
   );
 }
+
+// ==========================================
+// Phase 29: Offline-First Field Triage & Emergency Disaster Mode
+// ==========================================
+
+// Get current Disaster Mode status
+router.get('/disaster-mode/status', async (req, res) => {
+  try {
+    const status = await DisasterFieldTriageService.getDisasterModeStatus();
+    res.json(status);
+  } catch (err) {
+    console.error('Get disaster status error:', err);
+    res.status(500).json({ error: 'Failed to retrieve disaster mode status.' });
+  }
+});
+
+// Toggle facility Disaster Mode
+router.post('/disaster-mode/toggle', async (req, res) => {
+  const { isActive, activatedBy, incidentName, guidelines } = req.body;
+  if (isActive === undefined || !activatedBy) {
+    res.status(400).json({ error: 'isActive and activatedBy are required.' });
+    return;
+  }
+  try {
+    const updated = await DisasterFieldTriageService.toggleDisasterMode({
+      isActive: Boolean(isActive),
+      activatedBy,
+      incidentName,
+      guidelines
+    });
+    res.json({ success: true, event: updated });
+  } catch (err) {
+    console.error('Toggle disaster mode error:', err);
+    res.status(500).json({ error: 'Failed to update disaster mode.' });
+  }
+});
+
+// Evaluate START Triage physiological criteria
+router.post('/offline/evaluate-start', (req, res) => {
+  try {
+    const result = DisasterFieldTriageService.evaluateStartTriage(req.body);
+    res.json(result);
+  } catch (err) {
+    console.error('Evaluate START triage error:', err);
+    res.status(500).json({ error: 'Failed to evaluate START triage criteria.' });
+  }
+});
+
+// Ingest batch of offline field intakes
+router.post('/offline/batch-sync', async (req, res) => {
+  const { intakes } = req.body;
+  if (!intakes || !Array.isArray(intakes)) {
+    res.status(400).json({ error: 'intakes array is required for batch sync.' });
+    return;
+  }
+  try {
+    const syncReport = await DisasterFieldTriageService.processBatchSync(intakes);
+    res.json({ success: true, ...syncReport });
+  } catch (err) {
+    console.error('Batch offline sync error:', err);
+    res.status(500).json({ error: 'Failed to process offline batch sync.' });
+  }
+});
 
 export default router;
 export { generateSOAPSummary, validateSOAPData, SOAPData };

@@ -9,6 +9,7 @@ import WaitingRoomQueueManager from './WaitingRoomQueueManager';
 import ClinicalTrialMatcher from './ClinicalTrialMatcher';
 import CaseConferenceRoom from './CaseConferenceRoom';
 import PriorAuthClaimBuilder from './PriorAuthClaimBuilder';
+import DisasterModeBanner from './DisasterModeBanner';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -2812,6 +2813,13 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
       ) : (
         /* Clinician Portal Layout */
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100vh', overflow: 'hidden' }}>
+          <DisasterModeBanner
+            backendUrl={backendUrl}
+            token={token}
+            clinicianName={clinician?.name}
+            onSyncComplete={loadSessionsList}
+          />
+
           {/* Global Portal Header */}
           <div style={{
             display: 'flex',

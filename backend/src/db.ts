@@ -77,7 +77,11 @@ export async function bootstrap() {
     // Column updates
     await migrationPool.query(`
       ALTER TABLE intake_sessions 
-      ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(50) DEFAULT 'en-US';
+      ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(50) DEFAULT 'en-US',
+      ADD COLUMN IF NOT EXISTS is_disaster_intake BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS start_triage_tag VARCHAR(16),
+      ADD COLUMN IF NOT EXISTS offline_sync_id VARCHAR(64),
+      ADD COLUMN IF NOT EXISTS field_responder VARCHAR(128);
     `);
 
     // Create messages table
@@ -486,6 +490,20 @@ export async function bootstrap() {
         cms1500_rendered_text TEXT,
         status VARCHAR(32) NOT NULL DEFAULT 'scrubbed_clean',
         clearinghouse_batch_id VARCHAR(64),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create disaster_mode_events table (Phase 29)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS disaster_mode_events (
+        id SERIAL PRIMARY KEY,
+        is_active BOOLEAN NOT NULL DEFAULT FALSE,
+        activated_by VARCHAR(128) NOT NULL,
+        incident_name VARCHAR(255) NOT NULL,
+        casualty_count INTEGER DEFAULT 0,
+        guidelines TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
