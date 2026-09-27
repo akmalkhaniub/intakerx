@@ -116,6 +116,11 @@ graph TD
 | **Phase 28** | **Autonomous Prior-Auth & CMS-1500 Generator** | Payer medical policy denial risk scoring, automated Letter of Medical Necessity compiler, and 100% clean CMS-1500 claim scrubber. | `test_billing_prior_auth.ts` (Passed) |
 | **Phase 29** | **Offline-First Field Triage & Disaster Mode** | Local START triage classification engine, offline client queue, idempotent batch sync, and facility-wide Disaster Mode toggle. | `test_offline_sync.ts` (Passed) |
 | **Phase 30** | **Pediatric & Geriatric Specialized Protocols** | PEWS pediatric scoring with rapid response escalation, Morse Fall Risk assessment, atypical delirium screening, and caregiver proxy access. | `test_specialized_triage.ts` (Passed) |
+| **Phase 31** | **Computer-Assisted Coding (CAC) & Cross-Mapping** | Dual ICD-10-CM / ICD-11 & SNOMED CT clinical cross-mapping engine with specificity analysis, HCC risk flags, and 1-click SOAP insertion. | `test_clinical_coding.ts` (Passed) |
+| **Phase 32** | **Antimicrobial Stewardship & PGx Safety Engine** | Renal CrCl-adjusted dosing calculator, pathogen de-escalation, CYP2C19/CYP2D6/SLCO1B1 pharmacogenomics (PGx) CPIC guideline alerts. | `test_antimicrobial_pgx.ts` (Passed) |
+| **Phase 33** | **Closed-Loop Specialist Referrals & e-Consults** | Inter-facility referral routing, provisional ICD-10s, specialist consultation feedback loop, and CPT 99451 asynchronous e-Consult exchange. | `test_referral_management.ts` (Passed) |
+| **Phase 34** | **Inpatient Bedside Rounding & I-PASS Shift Handoff** | Standardized I-PASS handoff suite (Illness severity, Patient summary, Action items, Contingency, Synthesis), lines/tubes/drains infection monitor. | `test_ipass_rounding.ts` (Passed) |
+| **Phase 35** | **Population Health, CMS-HCC RAF & HEDIS Care Gaps** | CMS-HCC V28 risk adjustment factor (RAF) engine with disease interactions, annual Medicare capitation benchmarks, and NCQA HEDIS care gap closer. | `test_population_health.ts` (Passed) |
 
 ---
 
