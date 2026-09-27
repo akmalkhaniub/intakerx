@@ -12,6 +12,7 @@ import PriorAuthClaimBuilder from './PriorAuthClaimBuilder';
 import DisasterModeBanner from './DisasterModeBanner';
 import SpecializedTriageModule from './SpecializedTriageModule';
 import { ComputerAssistedCoding } from './ComputerAssistedCoding';
+import AntimicrobialPgxAdvisor from './AntimicrobialPgxAdvisor';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -67,7 +68,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2592,6 +2593,21 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderAntimicrobialPgx = () => {
+    const activeSessionId = selectedSessionId || (sessions.length > 0 ? sessions[0].id : '');
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <AntimicrobialPgxAdvisor
+          sessionId={activeSessionId}
+          patientId={sessionDetail?.patient?.id}
+          token={token}
+          backendUrl={backendUrl}
+          patientName={sessionDetail?.patient?.name || 'Encounter Patient'}
+        />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3130,6 +3146,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 🏷️ Autonomous CAC
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('antimicrobial_pgx')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'antimicrobial_pgx' ? '#10b981' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'antimicrobial_pgx' ? '2.5px solid #10b981' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🧬 Antimicrobial &amp; PGx
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3398,6 +3432,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderSpecializedTriage()
             ) : currentTab === 'cac_coding' ? (
               renderCacCoding()
+            ) : currentTab === 'antimicrobial_pgx' ? (
+              renderAntimicrobialPgx()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

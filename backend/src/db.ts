@@ -565,6 +565,36 @@ export async function bootstrap() {
       );
     `);
 
+    // Create patient_pgx_profiles table (Phase 32)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS patient_pgx_profiles (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        gene VARCHAR(32) NOT NULL,
+        diplotype VARCHAR(64) NOT NULL,
+        phenotype VARCHAR(64) NOT NULL,
+        test_date DATE DEFAULT CURRENT_DATE,
+        lab_source VARCHAR(128) DEFAULT 'Standard PGx NGS Panel',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create antimicrobial_stewardship_audits table (Phase 32)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS antimicrobial_stewardship_audits (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        infection_site VARCHAR(64) NOT NULL,
+        creatinine_clearance NUMERIC(6,2),
+        prescribed_regimen VARCHAR(128),
+        stewardship_recommendation JSONB DEFAULT '{}'::jsonb,
+        pgx_alerts JSONB DEFAULT '[]'::jsonb,
+        approval_status VARCHAR(32) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

@@ -21,6 +21,7 @@ import * as CaseConferencingService from '../services/caseConferencing';
 import { BillingPriorAuthService } from '../services/billingPriorAuth';
 import { SpecializedTriageService } from '../services/specializedTriage';
 import { clinicalCodingService } from '../services/clinicalCoding';
+import { antimicrobialPgxService } from '../services/antimicrobialPgx';
 
 const router = Router();
 
@@ -1626,6 +1627,72 @@ router.put('/cac/review/:cacId', async (req: AuthenticatedRequest, res: Response
   } catch (err: any) {
     console.error('Review CAC error:', err);
     res.status(500).json({ error: 'Failed to record CAC code review.' });
+  }
+});
+
+// -------------------------------------------------------------
+// Phase 32: Antimicrobial Stewardship & Pharmacogenomics (PGx) Routes
+// -------------------------------------------------------------
+router.post('/antimicrobial/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, sessionId, proposedMeds, infectionSite, serumCrMgDl, weightKg } = req.body;
+    if (!patientId) {
+      return res.status(400).json({ error: 'patientId is required for safety evaluation.' });
+    }
+    const result = await antimicrobialPgxService.evaluatePatientSafety(
+      parseInt(patientId, 10),
+      sessionId,
+      proposedMeds || [],
+      infectionSite || 'UTI',
+      serumCrMgDl ? parseFloat(serumCrMgDl) : 1.1,
+      weightKg ? parseFloat(weightKg) : 70
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('Antimicrobial/PGx evaluation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate antimicrobial/PGx safety profile.' });
+  }
+});
+
+router.get('/pgx/profiles/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = parseInt(req.params.patientId as string, 10);
+    const profiles = await antimicrobialPgxService.getPatientPgxProfiles(patientId);
+    res.json(profiles);
+  } catch (err: any) {
+    console.error('Fetch PGx profiles error:', err);
+    res.status(500).json({ error: 'Failed to fetch patient PGx profiles.' });
+  }
+});
+
+router.post('/pgx/profiles', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, gene, diplotype, phenotype, labSource } = req.body;
+    if (!patientId || !gene || !diplotype || !phenotype) {
+      return res.status(400).json({ error: 'patientId, gene, diplotype, and phenotype are required.' });
+    }
+    const record = await antimicrobialPgxService.addPatientPgxProfile({
+      patientId: parseInt(patientId, 10),
+      gene,
+      diplotype,
+      phenotype,
+      labSource
+    });
+    res.status(201).json(record);
+  } catch (err: any) {
+    console.error('Create PGx profile error:', err);
+    res.status(500).json({ error: 'Failed to record PGx profile.' });
+  }
+});
+
+router.get('/antimicrobial/audits/:sessionId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = req.params.sessionId as string;
+    const audits = await antimicrobialPgxService.getAuditsBySession(sessionId);
+    res.json(audits);
+  } catch (err: any) {
+    console.error('Fetch stewardship audits error:', err);
+    res.status(500).json({ error: 'Failed to retrieve stewardship audits.' });
   }
 });
 
