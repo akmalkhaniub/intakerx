@@ -24,6 +24,7 @@ import { clinicalCodingService } from '../services/clinicalCoding';
 import { antimicrobialPgxService } from '../services/antimicrobialPgx';
 import { referralManagementService } from '../services/referralManagement';
 import { ipassRoundingService } from '../services/ipassRounding';
+import { populationHealthService } from '../services/populationHealth';
 
 const router = Router();
 
@@ -1901,6 +1902,74 @@ router.get('/ipass/rounding/census', async (req: AuthenticatedRequest, res: Resp
   } catch (err: any) {
     console.error('Fetch rounding census error:', err);
     res.status(500).json({ error: 'Failed to retrieve inpatient rounding census.' });
+  }
+});
+
+// Phase 35: Population Health, CMS-HCC Risk Adjustment & HEDIS Care Gaps
+router.post('/population/raf/calculate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, documentedConditions } = req.body;
+    if (!patientId) {
+      return res.status(400).json({ error: 'patientId is required.' });
+    }
+    const result = await populationHealthService.calculatePatientRaf(
+      parseInt(patientId, 10),
+      documentedConditions || []
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('Calculate RAF score error:', err);
+    res.status(500).json({ error: 'Failed to calculate CMS-HCC RAF score.' });
+  }
+});
+
+router.post('/population/care-gaps/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, conditions } = req.body;
+    if (!patientId) {
+      return res.status(400).json({ error: 'patientId is required.' });
+    }
+    const gaps = await populationHealthService.evaluateHedisCareGaps(
+      parseInt(patientId, 10),
+      conditions || []
+    );
+    res.json(gaps);
+  } catch (err: any) {
+    console.error('Evaluate care gaps error:', err);
+    res.status(500).json({ error: 'Failed to evaluate HEDIS care gaps.' });
+  }
+});
+
+router.get('/population/care-gaps/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = parseInt(req.params.patientId as string, 10);
+    const gaps = await populationHealthService.getCareGapsByPatient(patientId);
+    res.json(gaps);
+  } catch (err: any) {
+    console.error('Fetch care gaps error:', err);
+    res.status(500).json({ error: 'Failed to fetch HEDIS care gaps.' });
+  }
+});
+
+router.put('/population/care-gaps/:id/close', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const gapId = parseInt(req.params.id as string, 10);
+    const { completionDate } = req.body;
+    const closed = await populationHealthService.closeCareGap(gapId, completionDate);
+    res.json(closed);
+  } catch (err: any) {
+    console.error('Close care gap error:', err);
+    res.status(500).json({ error: 'Failed to close HEDIS care gap.' });
+  }
+});
+
+router.get('/population/analytics/summary', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const summary = await populationHealthService.getPopulationAnalytics();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('Fetch population analytics error:', err);
+    res.status(500).json({ error: 'Failed to retrieve population analytics summary.' });
   }
 });
 

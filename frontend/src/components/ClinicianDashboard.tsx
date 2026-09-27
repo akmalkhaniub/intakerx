@@ -15,6 +15,7 @@ import { ComputerAssistedCoding } from './ComputerAssistedCoding';
 import AntimicrobialPgxAdvisor from './AntimicrobialPgxAdvisor';
 import ReferralManager from './ReferralManager';
 import IpassRoundingSuite from './IpassRoundingSuite';
+import { PopulationHealthDashboard } from './PopulationHealthDashboard';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -70,7 +71,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2640,6 +2641,19 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderPopulationHealth = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <PopulationHealthDashboard
+          patientId={sessionDetail?.patient?.id}
+          token={token}
+          backendUrl={backendUrl}
+          patientName={sessionDetail?.patient?.name || 'Encounter Patient'}
+        />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3232,6 +3246,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 🏥 I-PASS Rounding
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('population_health')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'population_health' ? '#818cf8' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'population_health' ? '2.5px solid #818cf8' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                📊 Population Health & RAF
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3506,6 +3538,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderReferralManager()
             ) : currentTab === 'ipass_rounding' ? (
               renderIpassRounding()
+            ) : currentTab === 'population_health' ? (
+              renderPopulationHealth()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

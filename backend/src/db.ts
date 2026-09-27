@@ -656,6 +656,35 @@ export async function bootstrap() {
       );
     `);
 
+    // Create population_patient_raf table (Phase 35)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS population_patient_raf (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        raf_score NUMERIC(5,3) NOT NULL DEFAULT 1.000,
+        hcc_categories JSONB DEFAULT '[]'::jsonb,
+        disease_interactions JSONB DEFAULT '[]'::jsonb,
+        annual_capitation_benchmark NUMERIC(10,2) DEFAULT 0.00,
+        calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create hedis_care_gaps table (Phase 35)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS hedis_care_gaps (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        measure_code VARCHAR(32) NOT NULL,
+        measure_name VARCHAR(128) NOT NULL,
+        status VARCHAR(32) DEFAULT 'open',
+        due_date DATE,
+        last_completed_date DATE,
+        recommended_action TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
