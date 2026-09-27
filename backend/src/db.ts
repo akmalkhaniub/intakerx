@@ -546,6 +546,25 @@ export async function bootstrap() {
       );
     `);
 
+    // Create cac_coding_sessions table (Phase 31)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS cac_coding_sessions (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        status VARCHAR(32) DEFAULT 'draft',
+        suggested_codes JSONB DEFAULT '[]'::jsonb,
+        accepted_codes JSONB DEFAULT '[]'::jsonb,
+        downcoding_risk_score INTEGER DEFAULT 0,
+        revenue_impact_estimate NUMERIC(10,2) DEFAULT 0.00,
+        specificity_recommendations JSONB DEFAULT '[]'::jsonb,
+        clinician_feedback TEXT,
+        reviewed_by INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

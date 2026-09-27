@@ -11,6 +11,7 @@ import CaseConferenceRoom from './CaseConferenceRoom';
 import PriorAuthClaimBuilder from './PriorAuthClaimBuilder';
 import DisasterModeBanner from './DisasterModeBanner';
 import SpecializedTriageModule from './SpecializedTriageModule';
+import { ComputerAssistedCoding } from './ComputerAssistedCoding';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -66,7 +67,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2577,6 +2578,20 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderCacCoding = () => {
+    const activeSessionId = selectedSessionId || (sessions.length > 0 ? sessions[0].id : '');
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <ComputerAssistedCoding
+          sessionId={activeSessionId}
+          token={token}
+          backendUrl={backendUrl}
+          patientName={sessionDetail?.patient?.name || 'Encounter Patient'}
+        />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3097,6 +3112,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 👶/🧓 Specialized Triage
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('cac_coding')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'cac_coding' ? '#6366f1' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'cac_coding' ? '2.5px solid #6366f1' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🏷️ Autonomous CAC
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3363,6 +3396,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderBillingPriorAuth()
             ) : currentTab === 'specialized_triage' ? (
               renderSpecializedTriage()
+            ) : currentTab === 'cac_coding' ? (
+              renderCacCoding()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

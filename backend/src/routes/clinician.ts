@@ -20,6 +20,7 @@ import * as ClinicalTrialsService from '../services/clinicalTrials';
 import * as CaseConferencingService from '../services/caseConferencing';
 import { BillingPriorAuthService } from '../services/billingPriorAuth';
 import { SpecializedTriageService } from '../services/specializedTriage';
+import { clinicalCodingService } from '../services/clinicalCoding';
 
 const router = Router();
 
@@ -1579,6 +1580,52 @@ router.post('/patients/:patientId/proxies', async (req: AuthenticatedRequest, re
   } catch (err) {
     console.error('Register proxy error:', err);
     res.status(500).json({ error: 'Failed to register caregiver proxy.' });
+  }
+});
+
+// -------------------------------------------------------------
+// Phase 31: Autonomous Computer-Assisted Coding (CAC) Routes
+// -------------------------------------------------------------
+router.post('/cac/analyze', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { sessionId, customClinicalText } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId is required for CAC analysis.' });
+    }
+    const analysis = await clinicalCodingService.analyzeEncounterDocumentation(sessionId, customClinicalText);
+    res.json(analysis);
+  } catch (err: any) {
+    console.error('CAC analysis error:', err);
+    res.status(500).json({ error: 'Failed to execute computer-assisted coding extraction.' });
+  }
+});
+
+router.get('/cac/sessions/:sessionId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = req.params.sessionId as string;
+    const records = await clinicalCodingService.getCacSessions(sessionId);
+    res.json(records);
+  } catch (err: any) {
+    console.error('Fetch CAC sessions error:', err);
+    res.status(500).json({ error: 'Failed to retrieve CAC sessions.' });
+  }
+});
+
+router.put('/cac/review/:cacId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const cacId = parseInt(req.params.cacId as string, 10);
+    const { acceptedCodes, clinicianFeedback } = req.body;
+    const reviewedBy = req.user?.id;
+    const updated = await clinicalCodingService.reviewAndAcceptCodes(
+      cacId,
+      acceptedCodes || [],
+      clinicianFeedback,
+      reviewedBy
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Review CAC error:', err);
+    res.status(500).json({ error: 'Failed to record CAC code review.' });
   }
 });
 
