@@ -23,6 +23,7 @@ import { SpecializedTriageService } from '../services/specializedTriage';
 import { clinicalCodingService } from '../services/clinicalCoding';
 import { antimicrobialPgxService } from '../services/antimicrobialPgx';
 import { referralManagementService } from '../services/referralManagement';
+import { ipassRoundingService } from '../services/ipassRounding';
 
 const router = Router();
 
@@ -1811,6 +1812,95 @@ router.post('/econsults/triage-check', async (req: AuthenticatedRequest, res: Re
   } catch (err: any) {
     console.error('EConsult triage check error:', err);
     res.status(500).json({ error: 'Failed to evaluate e-consult eligibility.' });
+  }
+});
+
+// -------------------------------------------------------------
+// Phase 34: Smart Inpatient Bedside Rounding & Shift Handoff (I-PASS) Routes
+// -------------------------------------------------------------
+router.post('/ipass/handoffs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, sessionId, illnessSeverity, patientSummary, actionItems, contingencyPlans, linesTubesDrains, dischargeBarriers } = req.body;
+    if (!patientId || !patientSummary) {
+      return res.status(400).json({ error: 'patientId and patientSummary are required for I-PASS handoff.' });
+    }
+    const outgoingClinicianId = req.user?.id;
+    const record = await ipassRoundingService.createHandoff({
+      patientId: parseInt(patientId, 10),
+      sessionId,
+      illnessSeverity: illnessSeverity || 'stable',
+      patientSummary,
+      actionItems: actionItems || [],
+      contingencyPlans: contingencyPlans || [],
+      linesTubesDrains: linesTubesDrains || [],
+      dischargeBarriers: dischargeBarriers || [],
+      outgoingClinicianId
+    });
+    res.status(201).json(record);
+  } catch (err: any) {
+    console.error('Create I-PASS handoff error:', err);
+    res.status(500).json({ error: 'Failed to record I-PASS handoff.' });
+  }
+});
+
+router.get('/ipass/patient/:patientId/latest', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = parseInt(req.params.patientId as string, 10);
+    const handoff = await ipassRoundingService.getLatestHandoffByPatient(patientId);
+    res.json(handoff);
+  } catch (err: any) {
+    console.error('Fetch latest patient handoff error:', err);
+    res.status(500).json({ error: 'Failed to retrieve patient handoff.' });
+  }
+});
+
+router.get('/ipass/session/:sessionId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = req.params.sessionId as string;
+    const list = await ipassRoundingService.getHandoffsBySession(sessionId);
+    res.json(list);
+  } catch (err: any) {
+    console.error('Fetch session handoffs error:', err);
+    res.status(500).json({ error: 'Failed to retrieve session handoffs.' });
+  }
+});
+
+router.put('/ipass/handoffs/:id/sign-off', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const handoffId = parseInt(req.params.id as string, 10);
+    const { synthesisNotes } = req.body;
+    const incomingClinicianId = req.user?.id || 1;
+    const updated = await ipassRoundingService.signOffHandoff(
+      handoffId,
+      incomingClinicianId,
+      synthesisNotes || 'Transfer of care accepted. Synthesized and agreed with contingency plans.'
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Sign-off handoff error:', err);
+    res.status(500).json({ error: 'Failed to sign off I-PASS transfer.' });
+  }
+});
+
+router.put('/ipass/handoffs/:id/action-item', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const handoffId = parseInt(req.params.id as string, 10);
+    const { actionItemId, completed } = req.body;
+    const updated = await ipassRoundingService.toggleActionItem(handoffId, actionItemId, !!completed);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Toggle action item error:', err);
+    res.status(500).json({ error: 'Failed to update action item.' });
+  }
+});
+
+router.get('/ipass/rounding/census', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const census = await ipassRoundingService.getBedsideRoundingCensus();
+    res.json(census);
+  } catch (err: any) {
+    console.error('Fetch rounding census error:', err);
+    res.status(500).json({ error: 'Failed to retrieve inpatient rounding census.' });
   }
 });
 

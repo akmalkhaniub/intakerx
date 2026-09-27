@@ -635,6 +635,27 @@ export async function bootstrap() {
       );
     `);
 
+    // Create ipass_handoffs table (Phase 34)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS ipass_handoffs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        illness_severity VARCHAR(32) NOT NULL DEFAULT 'stable',
+        patient_summary TEXT NOT NULL,
+        action_items JSONB DEFAULT '[]'::jsonb,
+        contingency_plans JSONB DEFAULT '[]'::jsonb,
+        lines_tubes_drains JSONB DEFAULT '[]'::jsonb,
+        discharge_barriers JSONB DEFAULT '[]'::jsonb,
+        outgoing_clinician_id INTEGER,
+        incoming_clinician_id INTEGER,
+        synthesis_notes TEXT,
+        signed_off_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
