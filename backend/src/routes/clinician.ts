@@ -22,6 +22,7 @@ import { BillingPriorAuthService } from '../services/billingPriorAuth';
 import { SpecializedTriageService } from '../services/specializedTriage';
 import { clinicalCodingService } from '../services/clinicalCoding';
 import { antimicrobialPgxService } from '../services/antimicrobialPgx';
+import { referralManagementService } from '../services/referralManagement';
 
 const router = Router();
 
@@ -1693,6 +1694,123 @@ router.get('/antimicrobial/audits/:sessionId', async (req: AuthenticatedRequest,
   } catch (err: any) {
     console.error('Fetch stewardship audits error:', err);
     res.status(500).json({ error: 'Failed to retrieve stewardship audits.' });
+  }
+});
+
+// -------------------------------------------------------------
+// Phase 33: Closed-Loop Referral Management & Direct e-Consultation Routes
+// -------------------------------------------------------------
+router.post('/referrals', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { sessionId, patientId, specialty, priority, reasonForReferral, provisionalDiagnosisCode, targetFacility, targetSpecialist } = req.body;
+    if (!patientId || !specialty || !reasonForReferral) {
+      return res.status(400).json({ error: 'patientId, specialty, and reasonForReferral are required.' });
+    }
+    const referringClinicianId = req.user?.id;
+    const referral = await referralManagementService.createReferral({
+      sessionId,
+      patientId: parseInt(patientId, 10),
+      specialty,
+      priority: priority || 'routine',
+      reasonForReferral,
+      provisionalDiagnosisCode,
+      targetFacility,
+      targetSpecialist,
+      referringClinicianId
+    });
+    res.status(201).json(referral);
+  } catch (err: any) {
+    console.error('Create referral error:', err);
+    res.status(500).json({ error: 'Failed to create specialist referral.' });
+  }
+});
+
+router.put('/referrals/:id/status', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const referralId = parseInt(req.params.id as string, 10);
+    const { status, appointmentDate, consultSummaryNotes, specialistSignature } = req.body;
+    const updated = await referralManagementService.updateReferralStatus(
+      referralId,
+      status,
+      appointmentDate,
+      consultSummaryNotes,
+      specialistSignature
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update referral status error:', err);
+    res.status(500).json({ error: 'Failed to update referral status.' });
+  }
+});
+
+router.get('/referrals/session/:sessionId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = req.params.sessionId as string;
+    const list = await referralManagementService.getReferralsBySession(sessionId);
+    res.json(list);
+  } catch (err: any) {
+    console.error('Fetch session referrals error:', err);
+    res.status(500).json({ error: 'Failed to retrieve specialist referrals.' });
+  }
+});
+
+router.post('/econsults', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { sessionId, patientId, specialty, clinicalQuestion, urgency } = req.body;
+    if (!patientId || !specialty || !clinicalQuestion) {
+      return res.status(400).json({ error: 'patientId, specialty, and clinicalQuestion are required.' });
+    }
+    const eConsult = await referralManagementService.createEConsult({
+      sessionId,
+      patientId: parseInt(patientId, 10),
+      specialty,
+      clinicalQuestion,
+      urgency
+    });
+    res.status(201).json(eConsult);
+  } catch (err: any) {
+    console.error('Create eConsult error:', err);
+    res.status(500).json({ error: 'Failed to create e-consultation request.' });
+  }
+});
+
+router.put('/econsults/:id/respond', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const eConsultId = parseInt(req.params.id as string, 10);
+    const { specialistResponse, convertToInPerson } = req.body;
+    const answeringSpecialistId = req.user?.id;
+    const updated = await referralManagementService.respondToEConsult(
+      eConsultId,
+      specialistResponse,
+      answeringSpecialistId,
+      !!convertToInPerson
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Respond to eConsult error:', err);
+    res.status(500).json({ error: 'Failed to record e-consult response.' });
+  }
+});
+
+router.get('/econsults/session/:sessionId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = req.params.sessionId as string;
+    const list = await referralManagementService.getEConsultsBySession(sessionId);
+    res.json(list);
+  } catch (err: any) {
+    console.error('Fetch session eConsults error:', err);
+    res.status(500).json({ error: 'Failed to retrieve e-consultation requests.' });
+  }
+});
+
+router.post('/econsults/triage-check', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { specialty, clinicalContext } = req.body;
+    const triage = referralManagementService.evaluateEConsultTriageEligibility(specialty || 'General', clinicalContext || '');
+    res.json(triage);
+  } catch (err: any) {
+    console.error('EConsult triage check error:', err);
+    res.status(500).json({ error: 'Failed to evaluate e-consult eligibility.' });
   }
 });
 

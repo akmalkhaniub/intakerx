@@ -595,6 +595,46 @@ export async function bootstrap() {
       );
     `);
 
+    // Create specialist_referrals table (Phase 33)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS specialist_referrals (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        specialty VARCHAR(64) NOT NULL,
+        priority VARCHAR(32) DEFAULT 'routine',
+        reason_for_referral TEXT NOT NULL,
+        provisional_diagnosis_code VARCHAR(32),
+        target_facility VARCHAR(128),
+        target_specialist VARCHAR(128),
+        status VARCHAR(32) DEFAULT 'submitted',
+        appointment_date TIMESTAMP,
+        consult_summary_notes TEXT,
+        referring_clinician_id INTEGER,
+        specialist_signature VARCHAR(128),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create e_consult_requests table (Phase 33)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS e_consult_requests (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        specialty VARCHAR(64) NOT NULL,
+        clinical_question TEXT NOT NULL,
+        urgency VARCHAR(32) DEFAULT 'standard_48h',
+        specialist_response TEXT,
+        status VARCHAR(32) DEFAULT 'pending',
+        cpt_billing_code VARCHAR(16) DEFAULT '99451',
+        answering_specialist_id INTEGER,
+        answered_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
