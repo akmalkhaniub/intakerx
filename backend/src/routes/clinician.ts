@@ -26,6 +26,7 @@ import { referralManagementService } from '../services/referralManagement';
 import { ipassRoundingService } from '../services/ipassRounding';
 import { populationHealthService } from '../services/populationHealth';
 import { sepsisWatchdogService } from '../services/sepsisWatchdog';
+import { revCycleAppealsService } from '../services/revCycleAppeals';
 
 const router = Router();
 
@@ -2035,6 +2036,87 @@ router.put('/sepsis/surveillance/:id/resolve', async (req: AuthenticatedRequest,
   } catch (err: any) {
     console.error('Resolve sepsis alert error:', err);
     res.status(500).json({ error: 'Failed to resolve sepsis alert.' });
+  }
+});
+
+// Phase 37: Zero-Click Revenue Cycle & Denial Appeals AI Engine
+router.post('/revcycle/scrub', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { cptCodes, icd10Codes } = req.body;
+    if (!cptCodes || !icd10Codes) {
+      return res.status(400).json({ error: 'cptCodes and icd10Codes are required.' });
+    }
+    const result = revCycleAppealsService.scrubClaim(cptCodes, icd10Codes);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Scrub claim error:', err);
+    res.status(500).json({ error: 'Failed to scrub claim line items.' });
+  }
+});
+
+router.post('/revcycle/claims', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, sessionId, claimType, payerName, cptCodes, icd10Codes } = req.body;
+    if (!patientId || !payerName || !cptCodes) {
+      return res.status(400).json({ error: 'patientId, payerName, and cptCodes are required.' });
+    }
+    const created = await revCycleAppealsService.createClaim({
+      patientId: parseInt(patientId, 10),
+      sessionId,
+      claimType,
+      payerName,
+      cptCodes,
+      icd10Codes: icd10Codes || []
+    });
+    res.json(created);
+  } catch (err: any) {
+    console.error('Create claim error:', err);
+    res.status(500).json({ error: 'Failed to create revenue cycle claim.' });
+  }
+});
+
+router.get('/revcycle/claims', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    const claims = await revCycleAppealsService.getClaims(status);
+    res.json(claims);
+  } catch (err: any) {
+    console.error('Fetch claims error:', err);
+    res.status(500).json({ error: 'Failed to fetch claims list.' });
+  }
+});
+
+router.post('/revcycle/claims/:id/simulate-denial', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const claimId = parseInt(req.params.id as string, 10);
+    const { denialCode, denialDescription } = req.body;
+    const denied = await revCycleAppealsService.simulateClaimDenial(claimId, denialCode, denialDescription);
+    res.json(denied);
+  } catch (err: any) {
+    console.error('Simulate denial error:', err);
+    res.status(500).json({ error: 'Failed to simulate claim denial.' });
+  }
+});
+
+router.post('/revcycle/claims/:id/generate-appeal', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const claimId = parseInt(req.params.id as string, 10);
+    const appeal = await revCycleAppealsService.generateAppealLetter(claimId);
+    res.json(appeal);
+  } catch (err: any) {
+    console.error('Generate appeal letter error:', err);
+    res.status(500).json({ error: 'Failed to generate clinical appeal letter.' });
+  }
+});
+
+router.put('/revcycle/appeals/:id/submit', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const appealId = parseInt(req.params.id as string, 10);
+    const submitted = await revCycleAppealsService.submitAppeal(appealId);
+    res.json(submitted);
+  } catch (err: any) {
+    console.error('Submit appeal error:', err);
+    res.status(500).json({ error: 'Failed to submit clinical appeal.' });
   }
 });
 

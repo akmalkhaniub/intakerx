@@ -724,6 +724,42 @@ export async function bootstrap() {
       );
     `);
 
+    // Create claims_revcycle_records table (Phase 37)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS claims_revcycle_records (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        claim_type VARCHAR(16) NOT NULL DEFAULT 'CMS-1500',
+        payer_name VARCHAR(128) NOT NULL,
+        total_billed_cents INTEGER NOT NULL DEFAULT 0,
+        status VARCHAR(32) NOT NULL DEFAULT 'scrubbed_clean',
+        cpt_codes JSONB DEFAULT '[]'::jsonb,
+        icd10_codes JSONB DEFAULT '[]'::jsonb,
+        cci_edits_detected JSONB DEFAULT '[]'::jsonb,
+        ncd_lcd_compliance BOOLEAN DEFAULT TRUE,
+        denial_reason_code VARCHAR(32),
+        denial_reason_description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create claim_appeal_letters table (Phase 37)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS claim_appeal_letters (
+        id SERIAL PRIMARY KEY,
+        claim_id INTEGER REFERENCES claims_revcycle_records(id) ON DELETE CASCADE,
+        appeal_level VARCHAR(32) DEFAULT 'first_level_reconsideration',
+        letter_content TEXT NOT NULL,
+        clinical_evidence JSONB DEFAULT '[]'::jsonb,
+        generated_by VARCHAR(64) DEFAULT 'ai_clinical_appeals_engine',
+        submitted_at TIMESTAMP,
+        status VARCHAR(32) DEFAULT 'draft',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
