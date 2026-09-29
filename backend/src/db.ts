@@ -760,6 +760,64 @@ export async function bootstrap() {
       );
     `);
 
+    // Create hah_enrollments table (Phase 38)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS hah_enrollments (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        admission_diagnosis VARCHAR(128) NOT NULL,
+        acuity_tier VARCHAR(32) DEFAULT 'moderate',
+        primary_virtual_nurse_id INTEGER,
+        status VARCHAR(32) DEFAULT 'active',
+        daily_checkin_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        discharged_at TIMESTAMP
+      );
+    `);
+
+    // Create rpm_device_fleet table (Phase 38)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS rpm_device_fleet (
+        id SERIAL PRIMARY KEY,
+        enrollment_id INTEGER REFERENCES hah_enrollments(id) ON DELETE CASCADE,
+        device_type VARCHAR(64) NOT NULL,
+        serial_number VARCHAR(64) NOT NULL UNIQUE,
+        battery_percent INTEGER DEFAULT 100,
+        cellular_signal_strength VARCHAR(16) DEFAULT 'strong',
+        sync_frequency_minutes INTEGER DEFAULT 15,
+        last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(32) DEFAULT 'online'
+      );
+    `);
+
+    // Create rpm_telemetry_readings table (Phase 38)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS rpm_telemetry_readings (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES rpm_device_fleet(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        reading_type VARCHAR(64) NOT NULL,
+        reading_data JSONB NOT NULL,
+        is_out_of_bounds BOOLEAN DEFAULT FALSE,
+        alert_severity VARCHAR(32) DEFAULT 'normal',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create rpm_billing_logs table (Phase 38)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS rpm_billing_logs (
+        id SERIAL PRIMARY KEY,
+        enrollment_id INTEGER REFERENCES hah_enrollments(id) ON DELETE CASCADE,
+        cpt_code VARCHAR(16) NOT NULL,
+        qualified_days_count INTEGER DEFAULT 1,
+        minutes_logged INTEGER DEFAULT 20,
+        status VARCHAR(32) DEFAULT 'billable',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

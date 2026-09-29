@@ -27,6 +27,7 @@ import { ipassRoundingService } from '../services/ipassRounding';
 import { populationHealthService } from '../services/populationHealth';
 import { sepsisWatchdogService } from '../services/sepsisWatchdog';
 import { revCycleAppealsService } from '../services/revCycleAppeals';
+import { hospitalAtHomeService } from '../services/hospitalAtHome';
 
 const router = Router();
 
@@ -2117,6 +2118,103 @@ router.put('/revcycle/appeals/:id/submit', async (req: AuthenticatedRequest, res
   } catch (err: any) {
     console.error('Submit appeal error:', err);
     res.status(500).json({ error: 'Failed to submit clinical appeal.' });
+  }
+});
+
+// Phase 38: Hospital-at-Home (HaH) & Continuous RPM Fleet Command
+router.post('/hah/enroll', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, sessionId, diagnosis, acuityTier, primaryVirtualNurseId } = req.body;
+    if (!patientId || !diagnosis) {
+      return res.status(400).json({ error: 'patientId and diagnosis are required.' });
+    }
+    const enrollment = await hospitalAtHomeService.enrollPatient(
+      parseInt(patientId, 10),
+      sessionId || null,
+      diagnosis,
+      acuityTier,
+      primaryVirtualNurseId
+    );
+    res.json(enrollment);
+  } catch (err: any) {
+    console.error('HaH enroll error:', err);
+    res.status(500).json({ error: 'Failed to enroll patient in Hospital-at-Home.' });
+  }
+});
+
+router.post('/hah/devices/provision', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { enrollmentId, deviceType, serialNumber, syncFrequencyMinutes } = req.body;
+    if (!enrollmentId || !deviceType || !serialNumber) {
+      return res.status(400).json({ error: 'enrollmentId, deviceType, and serialNumber are required.' });
+    }
+    const device = await hospitalAtHomeService.provisionDevice({
+      enrollmentId: parseInt(enrollmentId, 10),
+      deviceType,
+      serialNumber,
+      syncFrequencyMinutes
+    });
+    res.json(device);
+  } catch (err: any) {
+    console.error('Provision device error:', err);
+    res.status(500).json({ error: 'Failed to provision RPM device.' });
+  }
+});
+
+router.post('/hah/telemetry/ingest', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { serialNumber, readingType, readingData } = req.body;
+    if (!serialNumber || !readingType || !readingData) {
+      return res.status(400).json({ error: 'serialNumber, readingType, and readingData are required.' });
+    }
+    const result = await hospitalAtHomeService.ingestTelemetry({
+      serialNumber,
+      readingType,
+      readingData
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error('Ingest telemetry error:', err);
+    res.status(500).json({ error: 'Failed to ingest biometric telemetry.' });
+  }
+});
+
+router.get('/hah/fleet', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const fleet = await hospitalAtHomeService.getFleetOverview();
+    res.json(fleet);
+  } catch (err: any) {
+    console.error('Fetch fleet error:', err);
+    res.status(500).json({ error: 'Failed to retrieve HaH fleet overview.' });
+  }
+});
+
+router.get('/hah/telemetry/:enrollmentId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const enrollmentId = parseInt(req.params.enrollmentId as string, 10);
+    const telemetry = await hospitalAtHomeService.getEnrollmentTelemetry(enrollmentId);
+    res.json(telemetry);
+  } catch (err: any) {
+    console.error('Fetch telemetry error:', err);
+    res.status(500).json({ error: 'Failed to fetch enrollment telemetry.' });
+  }
+});
+
+router.post('/hah/billing/calculate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { enrollmentId, transmissionDaysCount, clinicalMinutesSpent } = req.body;
+    if (!enrollmentId) {
+      return res.status(400).json({ error: 'enrollmentId is required.' });
+    }
+    const billing = await hospitalAtHomeService.calculateRpmBilling(
+      parseInt(enrollmentId, 10),
+      transmissionDaysCount,
+      clinicalMinutesSpent
+    );
+    res.json(billing);
+  } catch (err: any) {
+    console.error('Calculate RPM billing error:', err);
+    res.status(500).json({ error: 'Failed to calculate RPM billing.' });
   }
 });
 
