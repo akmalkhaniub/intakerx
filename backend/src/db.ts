@@ -842,6 +842,49 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_voice_bio_session ON voice_biomarker_sessions(session_id);
     `);
 
+    // Create hospital_bed_inventory table (Phase 40)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS hospital_bed_inventory (
+        id SERIAL PRIMARY KEY,
+        facility_name VARCHAR(128) NOT NULL,
+        unit_name VARCHAR(64) NOT NULL,
+        bed_number VARCHAR(32) NOT NULL,
+        bed_type VARCHAR(32) NOT NULL,
+        status VARCHAR(32) DEFAULT 'available',
+        acuity_capabilities JSONB DEFAULT '[]'::jsonb,
+        assigned_patient_name VARCHAR(128),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_bed_status ON hospital_bed_inventory(status);
+      CREATE INDEX IF NOT EXISTS idx_bed_unit ON hospital_bed_inventory(unit_name);
+    `);
+
+    // Create facility_transfer_requests table (Phase 40)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS facility_transfer_requests (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        sending_facility VARCHAR(128) NOT NULL,
+        receiving_facility VARCHAR(128) NOT NULL,
+        service_needed VARCHAR(64) NOT NULL,
+        urgency_level VARCHAR(32) NOT NULL,
+        sending_physician_name VARCHAR(128) NOT NULL,
+        receiving_physician_name VARCHAR(128),
+        receiving_physician_accepted BOOLEAN DEFAULT FALSE,
+        bed_assigned_id INTEGER REFERENCES hospital_bed_inventory(id) ON DELETE SET NULL,
+        transport_mode VARCHAR(32) DEFAULT 'ground_als',
+        transport_eta_minutes INTEGER,
+        emtala_compliance_status VARCHAR(32) DEFAULT 'pending_acceptance',
+        clinical_rationale TEXT NOT NULL,
+        status VARCHAR(32) DEFAULT 'requested',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_transfer_patient ON facility_transfer_requests(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_transfer_status ON facility_transfer_requests(status);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

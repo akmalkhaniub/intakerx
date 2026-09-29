@@ -29,6 +29,7 @@ import { sepsisWatchdogService } from '../services/sepsisWatchdog';
 import { revCycleAppealsService } from '../services/revCycleAppeals';
 import { hospitalAtHomeService } from '../services/hospitalAtHome';
 import * as acousticBiomarkersService from '../services/acousticBiomarkers';
+import { transferLogisticsService } from '../services/transferLogistics';
 
 const router = Router();
 
@@ -2288,6 +2289,116 @@ router.get('/acoustic-biomarkers/:id', async (req: AuthenticatedRequest, res: Re
   } catch (err: any) {
     console.error('Fetch acoustic session error:', err);
     res.status(500).json({ error: 'Failed to retrieve acoustic session details.' });
+  }
+});
+
+// Phase 40: Inter-Facility Acute Transfer Center & Bed Logistics (EMTALA Hub)
+router.post('/transfers/request', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      sessionId,
+      sendingFacility,
+      receivingFacility,
+      serviceNeeded,
+      urgencyLevel,
+      sendingPhysicianName,
+      clinicalRationale,
+      transportMode
+    } = req.body;
+
+    if (!patientId || !sendingFacility || !receivingFacility || !serviceNeeded || !sendingPhysicianName) {
+      return res.status(400).json({ error: 'Missing mandatory transfer request parameters.' });
+    }
+
+    const request = await transferLogisticsService.createTransferRequest({
+      patientId: parseInt(patientId, 10),
+      sessionId: sessionId || null,
+      sendingFacility,
+      receivingFacility,
+      serviceNeeded,
+      urgencyLevel: urgencyLevel || 'stat_emergent',
+      sendingPhysicianName,
+      clinicalRationale: clinicalRationale || 'Acute care level elevation required for patient safety.',
+      transportMode: transportMode || 'ground_als'
+    });
+
+    res.json(request);
+  } catch (err: any) {
+    console.error('Create transfer request error:', err);
+    res.status(500).json({ error: err.message || 'Failed to create transfer request.' });
+  }
+});
+
+router.post('/transfers/:id/accept', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const { receivingPhysician, bedId } = req.body;
+
+    if (!receivingPhysician) {
+      return res.status(400).json({ error: 'receivingPhysician is required for EMTALA acceptance.' });
+    }
+
+    const updated = await transferLogisticsService.acceptTransfer(
+      id,
+      receivingPhysician,
+      bedId ? parseInt(bedId, 10) : undefined
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Accept transfer error:', err);
+    res.status(500).json({ error: err.message || 'Failed to accept transfer.' });
+  }
+});
+
+router.post('/transfers/:id/dispatch', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const { transportMode, etaMinutes } = req.body;
+
+    const updated = await transferLogisticsService.dispatchTransport(
+      id,
+      transportMode || 'ground_als',
+      etaMinutes ? parseInt(etaMinutes, 10) : 30
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Dispatch transport error:', err);
+    res.status(500).json({ error: err.message || 'Failed to dispatch transport.' });
+  }
+});
+
+router.post('/transfers/:id/complete', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const updated = await transferLogisticsService.completeTransfer(id);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Complete transfer error:', err);
+    res.status(500).json({ error: err.message || 'Failed to complete transfer.' });
+  }
+});
+
+router.get('/transfers/requests', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    const requests = await transferLogisticsService.getTransferRequests(status);
+    res.json(requests);
+  } catch (err: any) {
+    console.error('Get transfer requests error:', err);
+    res.status(500).json({ error: 'Failed to retrieve transfer requests.' });
+  }
+});
+
+router.get('/transfers/beds', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    const bedType = req.query.bedType as string | undefined;
+    const inventory = await transferLogisticsService.getBedInventory(status, bedType);
+    res.json(inventory);
+  } catch (err: any) {
+    console.error('Get bed inventory error:', err);
+    res.status(500).json({ error: 'Failed to retrieve hospital bed inventory.' });
   }
 });
 
