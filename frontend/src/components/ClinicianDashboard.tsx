@@ -19,6 +19,7 @@ import { PopulationHealthDashboard } from './PopulationHealthDashboard';
 import SepsisWatchdog from './SepsisWatchdog';
 import RevCycleAppealsHub from './RevCycleAppealsHub';
 import HospitalAtHomeCommand from './HospitalAtHomeCommand';
+import { VoiceBiomarkersConsole } from './VoiceBiomarkersConsole';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -74,7 +75,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2702,6 +2703,14 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderVoiceBiomarkers = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <VoiceBiomarkersConsole />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3366,6 +3375,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 🏠 Hospital-at-Home & RPM
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('voice_biomarkers')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'voice_biomarkers' ? '#10b981' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'voice_biomarkers' ? '2.5px solid #10b981' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🎙️ Voice Biomarkers
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3648,6 +3675,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderRevCycleAppeals()
             ) : currentTab === 'hospital_at_home' ? (
               renderHospitalAtHome()
+            ) : currentTab === 'voice_biomarkers' ? (
+              renderVoiceBiomarkers()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

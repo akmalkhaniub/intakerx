@@ -28,6 +28,7 @@ import { populationHealthService } from '../services/populationHealth';
 import { sepsisWatchdogService } from '../services/sepsisWatchdog';
 import { revCycleAppealsService } from '../services/revCycleAppeals';
 import { hospitalAtHomeService } from '../services/hospitalAtHome';
+import * as acousticBiomarkersService from '../services/acousticBiomarkers';
 
 const router = Router();
 
@@ -2215,6 +2216,78 @@ router.post('/hah/billing/calculate', async (req: AuthenticatedRequest, res: Res
   } catch (err: any) {
     console.error('Calculate RPM billing error:', err);
     res.status(500).json({ error: 'Failed to calculate RPM billing.' });
+  }
+});
+
+// Phase 39: Acoustic Biomarkers & Voice Affect Analyzer
+router.post('/acoustic-biomarkers/analyze', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      sessionId,
+      patientId,
+      audioDurationSeconds,
+      fundamentalFrequencyF0,
+      f0StdDev,
+      jitterPercent,
+      shimmerPercent,
+      hnrDb,
+      speechRateWpm,
+      pauseRatio,
+      respiratoryPauseCount,
+      affectiveTone,
+      transcriptSample
+    } = req.body;
+
+    if (!patientId || audioDurationSeconds === undefined) {
+      return res.status(400).json({ error: 'patientId and audioDurationSeconds are required.' });
+    }
+
+    const result = await acousticBiomarkersService.analyzeAndRecordAcousticSession({
+      sessionId: sessionId || null,
+      patientId: parseInt(patientId, 10),
+      audioDurationSeconds: parseFloat(audioDurationSeconds),
+      fundamentalFrequencyF0: parseFloat(fundamentalFrequencyF0 || 120),
+      f0StdDev: parseFloat(f0StdDev || 20),
+      jitterPercent: parseFloat(jitterPercent || 0.8),
+      shimmerPercent: parseFloat(shimmerPercent || 2.5),
+      hnrDb: parseFloat(hnrDb || 22),
+      speechRateWpm: parseInt(speechRateWpm || 135, 10),
+      pauseRatio: parseFloat(pauseRatio || 0.2),
+      respiratoryPauseCount: respiratoryPauseCount !== undefined ? parseInt(respiratoryPauseCount, 10) : 0,
+      affectiveTone,
+      transcriptSample
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Acoustic biomarker analysis error:', err);
+    res.status(500).json({ error: 'Failed to process and analyze acoustic biomarkers.' });
+  }
+});
+
+router.get('/acoustic-biomarkers', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patientId ? parseInt(req.query.patientId as string, 10) : undefined;
+    const sessionId = req.query.sessionId as string | undefined;
+    const sessions = await acousticBiomarkersService.getAcousticSessions(patientId, sessionId);
+    res.json(sessions);
+  } catch (err: any) {
+    console.error('Fetch acoustic biomarker sessions error:', err);
+    res.status(500).json({ error: 'Failed to retrieve voice biomarker sessions.' });
+  }
+});
+
+router.get('/acoustic-biomarkers/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const session = await acousticBiomarkersService.getAcousticSessionById(id);
+    if (!session) {
+      return res.status(404).json({ error: 'Acoustic session not found.' });
+    }
+    res.json(session);
+  } catch (err: any) {
+    console.error('Fetch acoustic session error:', err);
+    res.status(500).json({ error: 'Failed to retrieve acoustic session details.' });
   }
 });
 

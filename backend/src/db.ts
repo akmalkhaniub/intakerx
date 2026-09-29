@@ -818,6 +818,30 @@ export async function bootstrap() {
       );
     `);
 
+    // Create voice_biomarker_sessions table (Phase 39)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS voice_biomarker_sessions (
+        id SERIAL PRIMARY KEY,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        audio_duration_seconds REAL NOT NULL,
+        fundamental_frequency_f0 REAL NOT NULL,
+        f0_std_dev REAL NOT NULL,
+        jitter_percent REAL NOT NULL,
+        shimmer_percent REAL NOT NULL,
+        hnr_db REAL NOT NULL,
+        speech_rate_wpm INTEGER NOT NULL,
+        pause_ratio REAL NOT NULL,
+        respiratory_pause_count INTEGER DEFAULT 0,
+        affective_tone VARCHAR(64) NOT NULL,
+        clinical_screen_flags JSONB DEFAULT '[]'::jsonb,
+        ai_vocal_summary TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_voice_bio_patient ON voice_biomarker_sessions(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_voice_bio_session ON voice_biomarker_sessions(session_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
