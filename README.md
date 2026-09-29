@@ -121,6 +121,11 @@ graph TD
 | **Phase 33** | **Closed-Loop Specialist Referrals & e-Consults** | Inter-facility referral routing, provisional ICD-10s, specialist consultation feedback loop, and CPT 99451 asynchronous e-Consult exchange. | `test_referral_management.ts` (Passed) |
 | **Phase 34** | **Inpatient Bedside Rounding & I-PASS Shift Handoff** | Standardized I-PASS handoff suite (Illness severity, Patient summary, Action items, Contingency, Synthesis), lines/tubes/drains infection monitor. | `test_ipass_rounding.ts` (Passed) |
 | **Phase 35** | **Population Health, CMS-HCC RAF & HEDIS Care Gaps** | CMS-HCC V28 risk adjustment factor (RAF) engine with disease interactions, annual Medicare capitation benchmarks, and NCQA HEDIS care gap closer. | `test_population_health.ts` (Passed) |
+| **Phase 36** | **Sepsis Watchdog & SEP-1 Quality Bundle** | Multi-modal clinical deterioration surveillance computing NEWS2, qSOFA, and SIRS scores with automated CMS SEP-1 3h/6h bundle countdown timers. | `test_sepsis_watchdog.ts` (Passed) |
+| **Phase 37** | **Zero-Click RevCycle & Denial Appeals Engine** | Institutional UB-04 and CMS-1500 claim scrubber detecting NCCI/CCI unbundling and NCD/LCD policy breaches with 1-click evidence-backed appeal letters. | `test_revcycle_appeals.ts` (Passed) |
+| **Phase 38** | **Hospital-at-Home (HaH) & Continuous RPM Fleet** | In-home biometric telemetry surveillance (cellular scales, cuffs, pulse-ox) with acute decompensation alerting and CPT 99453–99458 automated billing. | `test_hospital_at_home.ts` (Passed) |
+| **Phase 39** | **Acoustic Biomarkers & Voice Affect Analyzer** | Ambient voice acoustic feature extractor (F0 pitch modulation, jitter %, shimmer %, HNR dB) screening for vocal cord strain, dyspnea, and psychomotor blunting. | `test_acoustic_biomarkers.ts` (Passed) |
+| **Phase 40** | **Inter-Facility Transfer Center & EMTALA Hub** | Centralized acute transfer command matching hospital bed capacity (ICU, Neuro, Burn), managing physician-to-physician sign-offs, and dispatching aeromedical medevacs. | `test_transfer_logistics.ts` (Passed) |
 
 ---
 
