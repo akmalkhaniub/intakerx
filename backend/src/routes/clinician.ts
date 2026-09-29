@@ -25,6 +25,7 @@ import { antimicrobialPgxService } from '../services/antimicrobialPgx';
 import { referralManagementService } from '../services/referralManagement';
 import { ipassRoundingService } from '../services/ipassRounding';
 import { populationHealthService } from '../services/populationHealth';
+import { sepsisWatchdogService } from '../services/sepsisWatchdog';
 
 const router = Router();
 
@@ -1970,6 +1971,70 @@ router.get('/population/analytics/summary', async (req: AuthenticatedRequest, re
   } catch (err: any) {
     console.error('Fetch population analytics error:', err);
     res.status(500).json({ error: 'Failed to retrieve population analytics summary.' });
+  }
+});
+
+// Phase 36: Sepsis & Clinical Deterioration Watchdog (SIRS / qSOFA / NEWS2 & SEP-1)
+router.post('/sepsis/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, sessionId, vitals, labs, sourceInfection } = req.body;
+    if (!patientId || !vitals) {
+      return res.status(400).json({ error: 'patientId and vitals are required.' });
+    }
+    const result = await sepsisWatchdogService.evaluatePatient(
+      parseInt(patientId, 10),
+      sessionId || null,
+      vitals,
+      labs,
+      sourceInfection
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate sepsis error:', err);
+    res.status(500).json({ error: 'Failed to evaluate sepsis and clinical deterioration.' });
+  }
+});
+
+router.put('/sepsis/bundle/:id/action', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const bundleId = parseInt(req.params.id as string, 10);
+    const updated = await sepsisWatchdogService.updateBundleAction(bundleId, req.body);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update SEP-1 bundle error:', err);
+    res.status(500).json({ error: 'Failed to update SEP-1 bundle action.' });
+  }
+});
+
+router.get('/sepsis/alerts', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const alerts = await sepsisWatchdogService.getActiveSepsisAlerts();
+    res.json(alerts);
+  } catch (err: any) {
+    console.error('Fetch sepsis alerts error:', err);
+    res.status(500).json({ error: 'Failed to retrieve active sepsis alerts.' });
+  }
+});
+
+router.get('/sepsis/patient/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = parseInt(req.params.patientId as string, 10);
+    const history = await sepsisWatchdogService.getPatientSurveillanceHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Fetch patient sepsis history error:', err);
+    res.status(500).json({ error: 'Failed to fetch patient sepsis history.' });
+  }
+});
+
+router.put('/sepsis/surveillance/:id/resolve', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const resolved = await sepsisWatchdogService.resolveAlert(id, req.body.notes);
+    res.json(resolved);
+  } catch (err: any) {
+    console.error('Resolve sepsis alert error:', err);
+    res.status(500).json({ error: 'Failed to resolve sepsis alert.' });
   }
 });
 

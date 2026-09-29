@@ -685,6 +685,45 @@ export async function bootstrap() {
       );
     `);
 
+    // Create sepsis_surveillance_events table (Phase 36)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS sepsis_surveillance_events (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        sirs_score INTEGER NOT NULL DEFAULT 0,
+        qsofa_score INTEGER NOT NULL DEFAULT 0,
+        news2_score INTEGER NOT NULL DEFAULT 0,
+        deterioration_tier VARCHAR(32) NOT NULL DEFAULT 'low',
+        vitals_snapshot JSONB DEFAULT '{}'::jsonb,
+        labs_snapshot JSONB DEFAULT '{}'::jsonb,
+        source_infection VARCHAR(128),
+        status VARCHAR(32) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create sep1_bundle_actions table (Phase 36)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS sep1_bundle_actions (
+        id SERIAL PRIMARY KEY,
+        surveillance_id INTEGER REFERENCES sepsis_surveillance_events(id) ON DELETE CASCADE,
+        bundle_window VARCHAR(16) NOT NULL DEFAULT '3_hour',
+        lactate_measured BOOLEAN DEFAULT FALSE,
+        lactate_value NUMERIC(4,1),
+        blood_cultures_drawn BOOLEAN DEFAULT FALSE,
+        broad_spectrum_abx_ordered BOOLEAN DEFAULT FALSE,
+        abx_regimen VARCHAR(128),
+        fluid_resuscitation_administered BOOLEAN DEFAULT FALSE,
+        fluid_volume_ml INTEGER DEFAULT 0,
+        vasopressors_initiated BOOLEAN DEFAULT FALSE,
+        repeat_lactate_measured BOOLEAN DEFAULT FALSE,
+        bundle_completed_at TIMESTAMP,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

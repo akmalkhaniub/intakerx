@@ -16,6 +16,7 @@ import AntimicrobialPgxAdvisor from './AntimicrobialPgxAdvisor';
 import ReferralManager from './ReferralManager';
 import IpassRoundingSuite from './IpassRoundingSuite';
 import { PopulationHealthDashboard } from './PopulationHealthDashboard';
+import SepsisWatchdog from './SepsisWatchdog';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -71,7 +72,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2654,6 +2655,21 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderSepsisWatchdog = () => {
+    const activeSessionId = selectedSessionId || (sessions.length > 0 ? sessions[0].id : '');
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <SepsisWatchdog
+          sessionId={activeSessionId}
+          patientId={sessionDetail?.patient?.id}
+          token={token}
+          backendUrl={backendUrl}
+          patientName={sessionDetail?.patient?.name || 'Encounter Patient'}
+        />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3264,6 +3280,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 📊 Population Health & RAF
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('sepsis_watchdog')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'sepsis_watchdog' ? '#f43f5e' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'sepsis_watchdog' ? '2.5px solid #f43f5e' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🚨 Sepsis & Deterioration
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3540,6 +3574,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderIpassRounding()
             ) : currentTab === 'population_health' ? (
               renderPopulationHealth()
+            ) : currentTab === 'sepsis_watchdog' ? (
+              renderSepsisWatchdog()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}
