@@ -34,6 +34,7 @@ import { perioperativeSuiteService } from '../services/perioperativeSuite';
 import { infectionSurveillanceService } from '../services/infectionSurveillance';
 import * as dischargeMedRecService from '../services/dischargeMedRec';
 import * as precisionOncologyService from '../services/precisionOncology';
+import * as behavioralCrisisService from '../services/behavioralCrisis';
 
 const router = Router();
 
@@ -2846,6 +2847,119 @@ router.get('/oncology/patient/:patientId', async (req: AuthenticatedRequest, res
   } catch (err: any) {
     console.error('Get patient oncology data error:', err);
     res.status(500).json({ error: 'Failed to retrieve patient oncology records.' });
+  }
+});
+
+// ==========================================
+// Phase 45: Behavioral Health Emergency Command & Crisis Routes
+// ==========================================
+
+router.get('/behavioral/summary', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const summary = await behavioralCrisisService.getBehavioralCrisisSummary();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('Get behavioral crisis summary error:', err);
+    res.status(500).json({ error: 'Failed to retrieve behavioral crisis summary.' });
+  }
+});
+
+router.post('/behavioral/evaluations', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      sessionId,
+      bvcItems,
+      suicideRiskLevel,
+      sensoryRoomUtilized,
+      chemicalRestraintAdministered,
+      evaluatingClinician,
+      clinicalNarrative
+    } = req.body;
+
+    if (!patientId || !bvcItems) {
+      return res.status(400).json({ error: 'patientId and bvcItems checklist are required.' });
+    }
+
+    const evaluation = await behavioralCrisisService.evaluateBehavioralCrisis({
+      patientId: parseInt(patientId, 10),
+      sessionId,
+      bvcItems,
+      suicideRiskLevel,
+      sensoryRoomUtilized: Boolean(sensoryRoomUtilized),
+      chemicalRestraintAdministered: Boolean(chemicalRestraintAdministered),
+      evaluatingClinician,
+      clinicalNarrative
+    });
+
+    res.status(201).json(evaluation);
+  } catch (err: any) {
+    console.error('Create behavioral evaluation error:', err);
+    res.status(500).json({ error: err.message || 'Failed to record crisis evaluation.' });
+  }
+});
+
+router.post('/behavioral/holds', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      crisisEvaluationId,
+      statutoryHoldType,
+      holdCriteria,
+      rightsAdvisementDelivered,
+      holdDurationHours,
+      initiatingClinician,
+      destinationFacility
+    } = req.body;
+
+    if (!patientId || !statutoryHoldType || !holdCriteria || holdCriteria.length === 0) {
+      return res.status(400).json({ error: 'patientId, statutoryHoldType, and at least one holdCriteria are required.' });
+    }
+
+    const hold = await behavioralCrisisService.initiateInvoluntaryHold({
+      patientId: parseInt(patientId, 10),
+      crisisEvaluationId: crisisEvaluationId ? parseInt(crisisEvaluationId, 10) : undefined,
+      statutoryHoldType,
+      holdCriteria,
+      rightsAdvisementDelivered: rightsAdvisementDelivered !== undefined ? Boolean(rightsAdvisementDelivered) : true,
+      holdDurationHours: holdDurationHours ? Number(holdDurationHours) : 72,
+      initiatingClinician,
+      destinationFacility
+    });
+
+    res.status(201).json(hold);
+  } catch (err: any) {
+    console.error('Initiate involuntary hold error:', err);
+    res.status(500).json({ error: err.message || 'Failed to initiate involuntary hold.' });
+  }
+});
+
+router.patch('/behavioral/holds/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const holdId = parseInt(req.params.id as string, 10);
+    const { bedPlacementStatus, destinationFacility, holdStatus } = req.body;
+
+    const updated = await behavioralCrisisService.updateHoldPlacement(holdId, {
+      bedPlacementStatus,
+      destinationFacility,
+      holdStatus
+    });
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update involuntary hold placement error:', err);
+    res.status(500).json({ error: err.message || 'Failed to update hold placement.' });
+  }
+});
+
+router.get('/behavioral/patient/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = parseInt(req.params.patientId as string, 10);
+    const data = await behavioralCrisisService.getPatientPsychData(patientId);
+    res.json(data);
+  } catch (err: any) {
+    console.error('Get patient behavioral data error:', err);
+    res.status(500).json({ error: 'Failed to retrieve patient behavioral health records.' });
   }
 });
 

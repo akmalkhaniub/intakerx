@@ -1053,6 +1053,49 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_oncology_cancer ON oncology_pathway_records(cancer_type);
     `);
 
+    // Create psych_crisis_evaluations table (Phase 45)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS psych_crisis_evaluations (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        bvc_score INTEGER NOT NULL DEFAULT 0,
+        bvc_items JSONB DEFAULT '[]'::jsonb,
+        violence_risk_level VARCHAR(32) NOT NULL DEFAULT 'low',
+        suicide_risk_level VARCHAR(32) DEFAULT 'low',
+        observation_level VARCHAR(32) DEFAULT 'standard_safety_rounds',
+        de_escalation_protocol VARCHAR(64) DEFAULT 'verbal_trauma_informed',
+        sensory_room_utilized BOOLEAN DEFAULT FALSE,
+        chemical_restraint_administered BOOLEAN DEFAULT FALSE,
+        evaluating_clinician VARCHAR(128),
+        clinical_narrative TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_psych_patient ON psych_crisis_evaluations(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_psych_violence ON psych_crisis_evaluations(violence_risk_level);
+    `);
+
+    // Create involuntary_hold_records table (Phase 45)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS involuntary_hold_records (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        crisis_evaluation_id INTEGER REFERENCES psych_crisis_evaluations(id) ON DELETE CASCADE,
+        statutory_hold_type VARCHAR(64) NOT NULL,
+        hold_criteria JSONB DEFAULT '[]'::jsonb,
+        rights_advisement_delivered BOOLEAN DEFAULT TRUE,
+        initiated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        hold_status VARCHAR(32) DEFAULT 'active_hold',
+        initiating_clinician VARCHAR(128),
+        destination_facility VARCHAR(128),
+        bed_placement_status VARCHAR(32) DEFAULT 'searching',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_hold_patient ON involuntary_hold_records(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_hold_status ON involuntary_hold_records(hold_status);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
