@@ -126,6 +126,11 @@ graph TD
 | **Phase 38** | **Hospital-at-Home (HaH) & Continuous RPM Fleet** | In-home biometric telemetry surveillance (cellular scales, cuffs, pulse-ox) with acute decompensation alerting and CPT 99453–99458 automated billing. | `test_hospital_at_home.ts` (Passed) |
 | **Phase 39** | **Acoustic Biomarkers & Voice Affect Analyzer** | Ambient voice acoustic feature extractor (F0 pitch modulation, jitter %, shimmer %, HNR dB) screening for vocal cord strain, dyspnea, and psychomotor blunting. | `test_acoustic_biomarkers.ts` (Passed) |
 | **Phase 40** | **Inter-Facility Transfer Center & EMTALA Hub** | Centralized acute transfer command matching hospital bed capacity (ICU, Neuro, Burn), managing physician-to-physician sign-offs, and dispatching aeromedical medevacs. | `test_transfer_logistics.ts` (Passed) |
+| **Phase 41** | **Operating Room & Perioperative Care Suite** | Comprehensive perioperative command with ERAS enhanced recovery bundles, ASA physical status scoring, RCRI cardiac risk, Mallampati airway classification, Train-of-Four (TOF) neuromuscular blockade, and Aldrete PACU discharge criteria. | `test_perioperative_suite.ts` (Passed) |
+| **Phase 42** | **Infection Prevention & Hospital Acquired Condition (HAI / CDC NHSN) Surveillance** | Real-time surveillance of invasive device-days (CVC, Foley, Ventilators), NHSN criteria matching for CLABSI, CAUTI, SSI, C. difficile LabID, automated Contact/Enteric isolation, and CMS HACRP Domain 2 Standardized Infection Ratio (SIR) forecasting. | `test_infection_surveillance.ts` (Passed) |
+| **Phase 43** | **Autonomous Pharmacotherapy Reconciliation & Meds-to-Beds Delivery Engine** | Automated triple-comparison (Home vs Inpatient vs Discharge) detecting unintended omissions, therapeutic duplications, and renal dose adjustments; formulary Tier 1 generic substitution with copay savings; and bedside courier hand-off with high-risk teach-back verification. | `test_discharge_medrec.ts` (Passed) |
+| **Phase 44** | **Oncology Clinical Pathway Navigator & Genomic Tumor Board Precision Engine** | Molecular Tumor Board (MTB) engine with AMP/ASCO/CAP Tier I/II NGS somatic variant actionability matching (EGFR, KRAS, BRAF, HER2, BRCA), NCCN guideline concordance checker, Mosteller BSA, and Calvert Carboplatin AUC dosing calculator. | `test_precision_oncology.ts` (Passed) |
+| **Phase 45** | **Behavioral Health Emergency Command & Crisis De-Escalation (B-SAFE Hub)** | Emergency psychiatry command featuring the 6-item Brøset Violence Checklist (BVC), automated 1:1 constant observation stratification, trauma-informed sensory room de-escalation protocols, statutory involuntary hold tracking (5150/Baker Act/Section 12), and regional psychiatric crisis bed locator. | `test_behavioral_crisis.ts` (Passed) |
 
 ---
 
@@ -239,6 +244,11 @@ npx ts-node src/test_clinical_orders.ts   # Smart LOINC/CPT requisitions & FHIR 
 npx ts-node src/test_telehealth.ts        # Telehealth video consult & live clinical HUD (Phase 23)
 npx ts-node src/test_esi_triage.ts        # Intelligent ESI 1-5 triage & waiting room manager (Phase 24)
 npx ts-node src/test_patient_portal.ts    # Patient health portal & wearables biometric ingestion (Phase 25)
+npx ts-node src/test_perioperative_suite.ts # OR, ERAS & Anesthesia PACU Suite (Phase 41)
+npx ts-node src/test_infection_surveillance.ts # Infection Prevention & HAI / NHSN Surveillance (Phase 42)
+npx ts-node src/test_discharge_medrec.ts   # Autonomous MedRec & Meds-to-Beds Delivery (Phase 43)
+npx ts-node src/test_precision_oncology.ts # Precision Oncology & Genomic Tumor Board (Phase 44)
+npx ts-node src/test_behavioral_crisis.ts  # Behavioral Health Crisis & B-SAFE ED Command (Phase 45)
 ```
 
 ---
