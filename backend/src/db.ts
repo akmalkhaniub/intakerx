@@ -928,6 +928,46 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_anesthesia_case ON anesthesia_records(case_id);
     `);
 
+    // Create device_line_days table (Phase 42)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS device_line_days (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        device_type VARCHAR(64) NOT NULL,
+        insertion_date DATE NOT NULL,
+        removal_date DATE,
+        line_days_count INTEGER DEFAULT 1,
+        anatomical_site VARCHAR(64) NOT NULL,
+        necessity_justification VARCHAR(255) NOT NULL,
+        bundle_checklist JSONB DEFAULT '[]'::jsonb,
+        status VARCHAR(32) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_device_patient ON device_line_days(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_device_status ON device_line_days(status);
+    `);
+
+    // Create hai_surveillance_events table (Phase 42)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS hai_surveillance_events (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        device_line_id INTEGER REFERENCES device_line_days(id) ON DELETE SET NULL,
+        infection_type VARCHAR(32) NOT NULL,
+        nhsn_criteria_met BOOLEAN DEFAULT TRUE,
+        identified_organism VARCHAR(128) NOT NULL,
+        colony_count VARCHAR(64),
+        isolation_precautions VARCHAR(64) NOT NULL,
+        hacrp_domain VARCHAR(32) DEFAULT 'Domain_2_NHSN',
+        hacrp_penalty_risk VARCHAR(32) DEFAULT 'elevated',
+        infection_prevention_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_hai_patient ON hai_surveillance_events(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_hai_type ON hai_surveillance_events(infection_type);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

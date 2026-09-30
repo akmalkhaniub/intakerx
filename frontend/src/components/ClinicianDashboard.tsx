@@ -22,6 +22,7 @@ import HospitalAtHomeCommand from './HospitalAtHomeCommand';
 import { VoiceBiomarkersConsole } from './VoiceBiomarkersConsole';
 import { TransferCenterHub } from './TransferCenterHub';
 import { OperatingRoomHub } from './OperatingRoomHub';
+import { InfectionControlHub } from './InfectionControlHub';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -77,7 +78,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2729,6 +2730,14 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderInfectionControl = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <InfectionControlHub />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3447,6 +3456,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 ✂️ OR & Perioperative
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('infection_control')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'infection_control' ? '#10b981' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'infection_control' ? '2.5px solid #10b981' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🛡️ Infection Control & HAI
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3735,6 +3762,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderTransferCenter()
             ) : currentTab === 'perioperative' ? (
               renderPerioperative()
+            ) : currentTab === 'infection_control' ? (
+              renderInfectionControl()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

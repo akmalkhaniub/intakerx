@@ -31,6 +31,7 @@ import { hospitalAtHomeService } from '../services/hospitalAtHome';
 import * as acousticBiomarkersService from '../services/acousticBiomarkers';
 import { transferLogisticsService } from '../services/transferLogistics';
 import { perioperativeSuiteService } from '../services/perioperativeSuite';
+import { infectionSurveillanceService } from '../services/infectionSurveillance';
 
 const router = Router();
 
@@ -2522,6 +2523,116 @@ router.get('/perioperative/cases/:id', async (req: AuthenticatedRequest, res: Re
   } catch (err: any) {
     console.error('Get single surgical case error:', err);
     res.status(500).json({ error: 'Failed to retrieve surgical case.' });
+  }
+});
+
+// Phase 42: Infection Prevention & Hospital Acquired Condition (HAI / CDC NHSN) Surveillance
+router.post('/infection/lines', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      sessionId,
+      deviceType,
+      insertionDate,
+      lineDaysCount,
+      anatomicalSite,
+      necessityJustification,
+      bundleChecklist
+    } = req.body;
+
+    if (!patientId || !deviceType || !insertionDate || !anatomicalSite || !necessityJustification) {
+      return res.status(400).json({ error: 'Missing mandatory invasive line parameters.' });
+    }
+
+    const created = await infectionSurveillanceService.logDeviceLine({
+      patientId: parseInt(patientId, 10),
+      sessionId: sessionId || null,
+      deviceType,
+      insertionDate,
+      lineDaysCount: lineDaysCount ? parseInt(lineDaysCount, 10) : 1,
+      anatomicalSite,
+      necessityJustification,
+      bundleChecklist
+    });
+
+    res.json(created);
+  } catch (err: any) {
+    console.error('Log device line error:', err);
+    res.status(500).json({ error: err.message || 'Failed to log invasive device line.' });
+  }
+});
+
+router.put('/infection/lines/:id/status', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const { status, removalDate } = req.body;
+    if (!status) {
+      return res.status(400).json({ error: 'status is required.' });
+    }
+    const updated = await infectionSurveillanceService.updateDeviceStatus(id, status, removalDate);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update line status error:', err);
+    res.status(500).json({ error: err.message || 'Failed to update line status.' });
+  }
+});
+
+router.post('/infection/surveillance/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      deviceLineId,
+      infectionType,
+      identifiedOrganism,
+      colonyCount,
+      lineDaysAtOnset,
+      feverPresent,
+      clinicalSignsDescription,
+      primaryAlternativeSourceExcluded
+    } = req.body;
+
+    if (!patientId || !infectionType || !identifiedOrganism || !clinicalSignsDescription) {
+      return res.status(400).json({ error: 'Missing mandatory HAI evaluation parameters.' });
+    }
+
+    const event = await infectionSurveillanceService.evaluateHaiInfection({
+      patientId: parseInt(patientId, 10),
+      deviceLineId: deviceLineId ? parseInt(deviceLineId, 10) : null,
+      infectionType,
+      identifiedOrganism,
+      colonyCount,
+      lineDaysAtOnset: lineDaysAtOnset ? parseInt(lineDaysAtOnset, 10) : undefined,
+      feverPresent: Boolean(feverPresent),
+      clinicalSignsDescription,
+      primaryAlternativeSourceExcluded: primaryAlternativeSourceExcluded !== undefined ? Boolean(primaryAlternativeSourceExcluded) : true
+    });
+
+    res.json(event);
+  } catch (err: any) {
+    console.error('Evaluate HAI infection error:', err);
+    res.status(500).json({ error: err.message || 'Failed to evaluate HAI infection.' });
+  }
+});
+
+router.get('/infection/surveillance/summary', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const summary = await infectionSurveillanceService.getHaiSurveillanceSummary();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('Get HAI surveillance summary error:', err);
+    res.status(500).json({ error: 'Failed to retrieve infection surveillance summary.' });
+  }
+});
+
+router.get('/infection/lines', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patientId ? parseInt(req.query.patientId as string, 10) : undefined;
+    const status = req.query.status as string | undefined;
+    const lines = await infectionSurveillanceService.getDeviceLines(patientId, status);
+    res.json(lines);
+  } catch (err: any) {
+    console.error('Get device lines error:', err);
+    res.status(500).json({ error: 'Failed to retrieve invasive lines list.' });
   }
 });
 
