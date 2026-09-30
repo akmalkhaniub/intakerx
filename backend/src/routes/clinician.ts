@@ -33,6 +33,7 @@ import { transferLogisticsService } from '../services/transferLogistics';
 import { perioperativeSuiteService } from '../services/perioperativeSuite';
 import { infectionSurveillanceService } from '../services/infectionSurveillance';
 import * as dischargeMedRecService from '../services/dischargeMedRec';
+import * as precisionOncologyService from '../services/precisionOncology';
 
 const router = Router();
 
@@ -2752,6 +2753,99 @@ router.get('/med-rec/patient/:patientId', async (req: AuthenticatedRequest, res:
   } catch (err: any) {
     console.error('Get patient med-recs error:', err);
     res.status(500).json({ error: 'Failed to retrieve patient med rec records.' });
+  }
+});
+
+// ==========================================
+// Phase 44: Precision Oncology & Genomic Tumor Board Routes
+// ==========================================
+
+router.get('/oncology/summary', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const summary = await precisionOncologyService.getOncologySummary();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('Get oncology summary error:', err);
+    res.status(500).json({ error: 'Failed to retrieve precision oncology summary.' });
+  }
+});
+
+router.post('/oncology/variants', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, sessionId, geneSymbol, variantNomenclature, variantAlleleFrequency, ampTier, actionableDrugTarget, evidenceLevel } = req.body;
+    if (!patientId || !geneSymbol || !variantNomenclature) {
+      return res.status(400).json({ error: 'patientId, geneSymbol, and variantNomenclature are required.' });
+    }
+
+    const variant = await precisionOncologyService.evaluateGenomicVariant({
+      patientId: parseInt(patientId, 10),
+      sessionId,
+      geneSymbol,
+      variantNomenclature,
+      variantAlleleFrequency: variantAlleleFrequency !== undefined ? Number(variantAlleleFrequency) : undefined,
+      ampTier,
+      actionableDrugTarget,
+      evidenceLevel
+    });
+
+    res.status(201).json(variant);
+  } catch (err: any) {
+    console.error('Evaluate genomic variant error:', err);
+    res.status(500).json({ error: err.message || 'Failed to evaluate genomic variant.' });
+  }
+});
+
+router.post('/oncology/pathway-evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      sessionId,
+      cancerType,
+      histology,
+      clinicalStage,
+      biomarkerProfile,
+      proposedRegimen,
+      heightCm,
+      weightKg,
+      gfr,
+      targetCarboplatinAuc,
+      oncologistSignature
+    } = req.body;
+
+    if (!patientId || !cancerType || !histology || !clinicalStage || !proposedRegimen) {
+      return res.status(400).json({ error: 'patientId, cancerType, histology, clinicalStage, and proposedRegimen are required.' });
+    }
+
+    const pathway = await precisionOncologyService.evaluatePathwayAndRegimen({
+      patientId: parseInt(patientId, 10),
+      sessionId,
+      cancerType,
+      histology,
+      clinicalStage,
+      biomarkerProfile: biomarkerProfile || {},
+      proposedRegimen,
+      heightCm: heightCm ? Number(heightCm) : undefined,
+      weightKg: weightKg ? Number(weightKg) : undefined,
+      gfr: gfr ? Number(gfr) : undefined,
+      targetCarboplatinAuc: targetCarboplatinAuc ? Number(targetCarboplatinAuc) : undefined,
+      oncologistSignature
+    });
+
+    res.json(pathway);
+  } catch (err: any) {
+    console.error('Evaluate oncology pathway error:', err);
+    res.status(500).json({ error: err.message || 'Failed to evaluate oncology pathway.' });
+  }
+});
+
+router.get('/oncology/patient/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = parseInt(req.params.patientId as string, 10);
+    const data = await precisionOncologyService.getPatientOncologyData(patientId);
+    res.json(data);
+  } catch (err: any) {
+    console.error('Get patient oncology data error:', err);
+    res.status(500).json({ error: 'Failed to retrieve patient oncology records.' });
   }
 });
 

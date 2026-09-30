@@ -1011,6 +1011,48 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_bedside_status ON bedside_delivery_orders(delivery_status);
     `);
 
+    // Create tumor_genomic_variants table (Phase 44)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS tumor_genomic_variants (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        gene_symbol VARCHAR(32) NOT NULL,
+        variant_nomenclature VARCHAR(64) NOT NULL,
+        variant_allele_frequency NUMERIC(5, 2) DEFAULT 0.00,
+        amp_tier VARCHAR(16) DEFAULT 'Tier_I',
+        actionable_drug_target VARCHAR(128) NOT NULL,
+        evidence_level VARCHAR(32) DEFAULT 'FDA_approved',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_variant_patient ON tumor_genomic_variants(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_variant_gene ON tumor_genomic_variants(gene_symbol);
+    `);
+
+    // Create oncology_pathway_records table (Phase 44)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS oncology_pathway_records (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        cancer_type VARCHAR(64) NOT NULL,
+        histology VARCHAR(64) NOT NULL,
+        clinical_stage VARCHAR(32) NOT NULL,
+        biomarker_profile JSONB DEFAULT '{}'::jsonb,
+        proposed_regimen VARCHAR(128) NOT NULL,
+        nccn_concordance VARCHAR(32) DEFAULT 'concordant',
+        bsa_m2 NUMERIC(4, 2),
+        calvert_auc_dose_mg NUMERIC(7, 2),
+        mtb_recommendation TEXT,
+        clinical_trial_matches JSONB DEFAULT '[]'::jsonb,
+        status VARCHAR(32) DEFAULT 'tumor_board_approved',
+        oncologist_signature VARCHAR(128),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_oncology_patient ON oncology_pathway_records(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_oncology_cancer ON oncology_pathway_records(cancer_type);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

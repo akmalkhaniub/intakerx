@@ -24,6 +24,7 @@ import { TransferCenterHub } from './TransferCenterHub';
 import { OperatingRoomHub } from './OperatingRoomHub';
 import { InfectionControlHub } from './InfectionControlHub';
 import { MedsToBedsCommand } from './MedsToBedsCommand';
+import { GenomicTumorBoard } from './GenomicTumorBoard';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -79,7 +80,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control' | 'meds_to_beds'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control' | 'meds_to_beds' | 'genomic_tumor_board'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2747,6 +2748,14 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderGenomicTumorBoard = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <GenomicTumorBoard />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3501,6 +3510,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 💊 MedRec & Meds-to-Beds
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('genomic_tumor_board')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'genomic_tumor_board' ? '#c084fc' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'genomic_tumor_board' ? '2.5px solid #c084fc' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🧬 Tumor Board & Oncology
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3793,6 +3820,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderInfectionControl()
             ) : currentTab === 'meds_to_beds' ? (
               renderMedsToBeds()
+            ) : currentTab === 'genomic_tumor_board' ? (
+              renderGenomicTumorBoard()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}
