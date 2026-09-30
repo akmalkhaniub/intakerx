@@ -968,6 +968,49 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_hai_type ON hai_surveillance_events(infection_type);
     `);
 
+    // Create med_reconciliations table (Phase 43)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS med_reconciliations (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        reconciliation_type VARCHAR(64) DEFAULT 'inpatient_to_discharge',
+        home_medications JSONB DEFAULT '[]'::jsonb,
+        inpatient_medications JSONB DEFAULT '[]'::jsonb,
+        discharge_medications JSONB DEFAULT '[]'::jsonb,
+        discrepancies JSONB DEFAULT '[]'::jsonb,
+        formulary_alternatives JSONB DEFAULT '[]'::jsonb,
+        status VARCHAR(32) DEFAULT 'pending_review',
+        reviewed_by VARCHAR(128),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_medrec_patient ON med_reconciliations(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_medrec_status ON med_reconciliations(status);
+    `);
+
+    // Create bedside_delivery_orders table (Phase 43)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS bedside_delivery_orders (
+        id SERIAL PRIMARY KEY,
+        reconciliation_id INTEGER REFERENCES med_reconciliations(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        room_bed VARCHAR(64) NOT NULL,
+        target_discharge_time TIMESTAMP,
+        delivery_status VARCHAR(32) DEFAULT 'order_placed',
+        courier_name VARCHAR(128) DEFAULT 'Pharmacy Courier Team',
+        copay_amount NUMERIC(8, 2) DEFAULT 0.00,
+        copay_collected BOOLEAN DEFAULT FALSE,
+        teach_back_completed BOOLEAN DEFAULT FALSE,
+        medication_list JSONB DEFAULT '[]'::jsonb,
+        pharmacist_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_bedside_patient ON bedside_delivery_orders(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_bedside_status ON bedside_delivery_orders(delivery_status);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

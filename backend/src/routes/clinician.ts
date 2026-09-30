@@ -32,6 +32,7 @@ import * as acousticBiomarkersService from '../services/acousticBiomarkers';
 import { transferLogisticsService } from '../services/transferLogistics';
 import { perioperativeSuiteService } from '../services/perioperativeSuite';
 import { infectionSurveillanceService } from '../services/infectionSurveillance';
+import * as dischargeMedRecService from '../services/dischargeMedRec';
 
 const router = Router();
 
@@ -2633,6 +2634,124 @@ router.get('/infection/lines', async (req: AuthenticatedRequest, res: Response) 
   } catch (err: any) {
     console.error('Get device lines error:', err);
     res.status(500).json({ error: 'Failed to retrieve invasive lines list.' });
+  }
+});
+
+// ==========================================
+// Phase 43: Autonomous Discharge MedRec & Meds-to-Beds Routes
+// ==========================================
+
+router.get('/med-rec/summary', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const summary = await dischargeMedRecService.getMedRecSummary();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('Get MedRec summary error:', err);
+    res.status(500).json({ error: 'Failed to retrieve medication reconciliation summary.' });
+  }
+});
+
+router.post('/med-rec/reconcile', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      sessionId,
+      reconciliationType,
+      homeMedications,
+      inpatientMedications,
+      dischargeMedications,
+      eGfr,
+      reviewedBy
+    } = req.body;
+
+    if (!patientId) {
+      return res.status(400).json({ error: 'patientId is required for medication reconciliation.' });
+    }
+
+    const result = await dischargeMedRecService.performDischargeMedRec({
+      patientId: parseInt(patientId, 10),
+      sessionId,
+      reconciliationType,
+      homeMedications: homeMedications || [],
+      inpatientMedications: inpatientMedications || [],
+      dischargeMedications: dischargeMedications || [],
+      eGfr: eGfr !== undefined ? Number(eGfr) : undefined,
+      reviewedBy: reviewedBy || (req.user ? `${req.user.role} (${req.user.email || 'Staff'})` : 'Clinical Pharmacist')
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Perform MedRec error:', err);
+    res.status(500).json({ error: err.message || 'Failed to perform discharge medication reconciliation.' });
+  }
+});
+
+router.post('/med-rec/delivery-orders', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      reconciliationId,
+      patientId,
+      roomBed,
+      targetDischargeTime,
+      courierName,
+      copayAmount,
+      medicationList,
+      pharmacistNotes
+    } = req.body;
+
+    if (!reconciliationId || !patientId || !roomBed) {
+      return res.status(400).json({ error: 'reconciliationId, patientId, and roomBed are required.' });
+    }
+
+    const order = await dischargeMedRecService.createBedsideDeliveryOrder({
+      reconciliationId: parseInt(reconciliationId, 10),
+      patientId: parseInt(patientId, 10),
+      roomBed,
+      targetDischargeTime,
+      courierName,
+      copayAmount: copayAmount !== undefined ? Number(copayAmount) : 0,
+      medicationList: medicationList || [],
+      pharmacistNotes
+    });
+
+    res.status(201).json(order);
+  } catch (err: any) {
+    console.error('Create bedside delivery order error:', err);
+    res.status(500).json({ error: err.message || 'Failed to create bedside delivery order.' });
+  }
+});
+
+router.patch('/med-rec/delivery-orders/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const orderId = parseInt(req.params.id as string, 10);
+    const { deliveryStatus, copayCollected, teachBackCompleted, courierName, pharmacistNotes } = req.body;
+
+    if (!deliveryStatus) {
+      return res.status(400).json({ error: 'deliveryStatus is required.' });
+    }
+
+    const updated = await dischargeMedRecService.updateDeliveryStatus(orderId, deliveryStatus, {
+      copayCollected,
+      teachBackCompleted,
+      courierName,
+      pharmacistNotes
+    });
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update delivery order status error:', err);
+    res.status(500).json({ error: err.message || 'Failed to update delivery order.' });
+  }
+});
+
+router.get('/med-rec/patient/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = parseInt(req.params.patientId as string, 10);
+    const data = await dischargeMedRecService.getPatientMedRecs(patientId);
+    res.json(data);
+  } catch (err: any) {
+    console.error('Get patient med-recs error:', err);
+    res.status(500).json({ error: 'Failed to retrieve patient med rec records.' });
   }
 });
 
