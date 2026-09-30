@@ -30,6 +30,7 @@ import { revCycleAppealsService } from '../services/revCycleAppeals';
 import { hospitalAtHomeService } from '../services/hospitalAtHome';
 import * as acousticBiomarkersService from '../services/acousticBiomarkers';
 import { transferLogisticsService } from '../services/transferLogistics';
+import { perioperativeSuiteService } from '../services/perioperativeSuite';
 
 const router = Router();
 
@@ -2399,6 +2400,128 @@ router.get('/transfers/beds', async (req: AuthenticatedRequest, res: Response) =
   } catch (err: any) {
     console.error('Get bed inventory error:', err);
     res.status(500).json({ error: 'Failed to retrieve hospital bed inventory.' });
+  }
+});
+
+// Phase 41: OR/Surgical Suite Logistics & Perioperative Care (ERAS Hub)
+router.post('/perioperative/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      sessionId,
+      procedureName,
+      operatingRoom,
+      primarySurgeon,
+      anesthesiologist,
+      asaClass,
+      rcriFactors,
+      mallampatiClass,
+      npoStatusVerified
+    } = req.body;
+
+    if (!patientId || !procedureName || !operatingRoom || !primarySurgeon || !anesthesiologist) {
+      return res.status(400).json({ error: 'Missing required surgical case fields.' });
+    }
+
+    const created = await perioperativeSuiteService.createSurgicalCase({
+      patientId: parseInt(patientId, 10),
+      sessionId: sessionId || null,
+      procedureName,
+      operatingRoom,
+      primarySurgeon,
+      anesthesiologist,
+      asaClass: asaClass || 'ASA_II',
+      rcriFactors,
+      mallampatiClass,
+      npoStatusVerified: npoStatusVerified !== undefined ? npoStatusVerified : true
+    });
+
+    res.json(created);
+  } catch (err: any) {
+    console.error('Create surgical case error:', err);
+    res.status(500).json({ error: err.message || 'Failed to create surgical case.' });
+  }
+});
+
+router.put('/perioperative/cases/:id/status', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const { status } = req.body;
+    if (!status) {
+      return res.status(400).json({ error: 'status is required.' });
+    }
+    const updated = await perioperativeSuiteService.updateCaseStatus(id, status);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update case status error:', err);
+    res.status(500).json({ error: err.message || 'Failed to update case status.' });
+  }
+});
+
+router.post('/perioperative/cases/:id/anesthesia', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const caseId = parseInt(req.params.id as string, 10);
+    const {
+      anesthesiaType,
+      airwayGrade,
+      tofTwitchCount,
+      reversalAgent,
+      eblMl,
+      fluidsAdministeredMl,
+      aldreteScore,
+      ponvApfelScore,
+      erasAdherenceItems,
+      anesthesiologistNotes
+    } = req.body;
+
+    if (!anesthesiaType || tofTwitchCount === undefined || aldreteScore === undefined) {
+      return res.status(400).json({ error: 'anesthesiaType, tofTwitchCount, and aldreteScore are required.' });
+    }
+
+    const log = await perioperativeSuiteService.recordAnesthesiaLog({
+      caseId,
+      anesthesiaType,
+      airwayGrade: airwayGrade || 'Grade_1',
+      tofTwitchCount: parseInt(tofTwitchCount, 10),
+      reversalAgent,
+      eblMl: parseInt(eblMl || 0, 10),
+      fluidsAdministeredMl: parseInt(fluidsAdministeredMl || 1000, 10),
+      aldreteScore: parseInt(aldreteScore, 10),
+      ponvApfelScore: parseInt(ponvApfelScore || 1, 10),
+      erasAdherenceItems: erasAdherenceItems || [],
+      anesthesiologistNotes
+    });
+
+    res.json(log);
+  } catch (err: any) {
+    console.error('Record anesthesia log error:', err);
+    res.status(500).json({ error: err.message || 'Failed to record anesthesia log.' });
+  }
+});
+
+router.get('/perioperative/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    const operatingRoom = req.query.operatingRoom as string | undefined;
+    const cases = await perioperativeSuiteService.getSurgicalCases(status, operatingRoom);
+    res.json(cases);
+  } catch (err: any) {
+    console.error('Get surgical cases error:', err);
+    res.status(500).json({ error: 'Failed to retrieve surgical cases.' });
+  }
+});
+
+router.get('/perioperative/cases/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const surgicalCase = await perioperativeSuiteService.getCaseById(id);
+    if (!surgicalCase) {
+      return res.status(404).json({ error: 'Surgical case not found.' });
+    }
+    res.json(surgicalCase);
+  } catch (err: any) {
+    console.error('Get single surgical case error:', err);
+    res.status(500).json({ error: 'Failed to retrieve surgical case.' });
   }
 });
 

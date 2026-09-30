@@ -21,6 +21,7 @@ import RevCycleAppealsHub from './RevCycleAppealsHub';
 import HospitalAtHomeCommand from './HospitalAtHomeCommand';
 import { VoiceBiomarkersConsole } from './VoiceBiomarkersConsole';
 import { TransferCenterHub } from './TransferCenterHub';
+import { OperatingRoomHub } from './OperatingRoomHub';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -76,7 +77,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2720,6 +2721,14 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderPerioperative = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <OperatingRoomHub />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3420,6 +3429,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 🚑 Transfer Center
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('perioperative')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'perioperative' ? '#38bdf8' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'perioperative' ? '2.5px solid #38bdf8' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                ✂️ OR & Perioperative
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3706,6 +3733,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderVoiceBiomarkers()
             ) : currentTab === 'transfer_center' ? (
               renderTransferCenter()
+            ) : currentTab === 'perioperative' ? (
+              renderPerioperative()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

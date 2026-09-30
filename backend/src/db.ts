@@ -885,6 +885,49 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_transfer_status ON facility_transfer_requests(status);
     `);
 
+    // Create surgical_cases table (Phase 41)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS surgical_cases (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        procedure_name VARCHAR(255) NOT NULL,
+        operating_room VARCHAR(64) NOT NULL,
+        primary_surgeon VARCHAR(128) NOT NULL,
+        anesthesiologist VARCHAR(128) NOT NULL,
+        asa_class VARCHAR(16) NOT NULL DEFAULT 'ASA_II',
+        rcri_score INTEGER DEFAULT 0,
+        mallampati_class VARCHAR(16) DEFAULT 'Class_I',
+        npo_status_verified BOOLEAN DEFAULT TRUE,
+        status VARCHAR(32) DEFAULT 'scheduled',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_surg_patient ON surgical_cases(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_surg_status ON surgical_cases(status);
+      CREATE INDEX IF NOT EXISTS idx_surg_or ON surgical_cases(operating_room);
+    `);
+
+    // Create anesthesia_records table (Phase 41)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS anesthesia_records (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER REFERENCES surgical_cases(id) ON DELETE CASCADE,
+        anesthesia_type VARCHAR(64) NOT NULL,
+        airway_grade VARCHAR(32) DEFAULT 'Grade_1',
+        tof_twitch_count INTEGER DEFAULT 4,
+        reversal_agent VARCHAR(64),
+        ebl_ml INTEGER DEFAULT 50,
+        fluids_administered_ml INTEGER DEFAULT 1000,
+        aldrete_score INTEGER DEFAULT 10,
+        ponv_apfel_score INTEGER DEFAULT 1,
+        eras_protocol_adherence JSONB DEFAULT '[]'::jsonb,
+        anesthesia_summary TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_anesthesia_case ON anesthesia_records(case_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
