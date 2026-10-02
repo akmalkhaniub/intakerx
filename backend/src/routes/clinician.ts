@@ -43,6 +43,7 @@ import * as cleanroomCompoundingService from '../services/cleanroomCompounding';
 import * as strokeCommandService from '../services/strokeCommand';
 import * as massiveTransfusionService from '../services/massiveTransfusion';
 import * as cathAlertService from '../services/cathAlert';
+import * as ecmoSupportService from '../services/ecmoSupport';
 
 const router = Router();
 
@@ -3906,6 +3907,90 @@ router.get('/stemi/activations', async (req: AuthenticatedRequest, res: Response
   } catch (err: any) {
     console.error('Get STEMI activations error:', err);
     res.status(500).json({ error: 'Failed to fetch STEMI activations.' });
+  }
+});
+
+// ==========================================
+// Phase 54: Extracorporeal Membrane Oxygenation (ECMO) & Mechanical Circulatory Support (MCS Hub)
+// ==========================================
+
+router.post('/ecmo/evaluate-resp', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = ecmoSupportService.EcmoSupportService.calculateRespScore(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate RESP score error:', err);
+    res.status(500).json({ error: 'Failed to evaluate RESP score.' });
+  }
+});
+
+router.post('/ecmo/evaluate-save', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = ecmoSupportService.EcmoSupportService.calculateSaveScore(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate SAVE score error:', err);
+    res.status(500).json({ error: 'Failed to evaluate SAVE score.' });
+  }
+});
+
+router.post('/ecmo/runs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, runData } = req.body;
+    if (!patientId || !runData) {
+      res.status(400).json({ error: 'patientId and runData are required' });
+      return;
+    }
+    const result = await ecmoSupportService.EcmoSupportService.initiateEcmoRun(Number(patientId), runData);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Initiate ECMO run error:', err);
+    res.status(500).json({ error: 'Failed to initiate ECMO run.' });
+  }
+});
+
+router.post('/ecmo/runs/:runId/telemetry', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { runId } = req.params;
+    const result = await ecmoSupportService.EcmoSupportService.recordCircuitTelemetry(Number(runId), req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Record ECMO telemetry error:', err);
+    res.status(500).json({ error: 'Failed to record circuit telemetry.' });
+  }
+});
+
+router.patch('/ecmo/runs/:runId/parameters', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { runId } = req.params;
+    const updated = await ecmoSupportService.EcmoSupportService.adjustSweepAndRpm(Number(runId), req.body);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Adjust ECMO parameters error:', err);
+    res.status(500).json({ error: 'Failed to adjust ECMO parameters.' });
+  }
+});
+
+router.patch('/ecmo/runs/:runId/decannulate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { runId } = req.params;
+    const { outcome } = req.body;
+    const updated = await ecmoSupportService.EcmoSupportService.decannulateCircuit(Number(runId), outcome || 'weaned_recovered');
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Decannulate ECMO error:', err);
+    res.status(500).json({ error: 'Failed to decannulate ECMO run.' });
+  }
+});
+
+router.get('/ecmo/runs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patient_id ? Number(req.query.patient_id) : undefined;
+    const runs = await ecmoSupportService.EcmoSupportService.getEcmoRuns(patientId);
+    res.json(runs);
+  } catch (err: any) {
+    console.error('Get ECMO runs error:', err);
+    res.status(500).json({ error: 'Failed to fetch ECMO runs.' });
   }
 });
 

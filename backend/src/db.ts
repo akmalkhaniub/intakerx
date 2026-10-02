@@ -1484,6 +1484,52 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_pci_stemi ON pci_procedure_logs(stemi_activation_id);
     `);
 
+    // Create ecmo_runs table (Phase 54)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS ecmo_runs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        ecmo_type VARCHAR(32) NOT NULL,
+        cannulation_config VARCHAR(64) NOT NULL,
+        cannula_size_drainage_fr INTEGER NOT NULL,
+        cannula_size_return_fr INTEGER NOT NULL,
+        distal_perfusion_cannula_placed BOOLEAN DEFAULT TRUE,
+        indication_diagnosis VARCHAR(128) NOT NULL,
+        baseline_pf_ratio NUMERIC(5, 1),
+        resp_score INTEGER,
+        save_score INTEGER,
+        survival_risk_class VARCHAR(16),
+        pump_rpm INTEGER NOT NULL,
+        blood_flow_lpm NUMERIC(4, 2) NOT NULL,
+        sweep_gas_lpm NUMERIC(4, 1) NOT NULL,
+        sweep_fio2_percent INTEGER NOT NULL,
+        circuit_status VARCHAR(32) DEFAULT 'active_run',
+        cannulated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        decannulated_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ecmo_patient ON ecmo_runs(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_ecmo_status ON ecmo_runs(circuit_status);
+    `);
+
+    // Create ecmo_circuit_telemetry table (Phase 54)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS ecmo_circuit_telemetry (
+        id SERIAL PRIMARY KEY,
+        ecmo_run_id INTEGER REFERENCES ecmo_runs(id) ON DELETE CASCADE,
+        pre_membrane_pressure_mmhg INTEGER NOT NULL,
+        post_membrane_pressure_mmhg INTEGER NOT NULL,
+        transmembrane_delta_p_mmhg INTEGER NOT NULL,
+        venous_drainage_pressure_mmhg INTEGER NOT NULL,
+        plasma_free_hemoglobin_mg_dl NUMERIC(5, 1) NOT NULL,
+        anti_xa_iu_ml NUMERIC(4, 2) NOT NULL,
+        aptt_seconds INTEGER NOT NULL,
+        chatter_detected BOOLEAN DEFAULT FALSE,
+        membrane_clot_alert BOOLEAN DEFAULT FALSE,
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_telemetry_ecmo ON ecmo_circuit_telemetry(ecmo_run_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
