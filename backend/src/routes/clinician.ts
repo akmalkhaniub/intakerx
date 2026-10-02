@@ -37,6 +37,7 @@ import * as precisionOncologyService from '../services/precisionOncology';
 import * as behavioralCrisisService from '../services/behavioralCrisis';
 import * as criticalCareShockService from '../services/criticalCareShock';
 import * as autonomousCdiService from '../services/autonomousCdi';
+import * as organTransplantService from '../services/organTransplant';
 
 const router = Router();
 
@@ -3161,6 +3162,176 @@ router.get('/cdi/queries', async (req: AuthenticatedRequest, res: Response) => {
   } catch (err: any) {
     console.error('Get CDI queries error:', err);
     res.status(500).json({ error: 'Failed to fetch physician queries.' });
+  }
+});
+
+// Phase 48: Solid Organ Transplant Logistics & HLA Virtual Crossmatch Engine
+router.post('/transplant/calc/meld-na', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { creatinine, bilirubin, inr, sodium, onDialysisTwicePastWeek } = req.body;
+    if (creatinine === undefined || bilirubin === undefined || inr === undefined || sodium === undefined) {
+      return res.status(400).json({ error: 'creatinine, bilirubin, inr, and sodium are required.' });
+    }
+
+    const scores = organTransplantService.OrganTransplantService.calculateMeldNa({
+      creatinine: parseFloat(creatinine),
+      bilirubin: parseFloat(bilirubin),
+      inr: parseFloat(inr),
+      sodium: parseFloat(sodium),
+      onDialysisTwicePastWeek: !!onDialysisTwicePastWeek
+    });
+
+    res.json(scores);
+  } catch (err: any) {
+    console.error('Calculate MELD-Na error:', err);
+    res.status(500).json({ error: 'Failed to calculate MELD-Na score.' });
+  }
+});
+
+router.post('/transplant/calc/kdpi', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { donorAge, donorHeightCm, donorWeightKg, hypertension, diabetes, causeOfDeath, creatinine, dcd, hcvPositive } = req.body;
+    if (donorAge === undefined || creatinine === undefined) {
+      return res.status(400).json({ error: 'donorAge and creatinine are required.' });
+    }
+
+    const kdpi = organTransplantService.OrganTransplantService.calculateKdpi({
+      donorAge: parseInt(donorAge, 10),
+      donorHeightCm: parseFloat(donorHeightCm || 170),
+      donorWeightKg: parseFloat(donorWeightKg || 75),
+      hypertension: !!hypertension,
+      diabetes: !!diabetes,
+      causeOfDeath: causeOfDeath || 'trauma',
+      creatinine: parseFloat(creatinine),
+      dcd: !!dcd,
+      hcvPositive: !!hcvPositive
+    });
+
+    res.json({ kdpi });
+  } catch (err: any) {
+    console.error('Calculate KDPI error:', err);
+    res.status(500).json({ error: 'Failed to calculate KDPI.' });
+  }
+});
+
+router.post('/transplant/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      organType,
+      recipientBloodGroup,
+      meldNaScore,
+      kdpiScore,
+      cpraPercentage,
+      recipientHla,
+      unacceptableAntigens,
+      assignedSurgeon
+    } = req.body;
+
+    if (!patientId || !organType || !recipientBloodGroup || !recipientHla) {
+      return res.status(400).json({ error: 'patientId, organType, recipientBloodGroup, and recipientHla are required.' });
+    }
+
+    const transplantCase = await organTransplantService.OrganTransplantService.createTransplantCase({
+      patientId: parseInt(patientId, 10),
+      organType,
+      recipientBloodGroup,
+      meldNaScore: meldNaScore ? parseInt(meldNaScore, 10) : undefined,
+      kdpiScore: kdpiScore ? parseInt(kdpiScore, 10) : undefined,
+      cpraPercentage: cpraPercentage ? parseFloat(cpraPercentage) : 0,
+      recipientHla,
+      unacceptableAntigens: unacceptableAntigens || [],
+      assignedSurgeon
+    });
+
+    res.json(transplantCase);
+  } catch (err: any) {
+    console.error('Create transplant case error:', err);
+    res.status(500).json({ error: err.message || 'Failed to create transplant case.' });
+  }
+});
+
+router.post('/transplant/crossmatch', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      transplantCaseId,
+      donorUnosId,
+      donorBloodGroup,
+      donorHla,
+      preservationMethod,
+      crossClampTimestamp,
+      transitEtaMinutes,
+      reviewedByDirector
+    } = req.body;
+
+    if (!transplantCaseId || !donorUnosId || !donorBloodGroup || !donorHla) {
+      return res.status(400).json({ error: 'transplantCaseId, donorUnosId, donorBloodGroup, and donorHla are required.' });
+    }
+
+    const result = await organTransplantService.OrganTransplantService.runVirtualCrossmatch({
+      transplantCaseId: parseInt(transplantCaseId, 10),
+      donorUnosId,
+      donorBloodGroup,
+      donorHla,
+      preservationMethod: preservationMethod || 'static_cold_storage',
+      crossClampTimestamp,
+      transitEtaMinutes: transitEtaMinutes ? parseInt(transitEtaMinutes, 10) : 90,
+      reviewedByDirector
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Run virtual crossmatch error:', err);
+    res.status(500).json({ error: err.message || 'Failed to execute virtual crossmatch.' });
+  }
+});
+
+router.post('/transplant/cases/:id/status', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const caseId = parseInt(req.params.id as string, 10);
+    const { status } = req.body;
+    if (!status) {
+      return res.status(400).json({ error: 'status is required.' });
+    }
+
+    const updated = await organTransplantService.OrganTransplantService.updateCaseStatus(caseId, status);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update transplant status error:', err);
+    res.status(500).json({ error: err.message || 'Failed to update transplant status.' });
+  }
+});
+
+router.get('/transplant/analytics', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const analytics = await organTransplantService.OrganTransplantService.getTransplantDashboardAnalytics();
+    res.json(analytics);
+  } catch (err: any) {
+    console.error('Get transplant analytics error:', err);
+    res.status(500).json({ error: 'Failed to fetch transplant analytics.' });
+  }
+});
+
+router.get('/transplant/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    const organType = req.query.organType as string | undefined;
+    const cases = await organTransplantService.OrganTransplantService.getTransplantCases(status, organType);
+    res.json(cases);
+  } catch (err: any) {
+    console.error('Get transplant cases error:', err);
+    res.status(500).json({ error: 'Failed to fetch transplant cases.' });
+  }
+});
+
+router.get('/transplant/cases/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const caseId = parseInt(req.params.id as string, 10);
+    const caseDetail = await organTransplantService.OrganTransplantService.getCaseDetails(caseId);
+    res.json(caseDetail);
+  } catch (err: any) {
+    console.error('Get transplant case details error:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch case details.' });
   }
 });
 

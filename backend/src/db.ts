@@ -1188,6 +1188,54 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_query_type ON physician_queries(query_type);
     `);
 
+    // Create transplant_cases table (Phase 48)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS transplant_cases (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        organ_type VARCHAR(32) NOT NULL,
+        listing_status VARCHAR(50) DEFAULT 'active_listed',
+        recipient_blood_group VARCHAR(10) NOT NULL,
+        meld_na_score INTEGER,
+        kdpi_score INTEGER,
+        cpra_percentage NUMERIC(5, 2) DEFAULT 0.00,
+        recipient_hla JSONB NOT NULL DEFAULT '{}'::jsonb,
+        unacceptable_antigens TEXT[] DEFAULT ARRAY[]::TEXT[],
+        donor_unos_id VARCHAR(64),
+        donor_blood_group VARCHAR(10),
+        donor_hla JSONB DEFAULT '{}'::jsonb,
+        preservation_method VARCHAR(64) DEFAULT 'static_cold_storage',
+        cross_clamp_timestamp TIMESTAMP,
+        max_acceptable_cit_hours NUMERIC(4, 1) DEFAULT 24.0,
+        transit_courier_eta TIMESTAMP,
+        assigned_surgeon VARCHAR(128),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_transplant_patient ON transplant_cases(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_transplant_organ ON transplant_cases(organ_type);
+      CREATE INDEX IF NOT EXISTS idx_transplant_status ON transplant_cases(listing_status);
+    `);
+
+    // Create hla_crossmatches table (Phase 48)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS hla_crossmatches (
+        id SERIAL PRIMARY KEY,
+        transplant_case_id INTEGER NOT NULL REFERENCES transplant_cases(id) ON DELETE CASCADE,
+        crossmatch_type VARCHAR(50) DEFAULT 'virtual_flow_cytometry',
+        detected_dsas JSONB NOT NULL DEFAULT '[]'::jsonb,
+        peak_mfi INTEGER DEFAULT 0,
+        crossmatch_prediction VARCHAR(64) NOT NULL,
+        rejection_risk_level VARCHAR(32) NOT NULL,
+        recommended_induction_protocol TEXT NOT NULL,
+        desensitization_required BOOLEAN DEFAULT FALSE,
+        reviewed_by_director VARCHAR(128),
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_crossmatch_case ON hla_crossmatches(transplant_case_id);
+      CREATE INDEX IF NOT EXISTS idx_crossmatch_pred ON hla_crossmatches(crossmatch_prediction);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
