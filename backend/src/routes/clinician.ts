@@ -38,6 +38,7 @@ import * as behavioralCrisisService from '../services/behavioralCrisis';
 import * as criticalCareShockService from '../services/criticalCareShock';
 import * as autonomousCdiService from '../services/autonomousCdi';
 import * as organTransplantService from '../services/organTransplant';
+import * as obstetricSafetyService from '../services/obstetricSafety';
 
 const router = Router();
 
@@ -3332,6 +3333,137 @@ router.get('/transplant/cases/:id', async (req: AuthenticatedRequest, res: Respo
   } catch (err: any) {
     console.error('Get transplant case details error:', err);
     res.status(500).json({ error: err.message || 'Failed to fetch case details.' });
+  }
+});
+
+// Phase 49: Labor & Delivery / Obstetric Emergency Command (OB-SAFE Hub)
+router.post('/obstetric/fetal-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      gestationalAgeWeeks,
+      fhrBaselineBpm,
+      variability,
+      accelerationsPresent,
+      decelerationsType,
+      uterineContractionsPer10min,
+      interventionsPerformed,
+      loggedBy
+    } = req.body;
+
+    if (!patientId || !gestationalAgeWeeks || !fhrBaselineBpm || !variability) {
+      return res.status(400).json({ error: 'patientId, gestationalAgeWeeks, fhrBaselineBpm, and variability are required.' });
+    }
+
+    const log = await obstetricSafetyService.ObstetricSafetyService.recordFetalMonitoringLog({
+      patientId: parseInt(patientId, 10),
+      gestationalAgeWeeks: parseFloat(gestationalAgeWeeks),
+      fhrBaselineBpm: parseInt(fhrBaselineBpm, 10),
+      variability,
+      accelerationsPresent: !!accelerationsPresent,
+      decelerationsType: decelerationsType || 'none',
+      uterineContractionsPer10min: uterineContractionsPer10min ? parseInt(uterineContractionsPer10min, 10) : 3,
+      interventionsPerformed: interventionsPerformed || [],
+      loggedBy
+    });
+
+    res.json(log);
+  } catch (err: any) {
+    console.error('Record fetal log error:', err);
+    res.status(500).json({ error: err.message || 'Failed to record fetal monitoring log.' });
+  }
+});
+
+router.post('/obstetric/emergencies/declare', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, emergencyType, quantitativeBloodLossMl, currentVitals, leadObstetrician } = req.body;
+    if (!patientId || !emergencyType) {
+      return res.status(400).json({ error: 'patientId and emergencyType are required.' });
+    }
+
+    const emergency = await obstetricSafetyService.ObstetricSafetyService.declareObstetricEmergency({
+      patientId: parseInt(patientId, 10),
+      emergencyType,
+      quantitativeBloodLossMl: quantitativeBloodLossMl ? parseInt(quantitativeBloodLossMl, 10) : 0,
+      currentVitals: currentVitals || {},
+      leadObstetrician
+    });
+
+    res.json(emergency);
+  } catch (err: any) {
+    console.error('Declare obstetric emergency error:', err);
+    res.status(500).json({ error: err.message || 'Failed to declare obstetric emergency.' });
+  }
+});
+
+router.post('/obstetric/emergencies/:id/medications', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const emergencyId = parseInt(req.params.id as string, 10);
+    const { medicationName, dose, route } = req.body;
+    if (!medicationName || !dose || !route) {
+      return res.status(400).json({ error: 'medicationName, dose, and route are required.' });
+    }
+
+    const updated = await obstetricSafetyService.ObstetricSafetyService.recordMedicationAdministration({
+      emergencyId,
+      medicationName,
+      dose,
+      route
+    });
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Administer medication error:', err);
+    res.status(500).json({ error: err.message || 'Failed to administer emergency medication.' });
+  }
+});
+
+router.post('/obstetric/emergencies/:id/resolve', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const emergencyId = parseInt(req.params.id as string, 10);
+    const { status } = req.body;
+    if (!status) {
+      return res.status(400).json({ error: 'status is required.' });
+    }
+
+    const resolved = await obstetricSafetyService.ObstetricSafetyService.resolveEmergency(emergencyId, status);
+    res.json(resolved);
+  } catch (err: any) {
+    console.error('Resolve obstetric emergency error:', err);
+    res.status(500).json({ error: err.message || 'Failed to resolve emergency.' });
+  }
+});
+
+router.get('/obstetric/analytics', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const analytics = await obstetricSafetyService.ObstetricSafetyService.getObSafeDashboardAnalytics();
+    res.json(analytics);
+  } catch (err: any) {
+    console.error('Get obstetric analytics error:', err);
+    res.status(500).json({ error: 'Failed to fetch obstetric analytics.' });
+  }
+});
+
+router.get('/obstetric/fetal-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patientId ? parseInt(req.query.patientId as string, 10) : undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+    const logs = await obstetricSafetyService.ObstetricSafetyService.getRecentFetalLogs(patientId, limit);
+    res.json(logs);
+  } catch (err: any) {
+    console.error('Get fetal logs error:', err);
+    res.status(500).json({ error: 'Failed to fetch fetal monitoring logs.' });
+  }
+});
+
+router.get('/obstetric/emergencies', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    const emergencies = await obstetricSafetyService.ObstetricSafetyService.getActiveEmergencies(status);
+    res.json(emergencies);
+  } catch (err: any) {
+    console.error('Get emergencies error:', err);
+    res.status(500).json({ error: 'Failed to fetch obstetric emergencies.' });
   }
 });
 

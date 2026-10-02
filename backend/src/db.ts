@@ -1236,6 +1236,51 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_crossmatch_pred ON hla_crossmatches(crossmatch_prediction);
     `);
 
+    // Create fetal_monitoring_logs table (Phase 49)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS fetal_monitoring_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        gestational_age_weeks NUMERIC(3, 1) NOT NULL,
+        fhr_baseline_bpm INTEGER NOT NULL,
+        variability VARCHAR(32) NOT NULL,
+        accelerations_present BOOLEAN DEFAULT TRUE,
+        decelerations_type VARCHAR(64) DEFAULT 'none',
+        uterine_contractions_per_10min INTEGER DEFAULT 3,
+        tachysystole BOOLEAN DEFAULT FALSE,
+        nichd_tier VARCHAR(10) NOT NULL,
+        interventions_performed TEXT[] DEFAULT ARRAY[]::TEXT[],
+        logged_by VARCHAR(128),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_fhr_patient ON fetal_monitoring_logs(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_fhr_tier ON fetal_monitoring_logs(nichd_tier);
+    `);
+
+    // Create obstetric_emergencies table (Phase 49)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS obstetric_emergencies (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        emergency_type VARCHAR(64) NOT NULL,
+        severity_stage VARCHAR(32) NOT NULL,
+        quantitative_blood_loss_ml INTEGER DEFAULT 0,
+        mewc_triggers JSONB NOT NULL DEFAULT '[]'::jsonb,
+        current_vitals JSONB NOT NULL DEFAULT '{}'::jsonb,
+        active_medications_administered JSONB NOT NULL DEFAULT '[]'::jsonb,
+        magnesium_infusion_active BOOLEAN DEFAULT FALSE,
+        magnesium_rate_g_hr NUMERIC(3, 1) DEFAULT 0.0,
+        protocol_checklist JSONB NOT NULL DEFAULT '[]'::jsonb,
+        emergency_status VARCHAR(32) DEFAULT 'active_emergency',
+        lead_obstetrician VARCHAR(128),
+        declared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        resolved_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ob_patient ON obstetric_emergencies(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_ob_type ON obstetric_emergencies(emergency_type);
+      CREATE INDEX IF NOT EXISTS idx_ob_status ON obstetric_emergencies(emergency_status);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
