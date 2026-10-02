@@ -31,6 +31,7 @@ import { CdiCommandHub } from './CdiCommandHub';
 import { OrganMatchHub } from './OrganMatchHub';
 import { ObstetricCommandHub } from './ObstetricCommandHub';
 import { CleanroomCompoundingHub } from './CleanroomCompoundingHub';
+import { CodeStrokeHub } from './CodeStrokeHub';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -86,7 +87,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control' | 'meds_to_beds' | 'genomic_tumor_board' | 'behavioral_health' | 'icu_shock' | 'autonomous_cdi' | 'organ_transplant' | 'labor_delivery' | 'cleanroom_compounding'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control' | 'meds_to_beds' | 'genomic_tumor_board' | 'behavioral_health' | 'icu_shock' | 'autonomous_cdi' | 'organ_transplant' | 'labor_delivery' | 'cleanroom_compounding' | 'code_stroke'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2810,6 +2811,14 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderStrokeCommandHub = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <CodeStrokeHub />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3690,6 +3699,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 🧪 Cleanroom IV Compounding
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('code_stroke')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'code_stroke' ? '#ef4444' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'code_stroke' ? '2.5px solid #ef4444' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                ⚡ CODE-STROKE Command
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -3996,6 +4023,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderLaborDeliveryHub()
             ) : currentTab === 'cleanroom_compounding' ? (
               renderCleanroomHub()
+            ) : currentTab === 'code_stroke' ? (
+              renderStrokeCommandHub()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

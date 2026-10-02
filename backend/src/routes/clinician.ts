@@ -40,6 +40,7 @@ import * as autonomousCdiService from '../services/autonomousCdi';
 import * as organTransplantService from '../services/organTransplant';
 import * as obstetricSafetyService from '../services/obstetricSafety';
 import * as cleanroomCompoundingService from '../services/cleanroomCompounding';
+import * as strokeCommandService from '../services/strokeCommand';
 
 const router = Router();
 
@@ -3600,6 +3601,113 @@ router.get('/cleanroom/telemetry/latest', async (req: AuthenticatedRequest, res:
   } catch (err: any) {
     console.error('Get latest cleanroom telemetry error:', err);
     res.status(500).json({ error: 'Failed to fetch cleanroom telemetry.' });
+  }
+});
+
+// ==========================================
+// Phase 51: Stroke & Neurovascular Acute Code Command (CODE-STROKE Hub)
+// ==========================================
+
+router.post('/stroke/evaluate-nihss', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { details } = req.body;
+    if (!details) {
+      res.status(400).json({ error: 'details (NihssDetails) is required' });
+      return;
+    }
+    const result = strokeCommandService.StrokeCommandService.evaluateNihss(details);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate NIHSS error:', err);
+    res.status(500).json({ error: 'Failed to evaluate NIHSS.' });
+  }
+});
+
+router.post('/stroke/evaluate-thrombolysis', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = strokeCommandService.StrokeCommandService.evaluateThrombolysis(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate thrombolysis error:', err);
+    res.status(500).json({ error: 'Failed to evaluate thrombolysis eligibility.' });
+  }
+});
+
+router.post('/stroke/evaluate-thrombectomy', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = strokeCommandService.StrokeCommandService.evaluateThrombectomy(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate thrombectomy error:', err);
+    res.status(500).json({ error: 'Failed to evaluate mechanical thrombectomy candidacy.' });
+  }
+});
+
+router.post('/stroke/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, caseData } = req.body;
+    if (!patientId || !caseData) {
+      res.status(400).json({ error: 'patientId and caseData are required' });
+      return;
+    }
+    const createdCase = await strokeCommandService.StrokeCommandService.createStrokeCase(Number(patientId), caseData);
+    res.status(201).json(createdCase);
+  } catch (err: any) {
+    console.error('Create stroke case error:', err);
+    res.status(500).json({ error: 'Failed to create acute stroke code case.' });
+  }
+});
+
+router.post('/stroke/cases/:caseId/thrombolytic-eval', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { caseId } = req.params;
+    const result = await strokeCommandService.StrokeCommandService.recordThrombolyticEvaluation(Number(caseId), req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Record thrombolytic eval error:', err);
+    res.status(500).json({ error: 'Failed to record thrombolytic evaluation.' });
+  }
+});
+
+router.post('/stroke/cases/:caseId/administer-thrombolytic', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { caseId } = req.params;
+    const { administeredAt } = req.body;
+    const result = await strokeCommandService.StrokeCommandService.recordThrombolyticAdministration(
+      Number(caseId),
+      administeredAt || new Date().toISOString()
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('Administer thrombolytic error:', err);
+    res.status(500).json({ error: 'Failed to record thrombolytic administration.' });
+  }
+});
+
+router.patch('/stroke/cases/:caseId/thrombectomy-status', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { caseId } = req.params;
+    const { status } = req.body;
+    if (!status) {
+      res.status(400).json({ error: 'status is required' });
+      return;
+    }
+    const updated = await strokeCommandService.StrokeCommandService.updateThrombectomyStatus(Number(caseId), status);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update thrombectomy status error:', err);
+    res.status(500).json({ error: 'Failed to update thrombectomy status.' });
+  }
+});
+
+router.get('/stroke/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patient_id ? Number(req.query.patient_id) : undefined;
+    const cases = await strokeCommandService.StrokeCommandService.getStrokeCases(patientId);
+    res.json(cases);
+  } catch (err: any) {
+    console.error('Get stroke cases error:', err);
+    res.status(500).json({ error: 'Failed to fetch stroke cases.' });
   }
 });
 

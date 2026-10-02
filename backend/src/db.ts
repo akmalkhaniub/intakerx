@@ -1330,6 +1330,57 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_cleanroom_status ON cleanroom_telemetry(pressure_status);
     `);
 
+    // Create stroke_code_cases table (Phase 51)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS stroke_code_cases (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        last_known_well TIMESTAMP NOT NULL,
+        ed_arrival_time TIMESTAMP NOT NULL,
+        ct_completion_time TIMESTAMP,
+        nihss_total_score INTEGER NOT NULL,
+        nihss_details JSONB NOT NULL,
+        stroke_subtype VARCHAR(64) NOT NULL,
+        aspects_score INTEGER,
+        lvo_detected BOOLEAN DEFAULT FALSE,
+        lvo_location VARCHAR(64),
+        thrombolytic_candidate BOOLEAN DEFAULT FALSE,
+        thrombolytic_administered BOOLEAN DEFAULT FALSE,
+        thrombolytic_agent VARCHAR(64),
+        door_to_needle_minutes INTEGER,
+        dtn_target_met BOOLEAN,
+        thrombectomy_candidate BOOLEAN DEFAULT FALSE,
+        thrombectomy_status VARCHAR(64) DEFAULT 'not_indicated',
+        case_status VARCHAR(32) DEFAULT 'active_code',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_stroke_patient ON stroke_code_cases(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_stroke_status ON stroke_code_cases(case_status);
+      CREATE INDEX IF NOT EXISTS idx_stroke_lvo ON stroke_code_cases(lvo_detected);
+    `);
+
+    // Create thrombolytic_evaluations table (Phase 51)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS thrombolytic_evaluations (
+        id SERIAL PRIMARY KEY,
+        stroke_case_id INTEGER REFERENCES stroke_code_cases(id) ON DELETE CASCADE,
+        systolic_bp INTEGER NOT NULL,
+        diastolic_bp INTEGER NOT NULL,
+        blood_glucose_mg_dl INTEGER NOT NULL,
+        platelet_count INTEGER NOT NULL,
+        inr NUMERIC(4, 2) NOT NULL,
+        on_oral_anticoagulants BOOLEAN DEFAULT FALSE,
+        recent_major_surgery_head_trauma BOOLEAN DEFAULT FALSE,
+        active_internal_bleeding BOOLEAN DEFAULT FALSE,
+        contraindications JSONB DEFAULT '[]'::jsonb,
+        safety_cleared BOOLEAN NOT NULL,
+        agent_recommended VARCHAR(64),
+        recommended_dose_mg NUMERIC(6, 2),
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_thromb_case ON thrombolytic_evaluations(stroke_case_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
