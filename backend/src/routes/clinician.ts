@@ -39,6 +39,7 @@ import * as criticalCareShockService from '../services/criticalCareShock';
 import * as autonomousCdiService from '../services/autonomousCdi';
 import * as organTransplantService from '../services/organTransplant';
 import * as obstetricSafetyService from '../services/obstetricSafety';
+import * as cleanroomCompoundingService from '../services/cleanroomCompounding';
 
 const router = Router();
 
@@ -3464,6 +3465,141 @@ router.get('/obstetric/emergencies', async (req: AuthenticatedRequest, res: Resp
   } catch (err: any) {
     console.error('Get emergencies error:', err);
     res.status(500).json({ error: 'Failed to fetch obstetric emergencies.' });
+  }
+});
+
+// Phase 50: Pharmacy Sterile Compounding & USP <797>/<800> Cleanroom IV Automation
+router.post('/cleanroom/batches', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      prescriptionOrderId,
+      medicationName,
+      baseSolution,
+      drugDoseMg,
+      drugVolumeMl,
+      drugSpecificGravity,
+      emptyBagTareGrams,
+      uspCategory,
+      storageCondition,
+      isHazardousUsp800,
+      cstdVerified,
+      compoundingHoodId,
+      compoundedByPharmacist
+    } = req.body;
+
+    if (!medicationName || !baseSolution || drugDoseMg === undefined || drugVolumeMl === undefined || emptyBagTareGrams === undefined) {
+      return res.status(400).json({ error: 'medicationName, baseSolution, drugDoseMg, drugVolumeMl, and emptyBagTareGrams are required.' });
+    }
+
+    const batch = await cleanroomCompoundingService.CleanroomCompoundingService.createCompoundingBatch({
+      patientId: patientId ? parseInt(patientId, 10) : undefined,
+      prescriptionOrderId,
+      medicationName,
+      baseSolution,
+      drugDoseMg: parseFloat(drugDoseMg),
+      drugVolumeMl: parseFloat(drugVolumeMl),
+      drugSpecificGravity: drugSpecificGravity ? parseFloat(drugSpecificGravity) : 1.000,
+      emptyBagTareGrams: parseFloat(emptyBagTareGrams),
+      uspCategory,
+      storageCondition,
+      isHazardousUsp800: !!isHazardousUsp800,
+      cstdVerified: !!cstdVerified,
+      compoundingHoodId: compoundingHoodId || 'HOOD-ISO5-01',
+      compoundedByPharmacist: compoundedByPharmacist || 'Staff Compounding Pharmacist'
+    });
+
+    res.json(batch);
+  } catch (err: any) {
+    console.error('Create compounding batch error:', err);
+    res.status(500).json({ error: err.message || 'Failed to create compounding batch.' });
+  }
+});
+
+router.post('/cleanroom/batches/:id/verify-gravimetric', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const batchId = parseInt(req.params.id as string, 10);
+    const { actualScaleWeightGrams } = req.body;
+    if (actualScaleWeightGrams === undefined) {
+      return res.status(400).json({ error: 'actualScaleWeightGrams is required.' });
+    }
+
+    const verified = await cleanroomCompoundingService.CleanroomCompoundingService.verifyBatchGravimetric({
+      batchId,
+      actualScaleWeightGrams: parseFloat(actualScaleWeightGrams)
+    });
+
+    res.json(verified);
+  } catch (err: any) {
+    console.error('Verify gravimetric error:', err);
+    res.status(500).json({ error: err.message || 'Failed to verify gravimetric weight.' });
+  }
+});
+
+router.post('/cleanroom/telemetry', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      cleanroomZone,
+      differentialPressureInWg,
+      hepaParticleCount05um,
+      isoClass,
+      airChangesPerHour,
+      temperatureCelsius,
+      relativeHumidityPercent
+    } = req.body;
+
+    if (!cleanroomZone || differentialPressureInWg === undefined || hepaParticleCount05um === undefined) {
+      return res.status(400).json({ error: 'cleanroomZone, differentialPressureInWg, and hepaParticleCount05um are required.' });
+    }
+
+    const telem = await cleanroomCompoundingService.CleanroomCompoundingService.recordTelemetry({
+      cleanroomZone,
+      differentialPressureInWg: parseFloat(differentialPressureInWg),
+      hepaParticleCount05um: parseInt(hepaParticleCount05um, 10),
+      isoClass: isoClass || 'ISO_7',
+      airChangesPerHour: parseInt(airChangesPerHour || 30, 10),
+      temperatureCelsius: parseFloat(temperatureCelsius || 19.5),
+      relativeHumidityPercent: parseFloat(relativeHumidityPercent || 45.0)
+    });
+
+    res.json(telem);
+  } catch (err: any) {
+    console.error('Record cleanroom telemetry error:', err);
+    res.status(500).json({ error: err.message || 'Failed to record cleanroom telemetry.' });
+  }
+});
+
+router.get('/cleanroom/analytics', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const analytics = await cleanroomCompoundingService.CleanroomCompoundingService.getCleanroomAnalytics();
+    res.json(analytics);
+  } catch (err: any) {
+    console.error('Get cleanroom analytics error:', err);
+    res.status(500).json({ error: 'Failed to fetch cleanroom analytics.' });
+  }
+});
+
+router.get('/cleanroom/batches', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    const isHazardous = req.query.isHazardous !== undefined ? req.query.isHazardous === 'true' : undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+
+    const batches = await cleanroomCompoundingService.CleanroomCompoundingService.getRecentBatches(status, isHazardous, limit);
+    res.json(batches);
+  } catch (err: any) {
+    console.error('Get compounding batches error:', err);
+    res.status(500).json({ error: 'Failed to fetch compounding batches.' });
+  }
+});
+
+router.get('/cleanroom/telemetry/latest', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const latest = await cleanroomCompoundingService.CleanroomCompoundingService.getLatestCleanroomTelemetry();
+    res.json(latest);
+  } catch (err: any) {
+    console.error('Get latest cleanroom telemetry error:', err);
+    res.status(500).json({ error: 'Failed to fetch cleanroom telemetry.' });
   }
 });
 

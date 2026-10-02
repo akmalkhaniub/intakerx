@@ -1281,6 +1281,55 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_ob_status ON obstetric_emergencies(emergency_status);
     `);
 
+    // Create iv_compounding_batches table (Phase 50)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS iv_compounding_batches (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE SET NULL,
+        prescription_order_id VARCHAR(64),
+        medication_name VARCHAR(128) NOT NULL,
+        base_solution VARCHAR(64) NOT NULL,
+        drug_dose_mg NUMERIC(8, 2) NOT NULL,
+        drug_volume_ml NUMERIC(6, 2) NOT NULL,
+        drug_specific_gravity NUMERIC(5, 3) DEFAULT 1.000,
+        empty_bag_tare_grams NUMERIC(7, 2) NOT NULL,
+        expected_final_weight_grams NUMERIC(7, 2) NOT NULL,
+        actual_scale_weight_grams NUMERIC(7, 2),
+        weight_variance_percent NUMERIC(5, 2),
+        gravimetric_passed BOOLEAN,
+        usp_category VARCHAR(32) NOT NULL DEFAULT 'Category_2',
+        storage_condition VARCHAR(32) NOT NULL DEFAULT 'refrigerated',
+        beyond_use_date TIMESTAMP NOT NULL,
+        is_hazardous_usp800 BOOLEAN DEFAULT FALSE,
+        cstd_verified BOOLEAN DEFAULT FALSE,
+        compounding_hood_id VARCHAR(64) NOT NULL,
+        compounded_by_pharmacist VARCHAR(128) NOT NULL,
+        batch_status VARCHAR(32) DEFAULT 'compounded',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_iv_med ON iv_compounding_batches(medication_name);
+      CREATE INDEX IF NOT EXISTS idx_iv_status ON iv_compounding_batches(batch_status);
+      CREATE INDEX IF NOT EXISTS idx_iv_hazardous ON iv_compounding_batches(is_hazardous_usp800);
+    `);
+
+    // Create cleanroom_telemetry table (Phase 50)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS cleanroom_telemetry (
+        id SERIAL PRIMARY KEY,
+        cleanroom_zone VARCHAR(64) NOT NULL,
+        differential_pressure_in_wg NUMERIC(5, 4) NOT NULL,
+        pressure_status VARCHAR(32) NOT NULL,
+        hepa_particle_count_0_5um INTEGER NOT NULL,
+        iso_class VARCHAR(16) NOT NULL,
+        air_changes_per_hour INTEGER NOT NULL,
+        temperature_celsius NUMERIC(4, 1) NOT NULL,
+        relative_humidity_percent NUMERIC(4, 1) NOT NULL,
+        sensor_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cleanroom_zone ON cleanroom_telemetry(cleanroom_zone);
+      CREATE INDEX IF NOT EXISTS idx_cleanroom_status ON cleanroom_telemetry(pressure_status);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
