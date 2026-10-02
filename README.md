@@ -131,6 +131,11 @@ graph TD
 | **Phase 43** | **Autonomous Pharmacotherapy Reconciliation & Meds-to-Beds Delivery Engine** | Automated triple-comparison (Home vs Inpatient vs Discharge) detecting unintended omissions, therapeutic duplications, and renal dose adjustments; formulary Tier 1 generic substitution with copay savings; and bedside courier hand-off with high-risk teach-back verification. | `test_discharge_medrec.ts` (Passed) |
 | **Phase 44** | **Oncology Clinical Pathway Navigator & Genomic Tumor Board Precision Engine** | Molecular Tumor Board (MTB) engine with AMP/ASCO/CAP Tier I/II NGS somatic variant actionability matching (EGFR, KRAS, BRAF, HER2, BRCA), NCCN guideline concordance checker, Mosteller BSA, and Calvert Carboplatin AUC dosing calculator. | `test_precision_oncology.ts` (Passed) |
 | **Phase 45** | **Behavioral Health Emergency Command & Crisis De-Escalation (B-SAFE Hub)** | Emergency psychiatry command featuring the 6-item Brøset Violence Checklist (BVC), automated 1:1 constant observation stratification, trauma-informed sensory room de-escalation protocols, statutory involuntary hold tracking (5150/Baker Act/Section 12), and regional psychiatric crisis bed locator. | `test_behavioral_crisis.ts` (Passed) |
+| **Phase 46** | **Critical Care ICU Shock & Vasopressor Titration (ICU-SHOCK Hub)** | Multi-subtype shock classifier (Septic, Cardiogenic, Hypovolemic, Obstructive, Anaphylactic), Surviving Sepsis Campaign 30 mL/kg balanced crystalloids, weight-based vasoactive titration (Norepinephrine, Vasopressin, Epinephrine, Dobutamine), and Dynamic Arterial Elastance (Ea_dyn) fluid responsiveness. | `test_critical_care_shock.ts` (Passed) |
+| **Phase 47** | **Autonomous Clinical Documentation Improvement (CDI) & Physician Query Hub** | Natural language chart discrepancy auditor scanning clinical notes, lab results, and medications; AHIMA/ACDIS compliant non-leading physician queries; MCC/CC diagnostic specificity optimization; and DRG payment weight lift forecasting. | `test_autonomous_cdi.ts` (Passed) |
+| **Phase 48** | **Solid Organ Transplant Logistics & HLA Virtual Crossmatch Engine (OrganMatch Hub)** | UNOS waitlist allocation with MELD-Na, KDPI, and cPRA computation; high-resolution HLA allele virtual crossmatching (HLA-A, B, C, DRB1, DQB1) with DSA MFI threshold warnings; and live Cold Ischemia Time (CIT) countdown clocks. | `test_organ_transplant.ts` (Passed) |
+| **Phase 49** | **Labor & Delivery / Obstetric Emergency Command (OB-SAFE Hub)** | NICHD 3-tier continuous fetal heart rate (FHR) interpretation, Maternal Early Warning Criteria (MEWC) surveillance, ACOG Stage 1-3 postpartum hemorrhage (PPH) gravimetric QBL management, and urgent severe preeclampsia antihypertensive/MgSO4 protocols. | `test_obstetric_safety.ts` (Passed) |
+| **Phase 50** | **Pharmacy Sterile Compounding & USP <797>/<800> Cleanroom IV Automation** | USP <797> Beyond-Use Date (BUD) risk tier calculator, density-adjusted gravimetric check with strict ±3% mass tolerance lockout, USP <800> hazardous closed-system drug transfer (CSTD) enforcement, and negative pressure differential telemetry surveillance. | `test_cleanroom_compounding.ts` (Passed) |
 
 ---
 
@@ -249,6 +254,11 @@ npx ts-node src/test_infection_surveillance.ts # Infection Prevention & HAI / NH
 npx ts-node src/test_discharge_medrec.ts   # Autonomous MedRec & Meds-to-Beds Delivery (Phase 43)
 npx ts-node src/test_precision_oncology.ts # Precision Oncology & Genomic Tumor Board (Phase 44)
 npx ts-node src/test_behavioral_crisis.ts  # Behavioral Health Crisis & B-SAFE ED Command (Phase 45)
+npx ts-node src/test_critical_care_shock.ts   # Critical Care ICU Shock & Pressor Titration (Phase 46)
+npx ts-node src/test_autonomous_cdi.ts        # Autonomous Clinical Documentation Improvement (Phase 47)
+npx ts-node src/test_organ_transplant.ts      # Solid Organ Transplant & HLA Crossmatch (Phase 48)
+npx ts-node src/test_obstetric_safety.ts      # Labor & Delivery / Obstetric Emergency Command (Phase 49)
+npx ts-node src/test_cleanroom_compounding.ts # Pharmacy Sterile Compounding & USP <797>/<800> (Phase 50)
 ```
 
 ---
