@@ -1096,6 +1096,49 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_hold_status ON involuntary_hold_records(hold_status);
     `);
 
+    // Create icu_shock_records table (Phase 46)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS icu_shock_records (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES intake_sessions(id) ON DELETE SET NULL,
+        icu_bed VARCHAR(64) NOT NULL,
+        shock_phenotype VARCHAR(32) NOT NULL,
+        mean_arterial_pressure NUMERIC(5, 1) NOT NULL,
+        cardiac_index NUMERIC(4, 2),
+        systemic_vascular_resistance INTEGER,
+        fluid_responsiveness_index VARCHAR(64),
+        ultrasound_pattern VARCHAR(32) DEFAULT 'A_lines_dry',
+        serum_lactate_mmol_l NUMERIC(4, 1) NOT NULL,
+        lactate_clearance_percent NUMERIC(5, 1) DEFAULT 0.0,
+        primary_vasopressor VARCHAR(64) DEFAULT 'Norepinephrine',
+        current_dose_mcg_kg_min NUMERIC(5, 2) DEFAULT 0.00,
+        resuscitation_status VARCHAR(32) DEFAULT 'active_resuscitation',
+        attending_intensivist VARCHAR(128),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_shock_patient ON icu_shock_records(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_shock_phenotype ON icu_shock_records(shock_phenotype);
+    `);
+
+    // Create vasopressor_titrations table (Phase 46)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS vasopressor_titrations (
+        id SERIAL PRIMARY KEY,
+        shock_record_id INTEGER REFERENCES icu_shock_records(id) ON DELETE CASCADE,
+        agent_name VARCHAR(64) NOT NULL,
+        dose_rate NUMERIC(6, 3) NOT NULL,
+        dose_units VARCHAR(32) NOT NULL DEFAULT 'mcg/kg/min',
+        target_map INTEGER DEFAULT 65,
+        resulting_map INTEGER NOT NULL,
+        titration_reason VARCHAR(128),
+        titrated_by VARCHAR(128),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_titration_shock ON vasopressor_titrations(shock_record_id);
+      CREATE INDEX IF NOT EXISTS idx_titration_agent ON vasopressor_titrations(agent_name);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

@@ -35,6 +35,7 @@ import { infectionSurveillanceService } from '../services/infectionSurveillance'
 import * as dischargeMedRecService from '../services/dischargeMedRec';
 import * as precisionOncologyService from '../services/precisionOncology';
 import * as behavioralCrisisService from '../services/behavioralCrisis';
+import * as criticalCareShockService from '../services/criticalCareShock';
 
 const router = Router();
 
@@ -2960,6 +2961,104 @@ router.get('/behavioral/patient/:patientId', async (req: AuthenticatedRequest, r
   } catch (err: any) {
     console.error('Get patient behavioral data error:', err);
     res.status(500).json({ error: 'Failed to retrieve patient behavioral health records.' });
+  }
+});
+
+// ==========================================
+// Phase 46: Critical Care & ICU Hemodynamic Shock Routes
+// ==========================================
+
+router.get('/icu-shock/summary', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const summary = await criticalCareShockService.getIcuShockSummary();
+    res.json(summary);
+  } catch (err: any) {
+    console.error('Get ICU shock summary error:', err);
+    res.status(500).json({ error: 'Failed to retrieve ICU shock summary.' });
+  }
+});
+
+router.post('/icu-shock/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      sessionId,
+      icuBed,
+      shockPhenotype,
+      meanArterialPressure,
+      cardiacIndex,
+      systemicVascularResistance,
+      fluidResponsivenessIndex,
+      ultrasoundPattern,
+      serumLactateMmolL,
+      baselineLactate,
+      primaryVasopressor,
+      currentDoseMcgKgMin,
+      attendingIntensivist
+    } = req.body;
+
+    if (!patientId || !icuBed || !shockPhenotype || meanArterialPressure === undefined || serumLactateMmolL === undefined) {
+      return res.status(400).json({ error: 'patientId, icuBed, shockPhenotype, meanArterialPressure, and serumLactateMmolL are required.' });
+    }
+
+    const evaluation = await criticalCareShockService.evaluateShockAndResuscitation({
+      patientId: parseInt(patientId, 10),
+      sessionId,
+      icuBed,
+      shockPhenotype,
+      meanArterialPressure: Number(meanArterialPressure),
+      cardiacIndex: cardiacIndex !== undefined ? Number(cardiacIndex) : undefined,
+      systemicVascularResistance: systemicVascularResistance !== undefined ? Number(systemicVascularResistance) : undefined,
+      fluidResponsivenessIndex,
+      ultrasoundPattern,
+      serumLactateMmolL: Number(serumLactateMmolL),
+      baselineLactate: baselineLactate !== undefined ? Number(baselineLactate) : undefined,
+      primaryVasopressor,
+      currentDoseMcgKgMin: currentDoseMcgKgMin !== undefined ? Number(currentDoseMcgKgMin) : undefined,
+      attendingIntensivist
+    });
+
+    res.status(201).json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate ICU shock error:', err);
+    res.status(500).json({ error: err.message || 'Failed to evaluate shock resuscitation status.' });
+  }
+});
+
+router.post('/icu-shock/titrations', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { shockRecordId, agentName, doseRate, doseUnits, targetMap, resultingMap, titrationReason, titratedBy } = req.body;
+
+    if (!shockRecordId || !agentName || doseRate === undefined || resultingMap === undefined || !titrationReason) {
+      return res.status(400).json({ error: 'shockRecordId, agentName, doseRate, resultingMap, and titrationReason are required.' });
+    }
+
+    const titration = await criticalCareShockService.recordVasopressorTitration({
+      shockRecordId: parseInt(shockRecordId, 10),
+      agentName,
+      doseRate: Number(doseRate),
+      doseUnits,
+      targetMap: targetMap ? Number(targetMap) : 65,
+      resultingMap: Number(resultingMap),
+      titrationReason,
+      titratedBy
+    });
+
+    res.status(201).json(titration);
+  } catch (err: any) {
+    console.error('Record vasopressor titration error:', err);
+    res.status(500).json({ error: err.message || 'Failed to log vasopressor titration.' });
+  }
+});
+
+router.get('/icu-shock/patient/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = parseInt(req.params.patientId as string, 10);
+    const data = await criticalCareShockService.getPatientShockData(patientId);
+    res.json(data);
+  } catch (err: any) {
+    console.error('Get patient shock records error:', err);
+    res.status(500).json({ error: 'Failed to retrieve patient shock records.' });
   }
 });
 
