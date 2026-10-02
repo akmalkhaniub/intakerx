@@ -1139,6 +1139,55 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_titration_agent ON vasopressor_titrations(agent_name);
     `);
 
+    // Create cdi_chart_reviews table (Phase 47)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS cdi_chart_reviews (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        session_id VARCHAR(100),
+        admission_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        principal_diagnosis VARCHAR(255) NOT NULL,
+        secondary_diagnoses TEXT[] DEFAULT ARRAY[]::TEXT[],
+        clinical_indicators JSONB NOT NULL DEFAULT '{}'::jsonb,
+        identified_discrepancies JSONB NOT NULL DEFAULT '[]'::jsonb,
+        base_ms_drg VARCHAR(50),
+        base_drg_weight NUMERIC(6, 4) DEFAULT 1.0000,
+        projected_ms_drg VARCHAR(50),
+        projected_drg_weight NUMERIC(6, 4) DEFAULT 1.0000,
+        estimated_reimbursement_delta NUMERIC(10, 2) DEFAULT 0.00,
+        review_status VARCHAR(50) DEFAULT 'discrepancy_detected',
+        reviewer_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cdi_patient ON cdi_chart_reviews(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_cdi_status ON cdi_chart_reviews(review_status);
+    `);
+
+    // Create physician_queries table (Phase 47)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS physician_queries (
+        id SERIAL PRIMARY KEY,
+        cdi_review_id INTEGER NOT NULL REFERENCES cdi_chart_reviews(id) ON DELETE CASCADE,
+        patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        query_type VARCHAR(100) NOT NULL,
+        clinical_rationale TEXT NOT NULL,
+        objective_evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
+        query_options JSONB NOT NULL DEFAULT '[]'::jsonb,
+        compliance_audit_passed BOOLEAN DEFAULT TRUE,
+        status VARCHAR(50) DEFAULT 'drafted',
+        physician_response TEXT,
+        selected_diagnosis VARCHAR(255),
+        physician_response_notes TEXT,
+        impact_summary TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        responded_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_query_cdi ON physician_queries(cdi_review_id);
+      CREATE INDEX IF NOT EXISTS idx_query_status ON physician_queries(status);
+      CREATE INDEX IF NOT EXISTS idx_query_type ON physician_queries(query_type);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

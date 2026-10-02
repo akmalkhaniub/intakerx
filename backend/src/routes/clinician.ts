@@ -36,6 +36,7 @@ import * as dischargeMedRecService from '../services/dischargeMedRec';
 import * as precisionOncologyService from '../services/precisionOncology';
 import * as behavioralCrisisService from '../services/behavioralCrisis';
 import * as criticalCareShockService from '../services/criticalCareShock';
+import * as autonomousCdiService from '../services/autonomousCdi';
 
 const router = Router();
 
@@ -3059,6 +3060,107 @@ router.get('/icu-shock/patient/:patientId', async (req: AuthenticatedRequest, re
   } catch (err: any) {
     console.error('Get patient shock records error:', err);
     res.status(500).json({ error: 'Failed to retrieve patient shock records.' });
+  }
+});
+
+// Phase 47: Autonomous Clinical Documentation Improvement (CDI) & Physician Query Hub
+router.post('/cdi/audit', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, sessionId, principalDiagnosis, secondaryDiagnoses, clinicalIndicators, reviewerNotes } = req.body;
+    if (!patientId || !principalDiagnosis || !clinicalIndicators) {
+      return res.status(400).json({ error: 'patientId, principalDiagnosis, and clinicalIndicators are required.' });
+    }
+
+    const review = await autonomousCdiService.AutonomousCdiService.auditChartForDiscrepancies({
+      patientId: parseInt(patientId, 10),
+      sessionId,
+      principalDiagnosis,
+      secondaryDiagnoses: secondaryDiagnoses || [],
+      clinicalIndicators,
+      reviewerNotes
+    });
+
+    res.json(review);
+  } catch (err: any) {
+    console.error('CDI chart audit error:', err);
+    res.status(500).json({ error: err.message || 'Failed to execute CDI chart audit.' });
+  }
+});
+
+router.post('/cdi/queries/generate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { cdiReviewId, queryType } = req.body;
+    if (!cdiReviewId || !queryType) {
+      return res.status(400).json({ error: 'cdiReviewId and queryType are required.' });
+    }
+
+    const query = await autonomousCdiService.AutonomousCdiService.generateCompliantPhysicianQuery({
+      cdiReviewId: parseInt(cdiReviewId, 10),
+      queryType
+    });
+
+    res.json(query);
+  } catch (err: any) {
+    console.error('Generate physician query error:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate physician query.' });
+  }
+});
+
+router.post('/cdi/queries/:id/respond', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const queryId = parseInt(req.params.id as string, 10);
+    const { selectedDiagnosis, physicianResponse, physicianNotes } = req.body;
+
+    if (!physicianResponse) {
+      return res.status(400).json({ error: 'physicianResponse (agree, disagree, or undetermined) is required.' });
+    }
+
+    const result = await autonomousCdiService.AutonomousCdiService.submitPhysicianResponse({
+      queryId,
+      selectedDiagnosis: selectedDiagnosis || '',
+      physicianResponse,
+      physicianNotes
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Submit query response error:', err);
+    res.status(500).json({ error: err.message || 'Failed to submit physician query response.' });
+  }
+});
+
+router.get('/cdi/analytics', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const analytics = await autonomousCdiService.AutonomousCdiService.getCdiAnalytics();
+    res.json(analytics);
+  } catch (err: any) {
+    console.error('Get CDI analytics error:', err);
+    res.status(500).json({ error: 'Failed to fetch CDI analytics.' });
+  }
+});
+
+router.get('/cdi/reviews', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 30;
+    const reviews = await autonomousCdiService.AutonomousCdiService.getRecentReviews(limit);
+    res.json(reviews);
+  } catch (err: any) {
+    console.error('Get CDI reviews error:', err);
+    res.status(500).json({ error: 'Failed to fetch CDI reviews.' });
+  }
+});
+
+router.get('/cdi/queries', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patientId ? parseInt(req.query.patientId as string, 10) : undefined;
+    const status = req.query.status as string | undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+
+    const queries = await autonomousCdiService.AutonomousCdiService.getQueries({ patientId, status, limit });
+    res.json(queries);
+  } catch (err: any) {
+    console.error('Get CDI queries error:', err);
+    res.status(500).json({ error: 'Failed to fetch physician queries.' });
   }
 });
 
