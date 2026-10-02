@@ -1381,6 +1381,64 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_thromb_case ON thrombolytic_evaluations(stroke_case_id);
     `);
 
+    // Create mtp_activations table (Phase 52)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS mtp_activations (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        activation_trigger VARCHAR(64) NOT NULL,
+        abc_score INTEGER NOT NULL,
+        shock_index NUMERIC(4, 2) NOT NULL,
+        temperature_celsius NUMERIC(4, 1) NOT NULL,
+        txa_administered BOOLEAN DEFAULT FALSE,
+        calcium_repleted_grams NUMERIC(4, 1) DEFAULT 0.0,
+        prbc_units_transfused INTEGER DEFAULT 0,
+        ffp_units_transfused INTEGER DEFAULT 0,
+        platelet_units_transfused INTEGER DEFAULT 0,
+        cryo_units_transfused INTEGER DEFAULT 0,
+        current_ratio VARCHAR(32) DEFAULT '0:0:0',
+        mtp_status VARCHAR(32) DEFAULT 'active_transfusion',
+        activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        deactivated_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_mtp_patient ON mtp_activations(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_mtp_status ON mtp_activations(mtp_status);
+    `);
+
+    // Create blood_component_transfusions table (Phase 52)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS blood_component_transfusions (
+        id SERIAL PRIMARY KEY,
+        mtp_activation_id INTEGER REFERENCES mtp_activations(id) ON DELETE CASCADE,
+        blood_unit_barcode VARCHAR(64) NOT NULL,
+        component_type VARCHAR(32) NOT NULL,
+        blood_group_rh VARCHAR(16) NOT NULL,
+        is_uncrossmatched BOOLEAN DEFAULT FALSE,
+        rapid_infuser_used BOOLEAN DEFAULT TRUE,
+        blood_warmer_verified BOOLEAN DEFAULT TRUE,
+        transfusion_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_transfusion_mtp ON blood_component_transfusions(mtp_activation_id);
+      CREATE INDEX IF NOT EXISTS idx_transfusion_type ON blood_component_transfusions(component_type);
+    `);
+
+    // Create viscoelastic_teg_records table (Phase 52)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS viscoelastic_teg_records (
+        id SERIAL PRIMARY KEY,
+        mtp_activation_id INTEGER REFERENCES mtp_activations(id) ON DELETE CASCADE,
+        r_time_min NUMERIC(4, 1) NOT NULL,
+        k_time_min NUMERIC(4, 1) NOT NULL,
+        alpha_angle_deg NUMERIC(4, 1) NOT NULL,
+        maximum_amplitude_mm NUMERIC(4, 1) NOT NULL,
+        ly30_percent NUMERIC(4, 1) NOT NULL,
+        ionized_calcium_mmol_l NUMERIC(4, 2) NOT NULL,
+        targeted_therapy_recommendation TEXT NOT NULL,
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_teg_mtp ON viscoelastic_teg_records(mtp_activation_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

@@ -41,6 +41,7 @@ import * as organTransplantService from '../services/organTransplant';
 import * as obstetricSafetyService from '../services/obstetricSafety';
 import * as cleanroomCompoundingService from '../services/cleanroomCompounding';
 import * as strokeCommandService from '../services/strokeCommand';
+import * as massiveTransfusionService from '../services/massiveTransfusion';
 
 const router = Router();
 
@@ -3708,6 +3709,104 @@ router.get('/stroke/cases', async (req: AuthenticatedRequest, res: Response) => 
   } catch (err: any) {
     console.error('Get stroke cases error:', err);
     res.status(500).json({ error: 'Failed to fetch stroke cases.' });
+  }
+});
+
+// ==========================================
+// Phase 52: Blood Bank & Massive Transfusion Protocol (HEMO-SURGE Command)
+// ==========================================
+
+router.post('/mtp/evaluate-activation', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = massiveTransfusionService.MassiveTransfusionService.evaluateMtpActivation(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate MTP activation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate MTP criteria.' });
+  }
+});
+
+router.post('/mtp/activations', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, activationData } = req.body;
+    if (!patientId || !activationData) {
+      res.status(400).json({ error: 'patientId and activationData are required' });
+      return;
+    }
+    const result = await massiveTransfusionService.MassiveTransfusionService.activateMtp(Number(patientId), activationData);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Activate MTP error:', err);
+    res.status(500).json({ error: 'Failed to activate MTP protocol.' });
+  }
+});
+
+router.post('/mtp/activations/:activationId/transfuse', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { activationId } = req.params;
+    const result = await massiveTransfusionService.MassiveTransfusionService.logBloodUnitTransfusion(
+      Number(activationId),
+      req.body
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('Log blood transfusion error:', err);
+    res.status(500).json({ error: 'Failed to log blood unit transfusion.' });
+  }
+});
+
+router.post('/mtp/activations/:activationId/teg', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { activationId } = req.params;
+    const result = await massiveTransfusionService.MassiveTransfusionService.recordTegAnalysis(
+      Number(activationId),
+      req.body
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('Record TEG analysis error:', err);
+    res.status(500).json({ error: 'Failed to record TEG analysis.' });
+  }
+});
+
+router.post('/mtp/activations/:activationId/replete-calcium', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { activationId } = req.params;
+    const { grams } = req.body;
+    const updated = await massiveTransfusionService.MassiveTransfusionService.repleteCalcium(
+      Number(activationId),
+      Number(grams || 1.0)
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Replete calcium error:', err);
+    res.status(500).json({ error: 'Failed to record calcium repletion.' });
+  }
+});
+
+router.patch('/mtp/activations/:activationId/deescalate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { activationId } = req.params;
+    const { status } = req.body;
+    const updated = await massiveTransfusionService.MassiveTransfusionService.deescalateMtp(
+      Number(activationId),
+      status || 'controlled'
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Deescalate MTP error:', err);
+    res.status(500).json({ error: 'Failed to deescalate MTP.' });
+  }
+});
+
+router.get('/mtp/activations', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patient_id ? Number(req.query.patient_id) : undefined;
+    const activations = await massiveTransfusionService.MassiveTransfusionService.getMtpActivations(patientId);
+    res.json(activations);
+  } catch (err: any) {
+    console.error('Get MTP activations error:', err);
+    res.status(500).json({ error: 'Failed to fetch MTP activations.' });
   }
 });
 
