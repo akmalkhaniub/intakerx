@@ -42,6 +42,7 @@ import * as obstetricSafetyService from '../services/obstetricSafety';
 import * as cleanroomCompoundingService from '../services/cleanroomCompounding';
 import * as strokeCommandService from '../services/strokeCommand';
 import * as massiveTransfusionService from '../services/massiveTransfusion';
+import * as cathAlertService from '../services/cathAlert';
 
 const router = Router();
 
@@ -3807,6 +3808,104 @@ router.get('/mtp/activations', async (req: AuthenticatedRequest, res: Response) 
   } catch (err: any) {
     console.error('Get MTP activations error:', err);
     res.status(500).json({ error: 'Failed to fetch MTP activations.' });
+  }
+});
+
+// ==========================================
+// Phase 53: Cardiac Catheterization Lab & STEMI Door-to-Balloon Fleet (CATH-ALERT Hub)
+// ==========================================
+
+router.post('/stemi/evaluate-ekg', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = cathAlertService.CathAlertService.evaluateEkgPattern(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate EKG error:', err);
+    res.status(500).json({ error: 'Failed to evaluate EKG pattern.' });
+  }
+});
+
+router.post('/stemi/evaluate-cin-risk', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = cathAlertService.CathAlertService.calculateMehranCinRisk(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate CIN risk error:', err);
+    res.status(500).json({ error: 'Failed to evaluate CIN risk.' });
+  }
+});
+
+router.post('/stemi/activations', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, activationData } = req.body;
+    if (!patientId || !activationData) {
+      res.status(400).json({ error: 'patientId and activationData are required' });
+      return;
+    }
+    const result = await cathAlertService.CathAlertService.activateStemiCode(Number(patientId), activationData);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Activate STEMI code error:', err);
+    res.status(500).json({ error: 'Failed to activate STEMI code.' });
+  }
+});
+
+router.post('/stemi/activations/:activationId/balloon-inflation', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { activationId } = req.params;
+    const { balloonInflationTime } = req.body;
+    const result = await cathAlertService.CathAlertService.logBalloonInflation(
+      Number(activationId),
+      balloonInflationTime || new Date().toISOString()
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('Log balloon inflation error:', err);
+    res.status(500).json({ error: 'Failed to record balloon inflation.' });
+  }
+});
+
+router.post('/stemi/activations/:activationId/pci-log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { activationId } = req.params;
+    const result = await cathAlertService.CathAlertService.recordPciProcedure(Number(activationId), req.body);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Record PCI procedure error:', err);
+    res.status(500).json({ error: 'Failed to record PCI procedure log.' });
+  }
+});
+
+router.post('/stemi/activations/:activationId/cin-risk', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { activationId } = req.params;
+    const result = await cathAlertService.CathAlertService.updateCinRisk(Number(activationId), req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Update CIN risk error:', err);
+    res.status(500).json({ error: 'Failed to record CIN risk evaluation.' });
+  }
+});
+
+router.patch('/stemi/activations/:activationId/closure', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { activationId } = req.params;
+    const updated = await cathAlertService.CathAlertService.updateClosureAndBedRest(Number(activationId), req.body);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update closure status error:', err);
+    res.status(500).json({ error: 'Failed to update arteriotomy closure status.' });
+  }
+});
+
+router.get('/stemi/activations', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patient_id ? Number(req.query.patient_id) : undefined;
+    const activations = await cathAlertService.CathAlertService.getStemiActivations(patientId);
+    res.json(activations);
+  } catch (err: any) {
+    console.error('Get STEMI activations error:', err);
+    res.status(500).json({ error: 'Failed to fetch STEMI activations.' });
   }
 });
 

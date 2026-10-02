@@ -1439,6 +1439,51 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_teg_mtp ON viscoelastic_teg_records(mtp_activation_id);
     `);
 
+    // Create stemi_activations table (Phase 53)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS stemi_activations (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        ekg_pattern_type VARCHAR(64) NOT NULL,
+        culprit_vessel_presumed VARCHAR(32) NOT NULL,
+        ed_arrival_time TIMESTAMP NOT NULL,
+        cath_lab_activation_time TIMESTAMP NOT NULL,
+        sheath_insertion_time TIMESTAMP,
+        balloon_inflation_time TIMESTAMP,
+        door_to_balloon_minutes INTEGER,
+        d2b_target_met BOOLEAN,
+        contrast_volume_ml NUMERIC(6, 1),
+        mehran_cin_risk_score INTEGER,
+        hydration_target_ml_per_hr NUMERIC(5, 1),
+        vascular_access_site VARCHAR(32) NOT NULL DEFAULT 'Right_Radial',
+        closure_device_used VARCHAR(64) DEFAULT 'None_Manual',
+        closure_time TIMESTAMP,
+        bed_rest_duration_hours NUMERIC(3, 1) DEFAULT 2.0,
+        activation_status VARCHAR(32) DEFAULT 'active_code',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_stemi_patient ON stemi_activations(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_stemi_status ON stemi_activations(activation_status);
+    `);
+
+    // Create pci_procedure_logs table (Phase 53)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS pci_procedure_logs (
+        id SERIAL PRIMARY KEY,
+        stemi_activation_id INTEGER REFERENCES stemi_activations(id) ON DELETE CASCADE,
+        lesion_location VARCHAR(64) NOT NULL,
+        pre_pci_timi_flow INTEGER NOT NULL,
+        post_pci_timi_flow INTEGER NOT NULL,
+        stent_type VARCHAR(64) NOT NULL,
+        stent_diameter_mm NUMERIC(4, 2) NOT NULL,
+        stent_length_mm NUMERIC(4, 1) NOT NULL,
+        anticoagulant_agent VARCHAR(64) NOT NULL,
+        peak_act_seconds INTEGER NOT NULL,
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pci_stemi ON pci_procedure_logs(stemi_activation_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
