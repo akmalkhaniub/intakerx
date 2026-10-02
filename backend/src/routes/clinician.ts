@@ -44,6 +44,7 @@ import * as strokeCommandService from '../services/strokeCommand';
 import * as massiveTransfusionService from '../services/massiveTransfusion';
 import * as cathAlertService from '../services/cathAlert';
 import * as ecmoSupportService from '../services/ecmoSupport';
+import * as burnTraumaService from '../services/burnTrauma';
 
 const router = Router();
 
@@ -3991,6 +3992,89 @@ router.get('/ecmo/runs', async (req: AuthenticatedRequest, res: Response) => {
   } catch (err: any) {
     console.error('Get ECMO runs error:', err);
     res.status(500).json({ error: 'Failed to fetch ECMO runs.' });
+  }
+});
+
+// ==========================================
+// Phase 55: Burn & Complex Trauma Resuscitation Command (TRAUMA-ONE Hub)
+// ==========================================
+
+router.post('/burn/evaluate-tbsa', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { map, isPediatric } = req.body;
+    const result = burnTraumaService.BurnTraumaService.calculateTbsa(map, isPediatric);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate TBSA error:', err);
+    res.status(500).json({ error: 'Failed to evaluate TBSA percentage.' });
+  }
+});
+
+router.post('/burn/calculate-resuscitation', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = burnTraumaService.BurnTraumaService.calculateFluidResuscitation(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Calculate fluid resuscitation error:', err);
+    res.status(500).json({ error: 'Failed to calculate fluid resuscitation.' });
+  }
+});
+
+router.post('/burn/evaluate-inhalation', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = burnTraumaService.BurnTraumaService.evaluateInhalationAndCyanide(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate inhalation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate inhalation injury & COHb.' });
+  }
+});
+
+router.post('/burn/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, caseData } = req.body;
+    if (!patientId || !caseData) {
+      res.status(400).json({ error: 'patientId and caseData are required' });
+      return;
+    }
+    const result = await burnTraumaService.BurnTraumaService.createBurnCase(Number(patientId), caseData);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Create burn case error:', err);
+    res.status(500).json({ error: 'Failed to create burn trauma case.' });
+  }
+});
+
+router.post('/burn/cases/:caseId/titration', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { caseId } = req.params;
+    const result = await burnTraumaService.BurnTraumaService.recordHourlyTitration(Number(caseId), req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Record burn titration error:', err);
+    res.status(500).json({ error: 'Failed to record hourly titration.' });
+  }
+});
+
+router.get('/burn/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patient_id ? Number(req.query.patient_id) : undefined;
+    const cases = await burnTraumaService.BurnTraumaService.getBurnCases(patientId);
+    res.json(cases);
+  } catch (err: any) {
+    console.error('Get burn cases error:', err);
+    res.status(500).json({ error: 'Failed to fetch burn cases.' });
+  }
+});
+
+router.get('/burn/cases/:caseId/titrations', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { caseId } = req.params;
+    const titrations = await burnTraumaService.BurnTraumaService.getHourlyTitrations(Number(caseId));
+    res.json(titrations);
+  } catch (err: any) {
+    console.error('Get hourly titrations error:', err);
+    res.status(500).json({ error: 'Failed to fetch hourly titrations.' });
   }
 });
 

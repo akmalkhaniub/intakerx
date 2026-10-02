@@ -1530,6 +1530,55 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_telemetry_ecmo ON ecmo_circuit_telemetry(ecmo_run_id);
     `);
 
+    // Create burn_trauma_cases table (Phase 55)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS burn_trauma_cases (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        injury_timestamp TIMESTAMP NOT NULL,
+        ed_arrival_timestamp TIMESTAMP NOT NULL,
+        patient_weight_kg NUMERIC(6, 2) NOT NULL,
+        is_pediatric BOOLEAN DEFAULT FALSE,
+        tbsa_percentage NUMERIC(5, 2) NOT NULL,
+        partial_thickness_tbsa NUMERIC(5, 2) DEFAULT 0.0,
+        full_thickness_tbsa NUMERIC(5, 2) DEFAULT 0.0,
+        burn_mechanism VARCHAR(64) NOT NULL,
+        inhalation_injury_present BOOLEAN DEFAULT FALSE,
+        formula_type VARCHAR(32) DEFAULT 'Parkland',
+        calculated_24h_volume_ml NUMERIC(10, 2) NOT NULL,
+        first_8h_rate_ml_hr NUMERIC(8, 2) NOT NULL,
+        next_16h_rate_ml_hr NUMERIC(8, 2) NOT NULL,
+        current_infusion_rate_ml_hr NUMERIC(8, 2) NOT NULL,
+        cumulative_fluid_infused_ml NUMERIC(10, 2) DEFAULT 0.0,
+        fluid_creep_warning BOOLEAN DEFAULT FALSE,
+        co_hemoglobin_percent NUMERIC(5, 2),
+        cyanide_suspected BOOLEAN DEFAULT FALSE,
+        case_status VARCHAR(32) DEFAULT 'active_resuscitation',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_burn_patient ON burn_trauma_cases(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_burn_status ON burn_trauma_cases(case_status);
+    `);
+
+    // Create burn_hourly_titrations table (Phase 55)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS burn_hourly_titrations (
+        id SERIAL PRIMARY KEY,
+        burn_case_id INTEGER REFERENCES burn_trauma_cases(id) ON DELETE CASCADE,
+        post_burn_hour INTEGER NOT NULL,
+        urine_output_ml NUMERIC(6, 1) NOT NULL,
+        uop_ml_kg_hr NUMERIC(5, 2) NOT NULL,
+        mean_arterial_pressure_mmhg NUMERIC(5, 1),
+        bladder_pressure_mmhg NUMERIC(5, 1),
+        infusion_rate_prescribed_ml_hr NUMERIC(8, 2) NOT NULL,
+        volume_infused_this_hour_ml NUMERIC(8, 2) NOT NULL,
+        rate_adjustment_recommendation VARCHAR(64) NOT NULL,
+        clinical_notes TEXT,
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_titration_burn ON burn_hourly_titrations(burn_case_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
