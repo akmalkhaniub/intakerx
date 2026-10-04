@@ -141,6 +141,11 @@ graph TD
 | **Phase 53** | **Cardiac Catheterization Lab & STEMI Door-to-Balloon Fleet (CATH-ALERT Hub)** | Door-to-Balloon <= 90m target countdown clock, Smith-Modified Sgarbossa LBBB criteria, Wellens Syndrome Type A/B, de Winter T-waves, Mehran 2.0 Contrast-Induced Nephropathy (CIN) risk scoring with hydration targets, and post-PCI arteriotomy closure bed-rest watchdog. | `test_cath_alert.ts` (Passed) |
 | **Phase 54** | **Extracorporeal Membrane Oxygenation (ECMO) & Mechanical Circulatory Support (MCS Hub)** | RESP score survival calculator for VV-ECMO (ARDS), SAVE score for VA-ECMO (cardiogenic shock), continuous Delta-P transmembrane pressure gradient clot alert (>= 55 mmHg), venous chatter suckdown watchdog (<= -90 mmHg), and plasma free hemoglobin (pfHb >= 50 mg/dL) pump shear hemolysis sentinel. | `test_ecmo_support.ts` (Passed) |
 | **Phase 55** | **Burn & Complex Trauma Resuscitation Command (TRAUMA-ONE Hub)** | Lund-Browder & Rule of Nines %TBSA burn surface estimator, Consensus Parkland (4 mL * kg * %TBSA) and Modified Brooke formulas, closed-loop hourly urine output (UOP) titration watchdog (0.5-1.0 mL/kg/hr), fluid creep (>250 mL/kg) abdominal compartment syndrome (ACS) warning, and carboxyhemoglobin (COHb) inhalation kinetics with Hydroxocobalamin (Cyanokit) antidote protocol. | `test_burn_trauma.ts` (Passed) |
+| **Phase 56** | **Pediatric Intensive Care (PICU) & Neonatal Resuscitation Program (NRP-SAFE Hub)** | APGAR scoring (0-10), NRP 8th Edition preductal SpO2 titration, Broselow tape pediatric weight-based airway sizing & defibrillation (2 J/kg, 4 J/kg), Bhutani total serum bilirubin hyperbilirubinemia phototherapy nomogram, and PELOD-2 pediatric multiorgan dysfunction score. | `test_pediatric_resuscitation.ts` (Passed) |
+| **Phase 57** | **Emergency Airway Management & Rapid Sequence Intubation (AIRWAY-CODE Hub)** | LEMON 0-10 difficult airway assessment, MACOCHA ICU intubation difficulty score, weight-based RSI induction/paralytic dosing, Succinylcholine hyperkalemia safety check, Sugammadex immediate rescue reversal (16 mg/kg), and Can't Intubate Can't Oxygenate (CICO) surgical cricothyroidotomy protocol watchdog. | `test_airway_intubation.ts` (Passed) |
+| **Phase 58** | **Medical Toxicology & Poison Control Command (TOX-ALERT Hub)** | Multi-toxidrome classifier (Anticholinergic, Cholinergic/SLUDGEM, Sympathomimetic, Opioid, Sedative-Hypnotic), Hunter Serotonin Toxicity Criteria, Rumack-Matthew APAP nomogram with 21-hour IV NAC protocol, Salicylate Done nomogram with NaHCO3 urine alkalinization (target pH 7.5-8.0) and hemodialysis sentinel, Toxic alcohol osmolar gap with Fomepizole dosing, and DigiFab vial calculator. | `test_medical_toxicology.ts` (Passed) |
+| **Phase 59** | **Continuous Renal Replacement Therapy & Nephrology (CRRT-NAVIGATOR Hub)** | KDIGO Acute Kidney Injury staging, CVVHDF/CVVH/CVVHD/SCUF modality selection with delivered effluent target (20-25 mL/kg/h) and filtration fraction sentinel, Transmembrane Pressure (TMP) and hollow-fiber drop (Delta-P) filter clotting watchdog, and Regional Citrate Anticoagulation (RCA) with Total:Ionized Calcium ratio (>2.5) citrate toxicity sentinel. | `test_crrt_navigator.ts` (Passed) |
+| **Phase 60** | **Radiation Oncology & Nuclear Medicine Theranostics (THERANOSTICS Hub)** | Linear-Quadratic radiobiology model (BED & EQD2) with tumor and late-responding OAR alpha/beta ratios, QUANTEC normal tissue complication probability (NTCP) organ constraints (spinal cord, lungs, kidneys, heart, rectum), targeted radioligand theranostics (177Lu-PSMA-617 Pluvicto, 177Lu-DOTATATE Lutathera with mandatory amino acid nephroprotection, 131I, 90Y SIRT), and radioactive decay countdown with NRC Regulatory Guide 8.39 ALARA patient release watchdog. | `test_radiation_theranostics.ts` (Passed) |
 
 ---
 
@@ -269,6 +274,11 @@ npx ts-node src/test_massive_transfusion.ts    # Blood Bank & Massive Transfusio
 npx ts-node src/test_cath_alert.ts            # Cath Lab & STEMI Door-to-Balloon Fleet (Phase 53)
 npx ts-node src/test_ecmo_support.ts          # ECMO & Mechanical Circulatory Support (Phase 54)
 npx ts-node src/test_burn_trauma.ts           # Burn & Complex Trauma Resuscitation Command (Phase 55)
+npx ts-node src/test_pediatric_resuscitation.ts # PICU & Neonatal Resuscitation Program (Phase 56)
+npx ts-node src/test_airway_intubation.ts       # Emergency Airway & Rapid Sequence Intubation (Phase 57)
+npx ts-node src/test_medical_toxicology.ts      # Medical Toxicology & Poison Control Command (Phase 58)
+npx ts-node src/test_crrt_navigator.ts          # CRRT & Acute Nephrology Navigator (Phase 59)
+npx ts-node src/test_radiation_theranostics.ts  # Radiation Oncology & Theranostics Hub (Phase 60)
 ```
 
 ---
