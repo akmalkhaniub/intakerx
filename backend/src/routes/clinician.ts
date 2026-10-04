@@ -48,6 +48,7 @@ import * as burnTraumaService from '../services/burnTrauma';
 import * as pediatricResuscitationService from '../services/pediatricResuscitation';
 import * as airwayIntubationService from '../services/airwayIntubation';
 import * as medicalToxicologyService from '../services/medicalToxicology';
+import * as crrtNavigatorService from '../services/crrtNavigator';
 
 const router = Router();
 
@@ -4422,6 +4423,96 @@ router.get('/toxicology/cases', async (req: AuthenticatedRequest, res: Response)
   } catch (err: any) {
     console.error('List active toxicology cases error:', err);
     res.status(500).json({ error: 'Failed to list toxicology cases.' });
+  }
+});
+
+// Phase 59: Continuous Renal Replacement Therapy (CRRT-NAVIGATOR)
+router.post('/crrt/kdigo-stage', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = crrtNavigatorService.evaluateKdigoStage(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('KDIGO staging error:', err);
+    res.status(500).json({ error: 'Failed to evaluate KDIGO AKI stage.' });
+  }
+});
+
+router.post('/crrt/prescribe', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = crrtNavigatorService.calculateCrrtPrescription(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('CRRT prescription error:', err);
+    res.status(500).json({ error: 'Failed to calculate CRRT prescription.' });
+  }
+});
+
+router.post('/crrt/filter-pressures', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = crrtNavigatorService.evaluateFilterPressures(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Filter pressure analysis error:', err);
+    res.status(500).json({ error: 'Failed to evaluate filter pressures.' });
+  }
+});
+
+router.post('/crrt/rca-protocol', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = crrtNavigatorService.evaluateRcaCitrateProtocol(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('RCA citrate evaluation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate RCA citrate protocol.' });
+  }
+});
+
+router.post('/crrt/sessions', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await crrtNavigatorService.createCrrtSession(req.body);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Create CRRT session error:', err);
+    res.status(500).json({ error: 'Failed to create CRRT session.' });
+  }
+});
+
+router.post('/crrt/sessions/:sessionId/telemetry', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = Number(req.params.sessionId);
+    const result = await crrtNavigatorService.recordHourlyTelemetry({
+      sessionId,
+      ...req.body
+    });
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Record CRRT telemetry error:', err);
+    res.status(500).json({ error: 'Failed to record CRRT hourly telemetry.' });
+  }
+});
+
+router.get('/crrt/sessions/:sessionId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = Number(req.params.sessionId);
+    const result = await crrtNavigatorService.getCrrtSessionDetails(sessionId);
+    if (!result) {
+      return res.status(404).json({ error: 'CRRT session not found.' });
+    }
+    res.json(result);
+  } catch (err: any) {
+    console.error('Get CRRT session details error:', err);
+    res.status(500).json({ error: 'Failed to get CRRT session details.' });
+  }
+});
+
+router.get('/crrt/sessions', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 25;
+    const sessions = await crrtNavigatorService.listActiveCrrtSessions(limit);
+    res.json(sessions);
+  } catch (err: any) {
+    console.error('List active CRRT sessions error:', err);
+    res.status(500).json({ error: 'Failed to list active CRRT sessions.' });
   }
 });
 

@@ -39,6 +39,7 @@ import { TraumaOneHub } from './TraumaOneHub';
 import { NrpSafeHub } from './NrpSafeHub';
 import { AirwayCodeHub } from './AirwayCodeHub';
 import { ToxAlertHub } from './ToxAlertHub';
+import { CrrtNavigatorHub } from './CrrtNavigatorHub';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -94,7 +95,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control' | 'meds_to_beds' | 'genomic_tumor_board' | 'behavioral_health' | 'icu_shock' | 'autonomous_cdi' | 'organ_transplant' | 'labor_delivery' | 'cleanroom_compounding' | 'code_stroke' | 'hemo_surge' | 'cath_alert' | 'mcs_hub' | 'trauma_one' | 'nrp_safe' | 'airway_code' | 'tox_alert'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control' | 'meds_to_beds' | 'genomic_tumor_board' | 'behavioral_health' | 'icu_shock' | 'autonomous_cdi' | 'organ_transplant' | 'labor_delivery' | 'cleanroom_compounding' | 'code_stroke' | 'hemo_surge' | 'cath_alert' | 'mcs_hub' | 'trauma_one' | 'nrp_safe' | 'airway_code' | 'tox_alert' | 'crrt_navigator'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2882,6 +2883,14 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderCrrtNavigatorHub = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <CrrtNavigatorHub />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -3906,6 +3915,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 🧪 TOX-ALERT (Poison)
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('crrt_navigator')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'crrt_navigator' ? '#06b6d4' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'crrt_navigator' ? '2.5px solid #06b6d4' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🩸 CRRT-NAVIGATOR
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -4228,6 +4255,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderAirwayCodeHub()
             ) : currentTab === 'tox_alert' ? (
               renderToxAlertHub()
+            ) : currentTab === 'crrt_navigator' ? (
+              renderCrrtNavigatorHub()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

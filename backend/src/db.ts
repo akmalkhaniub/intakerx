@@ -1723,6 +1723,49 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_antidote_case ON antidote_administrations(case_id);
     `);
 
+    // Create crrt_treatment_sessions table (Phase 59)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS crrt_treatment_sessions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        kdigo_stage INTEGER NOT NULL,
+        modality VARCHAR(32) NOT NULL,
+        prescribed_effluent_dose_ml_kg_hr NUMERIC(5, 2) NOT NULL,
+        patient_weight_kg NUMERIC(5, 2) NOT NULL,
+        blood_flow_rate_ml_min INTEGER NOT NULL,
+        dialysate_flow_rate_ml_hr INTEGER,
+        replacement_fluid_flow_rate_ml_hr INTEGER,
+        replacement_predilution_percent INTEGER DEFAULT 50,
+        net_ultrafiltration_target_ml_hr INTEGER NOT NULL,
+        anticoagulation_type VARCHAR(64) NOT NULL DEFAULT 'Regional_Citrate',
+        filter_type VARCHAR(64) DEFAULT 'AN69ST_1.5m2',
+        session_status VARCHAR(32) DEFAULT 'running',
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ended_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_crrt_patient ON crrt_treatment_sessions(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_crrt_status ON crrt_treatment_sessions(session_status);
+    `);
+
+    // Create crrt_hourly_telemetry table (Phase 59)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS crrt_hourly_telemetry (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES crrt_treatment_sessions(id) ON DELETE CASCADE,
+        hour_number INTEGER NOT NULL,
+        transmembrane_pressure_mmhg INTEGER NOT NULL,
+        filter_pressure_drop_mmhg INTEGER NOT NULL,
+        post_filter_ionized_ca_mmol_l NUMERIC(4, 2),
+        systemic_ionized_ca_mmol_l NUMERIC(4, 2),
+        total_serum_ca_mg_dl NUMERIC(4, 2),
+        total_to_ionized_ca_ratio NUMERIC(4, 2),
+        citrate_toxicity_alert BOOLEAN DEFAULT FALSE,
+        filter_clotting_risk VARCHAR(32) DEFAULT 'low',
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_crrt_telemetry_session ON crrt_hourly_telemetry(session_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
