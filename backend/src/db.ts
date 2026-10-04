@@ -1678,6 +1678,51 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_rsi_airway ON rsi_medication_administrations(airway_event_id);
     `);
 
+    // Create toxicology_ingestion_cases table (Phase 58)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS toxicology_ingestion_cases (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        substance_name VARCHAR(128) NOT NULL,
+        ingestion_category VARCHAR(64) NOT NULL,
+        ingestion_time_hours_ago NUMERIC(5, 2) NOT NULL,
+        amount_ingested_mg_or_units NUMERIC(10, 2),
+        patient_weight_kg NUMERIC(5, 2) NOT NULL,
+        serum_level NUMERIC(8, 2),
+        serum_level_unit VARCHAR(32),
+        measured_osmolality NUMERIC(6, 2),
+        calculated_osmolar_gap NUMERIC(6, 2),
+        toxidrome_identified VARCHAR(64),
+        hunter_serotonin_positive BOOLEAN DEFAULT FALSE,
+        recommended_antidote VARCHAR(128),
+        antidote_dosing_plan JSONB,
+        hemodialysis_indicated BOOLEAN DEFAULT FALSE,
+        poison_control_case_number VARCHAR(64),
+        case_status VARCHAR(32) DEFAULT 'active_monitoring',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_tox_patient ON toxicology_ingestion_cases(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_tox_category ON toxicology_ingestion_cases(ingestion_category);
+      CREATE INDEX IF NOT EXISTS idx_tox_status ON toxicology_ingestion_cases(case_status);
+    `);
+
+    // Create antidote_administrations table (Phase 58)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS antidote_administrations (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER REFERENCES toxicology_ingestion_cases(id) ON DELETE CASCADE,
+        antidote_name VARCHAR(128) NOT NULL,
+        dose_administered NUMERIC(8, 2) NOT NULL,
+        dose_unit VARCHAR(32) NOT NULL,
+        route VARCHAR(32) NOT NULL DEFAULT 'IV',
+        administered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        administered_by VARCHAR(64),
+        post_admin_vitals JSONB,
+        notes TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_antidote_case ON antidote_administrations(case_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

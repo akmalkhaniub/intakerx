@@ -47,6 +47,7 @@ import * as ecmoSupportService from '../services/ecmoSupport';
 import * as burnTraumaService from '../services/burnTrauma';
 import * as pediatricResuscitationService from '../services/pediatricResuscitation';
 import * as airwayIntubationService from '../services/airwayIntubation';
+import * as medicalToxicologyService from '../services/medicalToxicology';
 
 const router = Router();
 
@@ -4264,6 +4265,163 @@ router.get('/airway/events', async (req: AuthenticatedRequest, res: Response) =>
   } catch (err: any) {
     console.error('Get intubation events error:', err);
     res.status(500).json({ error: 'Failed to fetch intubation events.' });
+  }
+});
+
+// Phase 58: Medical Toxicology & Poison Control Hub
+router.post('/toxicology/classify-toxidrome', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = medicalToxicologyService.classifyToxidrome(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Toxidrome classification error:', err);
+    res.status(500).json({ error: 'Failed to classify toxidrome.' });
+  }
+});
+
+router.post('/toxicology/hunter-criteria', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = medicalToxicologyService.evaluateHunterCriteria(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Hunter criteria evaluation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate Hunter criteria.' });
+  }
+});
+
+router.post('/toxicology/apap-nomogram', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { hoursPostIngestion, apapConcentrationMcgPerMl, weightKg } = req.body;
+    const result = medicalToxicologyService.evaluateAcetaminophenToxicity(
+      Number(hoursPostIngestion),
+      Number(apapConcentrationMcgPerMl),
+      Number(weightKg)
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('APAP nomogram evaluation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate APAP nomogram.' });
+  }
+});
+
+router.post('/toxicology/salicylate-assessment', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      salicylateLevelMgPerDl,
+      arterialPh,
+      serumPotassiumMeqPerL,
+      hasAlteredMentalStatus,
+      hasPulmonaryEdema,
+      hasRenalFailure,
+      weightKg
+    } = req.body;
+    const result = medicalToxicologyService.evaluateSalicylateToxicity(
+      Number(salicylateLevelMgPerDl),
+      Number(arterialPh),
+      Number(serumPotassiumMeqPerL),
+      Boolean(hasAlteredMentalStatus),
+      Boolean(hasPulmonaryEdema),
+      Boolean(hasRenalFailure),
+      Number(weightKg)
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('Salicylate assessment error:', err);
+    res.status(500).json({ error: 'Failed to evaluate salicylate toxicity.' });
+  }
+});
+
+router.post('/toxicology/toxic-alcohol', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      suspectedAlcohol,
+      measuredSerumOsmolality,
+      sodiumMeqPerL,
+      glucoseMgPerDl,
+      bunMgPerDl,
+      ethanolMgPerDl,
+      weightKg,
+      arterialPh
+    } = req.body;
+    const result = medicalToxicologyService.evaluateToxicAlcoholIngestion(
+      suspectedAlcohol,
+      Number(measuredSerumOsmolality),
+      Number(sodiumMeqPerL),
+      Number(glucoseMgPerDl),
+      Number(bunMgPerDl),
+      Number(ethanolMgPerDl || 0),
+      Number(weightKg),
+      Number(arterialPh || 7.4)
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('Toxic alcohol evaluation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate toxic alcohol ingestion.' });
+  }
+});
+
+router.post('/toxicology/digifab', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { scenario, amountIngestedMg, serumDigoxinNgPerMl, patientWeightKg } = req.body;
+    const result = medicalToxicologyService.calculateDigiFabDosing(
+      scenario,
+      amountIngestedMg ? Number(amountIngestedMg) : undefined,
+      serumDigoxinNgPerMl ? Number(serumDigoxinNgPerMl) : undefined,
+      patientWeightKg ? Number(patientWeightKg) : undefined
+    );
+    res.json(result);
+  } catch (err: any) {
+    console.error('DigiFab calculation error:', err);
+    res.status(500).json({ error: 'Failed to calculate DigiFab dosing.' });
+  }
+});
+
+router.post('/toxicology/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await medicalToxicologyService.createToxicologyCase(req.body);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Create toxicology case error:', err);
+    res.status(500).json({ error: 'Failed to create toxicology case.' });
+  }
+});
+
+router.post('/toxicology/cases/:caseId/antidote', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const caseId = Number(req.params.caseId);
+    const result = await medicalToxicologyService.recordAntidoteAdministration({
+      caseId,
+      ...req.body
+    });
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Record antidote administration error:', err);
+    res.status(500).json({ error: 'Failed to record antidote administration.' });
+  }
+});
+
+router.get('/toxicology/cases/:caseId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const caseId = Number(req.params.caseId);
+    const result = await medicalToxicologyService.getToxicologyCaseDetails(caseId);
+    if (!result) {
+      return res.status(404).json({ error: 'Toxicology case not found.' });
+    }
+    res.json(result);
+  } catch (err: any) {
+    console.error('Get toxicology case details error:', err);
+    res.status(500).json({ error: 'Failed to get toxicology case details.' });
+  }
+});
+
+router.get('/toxicology/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 25;
+    const cases = await medicalToxicologyService.listActiveToxicologyCases(limit);
+    res.json(cases);
+  } catch (err: any) {
+    console.error('List active toxicology cases error:', err);
+    res.status(500).json({ error: 'Failed to list toxicology cases.' });
   }
 });
 
