@@ -1766,6 +1766,46 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_crrt_telemetry_session ON crrt_hourly_telemetry(session_id);
     `);
 
+    // Create radiation_treatment_plans table (Phase 60)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS radiation_treatment_plans (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        tumor_site VARCHAR(64) NOT NULL,
+        prescribed_physical_dose_gy NUMERIC(6, 2) NOT NULL,
+        fraction_count INTEGER NOT NULL,
+        dose_per_fraction_gy NUMERIC(5, 2) NOT NULL,
+        alpha_beta_ratio_tumor NUMERIC(4, 2) NOT NULL,
+        bed_tumor_gy NUMERIC(6, 2) NOT NULL,
+        eqd2_tumor_gy NUMERIC(6, 2) NOT NULL,
+        quantec_constraints_checked JSONB,
+        plan_status VARCHAR(32) DEFAULT 'approved',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_rad_patient ON radiation_treatment_plans(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_rad_site ON radiation_treatment_plans(tumor_site);
+    `);
+
+    // Create theranostic_cycles table (Phase 60)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS theranostic_cycles (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        radiopharmaceutical VARCHAR(64) NOT NULL,
+        cycle_number INTEGER NOT NULL,
+        administered_activity_gbq NUMERIC(6, 3) NOT NULL,
+        administered_activity_mci NUMERIC(6, 2) NOT NULL,
+        administration_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        amino_acid_nephroprotection_used BOOLEAN DEFAULT TRUE,
+        post_admin_1m_dose_rate_usv_hr NUMERIC(6, 2),
+        nrc_release_criteria_met BOOLEAN DEFAULT FALSE,
+        isolation_precautions_hours INTEGER NOT NULL,
+        status VARCHAR(32) DEFAULT 'infused'
+      );
+      CREATE INDEX IF NOT EXISTS idx_theranostics_patient ON theranostic_cycles(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_theranostics_agent ON theranostic_cycles(radiopharmaceutical);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

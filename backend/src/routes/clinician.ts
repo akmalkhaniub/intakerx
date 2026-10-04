@@ -49,6 +49,7 @@ import * as pediatricResuscitationService from '../services/pediatricResuscitati
 import * as airwayIntubationService from '../services/airwayIntubation';
 import * as medicalToxicologyService from '../services/medicalToxicology';
 import * as crrtNavigatorService from '../services/crrtNavigator';
+import * as radiationTheranosticsService from '../services/radiationTheranostics';
 
 const router = Router();
 
@@ -4513,6 +4514,103 @@ router.get('/crrt/sessions', async (req: AuthenticatedRequest, res: Response) =>
   } catch (err: any) {
     console.error('List active CRRT sessions error:', err);
     res.status(500).json({ error: 'Failed to list active CRRT sessions.' });
+  }
+});
+
+// Phase 60: Radiation Oncology & Nuclear Medicine Theranostics
+router.post('/radonc/radiobiology', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = radiationTheranosticsService.calculateRadiobiology(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Radiobiology calculation error:', err);
+    res.status(500).json({ error: 'Failed to calculate radiobiology metrics.' });
+  }
+});
+
+router.post('/radonc/quantec-eval', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = radiationTheranosticsService.evaluateQuantecConstraints(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('QUANTEC constraint evaluation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate QUANTEC constraints.' });
+  }
+});
+
+router.post('/radonc/theranostic-protocol', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = radiationTheranosticsService.evaluateTheranosticProtocol(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Theranostic protocol evaluation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate theranostic protocol.' });
+  }
+});
+
+router.post('/radonc/decay-release', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = radiationTheranosticsService.calculateDecayAndRelease(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Decay and release calculation error:', err);
+    res.status(500).json({ error: 'Failed to calculate radiation decay and release criteria.' });
+  }
+});
+
+router.post('/radonc/plans', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await radiationTheranosticsService.createRadiationPlan(req.body);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Create radiation plan error:', err);
+    res.status(500).json({ error: 'Failed to create radiation plan.' });
+  }
+});
+
+router.get('/radonc/plans', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 25;
+    const plans = await radiationTheranosticsService.listRadiationPlans(limit);
+    res.json(plans);
+  } catch (err: any) {
+    console.error('List radiation plans error:', err);
+    res.status(500).json({ error: 'Failed to list radiation plans.' });
+  }
+});
+
+router.post('/radonc/cycles', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await radiationTheranosticsService.recordTheranosticCycle(req.body);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Record theranostic cycle error:', err);
+    res.status(500).json({ error: 'Failed to record theranostic cycle.' });
+  }
+});
+
+router.get('/radonc/cycles/:cycleId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const cycleId = Number(req.params.cycleId);
+    const result = await radiationTheranosticsService.getTheranosticCycleDetails(cycleId);
+    if (!result) {
+      return res.status(404).json({ error: 'Theranostic cycle not found.' });
+    }
+    res.json(result);
+  } catch (err: any) {
+    console.error('Get theranostic cycle details error:', err);
+    res.status(500).json({ error: 'Failed to get theranostic cycle details.' });
+  }
+});
+
+router.get('/radonc/cycles', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 25;
+    const cycles = await radiationTheranosticsService.listActiveTheranosticCycles(limit);
+    res.json(cycles);
+  } catch (err: any) {
+    console.error('List theranostic cycles error:', err);
+    res.status(500).json({ error: 'Failed to list theranostic cycles.' });
   }
 });
 
