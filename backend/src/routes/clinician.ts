@@ -45,6 +45,7 @@ import * as massiveTransfusionService from '../services/massiveTransfusion';
 import * as cathAlertService from '../services/cathAlert';
 import * as ecmoSupportService from '../services/ecmoSupport';
 import * as burnTraumaService from '../services/burnTrauma';
+import * as pediatricResuscitationService from '../services/pediatricResuscitation';
 
 const router = Router();
 
@@ -4075,6 +4076,112 @@ router.get('/burn/cases/:caseId/titrations', async (req: AuthenticatedRequest, r
   } catch (err: any) {
     console.error('Get hourly titrations error:', err);
     res.status(500).json({ error: 'Failed to fetch hourly titrations.' });
+  }
+});
+
+// ==========================================
+// Phase 56: Pediatric Intensive Care (PICU) & Neonatal Resuscitation Program (NRP-SAFE Hub)
+// ==========================================
+
+router.post('/pediatric/evaluate-apgar', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = pediatricResuscitationService.PediatricResuscitationService.calculateApgar(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate APGAR error:', err);
+    res.status(500).json({ error: 'Failed to evaluate APGAR score.' });
+  }
+});
+
+router.post('/pediatric/evaluate-nrp', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = pediatricResuscitationService.PediatricResuscitationService.evaluateNrpAlgorithm(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate NRP algorithm error:', err);
+    res.status(500).json({ error: 'Failed to evaluate NRP algorithm.' });
+  }
+});
+
+router.post('/pediatric/calculate-broselow', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = pediatricResuscitationService.PediatricResuscitationService.calculateBroselowPals(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Calculate Broselow error:', err);
+    res.status(500).json({ error: 'Failed to calculate Broselow PALS parameters.' });
+  }
+});
+
+router.post('/pediatric/evaluate-bhutani', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = pediatricResuscitationService.PediatricResuscitationService.evaluateBhutaniNomogram(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Bhutani nomogram error:', err);
+    res.status(500).json({ error: 'Failed to evaluate Bhutani nomogram.' });
+  }
+});
+
+router.post('/pediatric/calculate-pelod2', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = pediatricResuscitationService.PediatricResuscitationService.calculatePelod2(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Calculate PELOD-2 error:', err);
+    res.status(500).json({ error: 'Failed to calculate PELOD-2 score.' });
+  }
+});
+
+router.post('/pediatric/neonatal-events', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, eventData } = req.body;
+    if (!patientId || !eventData) {
+      res.status(400).json({ error: 'patientId and eventData are required' });
+      return;
+    }
+    const result = await pediatricResuscitationService.PediatricResuscitationService.createNeonatalEvent(Number(patientId), eventData);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Create neonatal event error:', err);
+    res.status(500).json({ error: 'Failed to record neonatal resuscitation event.' });
+  }
+});
+
+router.post('/pediatric/code-cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, caseData } = req.body;
+    if (!patientId || !caseData) {
+      res.status(400).json({ error: 'patientId and caseData are required' });
+      return;
+    }
+    const result = await pediatricResuscitationService.PediatricResuscitationService.createPediatricCode(Number(patientId), caseData);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Create pediatric code case error:', err);
+    res.status(500).json({ error: 'Failed to record pediatric code case.' });
+  }
+});
+
+router.get('/pediatric/neonatal-events', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patient_id ? Number(req.query.patient_id) : undefined;
+    const events = await pediatricResuscitationService.PediatricResuscitationService.getNeonatalEvents(patientId);
+    res.json(events);
+  } catch (err: any) {
+    console.error('Get neonatal events error:', err);
+    res.status(500).json({ error: 'Failed to fetch neonatal events.' });
+  }
+});
+
+router.get('/pediatric/code-cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patient_id ? Number(req.query.patient_id) : undefined;
+    const codes = await pediatricResuscitationService.PediatricResuscitationService.getPediatricCodes(patientId);
+    res.json(codes);
+  } catch (err: any) {
+    console.error('Get pediatric codes error:', err);
+    res.status(500).json({ error: 'Failed to fetch pediatric code cases.' });
   }
 });
 

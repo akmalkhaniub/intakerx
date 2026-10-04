@@ -1579,6 +1579,59 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_titration_burn ON burn_hourly_titrations(burn_case_id);
     `);
 
+    // Create neonatal_resuscitation_events table (Phase 56)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS neonatal_resuscitation_events (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        birth_timestamp TIMESTAMP NOT NULL,
+        gestational_age_weeks NUMERIC(3, 1) NOT NULL,
+        birth_weight_grams NUMERIC(6, 1) NOT NULL,
+        apgar_1min INTEGER NOT NULL,
+        apgar_5min INTEGER NOT NULL,
+        apgar_10min INTEGER,
+        apgar_details JSONB NOT NULL,
+        ppv_required BOOLEAN DEFAULT FALSE,
+        intubation_required BOOLEAN DEFAULT FALSE,
+        chest_compressions_required BOOLEAN DEFAULT FALSE,
+        epinephrine_administered BOOLEAN DEFAULT FALSE,
+        uvc_placed BOOLEAN DEFAULT FALSE,
+        target_preductal_spo2_met BOOLEAN DEFAULT TRUE,
+        serum_bilirubin_mg_dl NUMERIC(4, 1),
+        postnatal_age_hours INTEGER,
+        phototherapy_indicated BOOLEAN DEFAULT FALSE,
+        exchange_transfusion_indicated BOOLEAN DEFAULT FALSE,
+        resuscitation_status VARCHAR(32) DEFAULT 'active_code',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_nrp_patient ON neonatal_resuscitation_events(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_nrp_status ON neonatal_resuscitation_events(resuscitation_status);
+    `);
+
+    // Create pediatric_code_cases table (Phase 56)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS pediatric_code_cases (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        patient_age_months INTEGER NOT NULL,
+        patient_weight_kg NUMERIC(5, 2) NOT NULL,
+        broselow_color VARCHAR(32) NOT NULL,
+        ett_size_uncuffed_mm NUMERIC(3, 1) NOT NULL,
+        ett_size_cuffed_mm NUMERIC(3, 1) NOT NULL,
+        ett_insertion_depth_cm NUMERIC(3, 1) NOT NULL,
+        defibrillation_joules INTEGER NOT NULL,
+        cardioversion_joules INTEGER NOT NULL,
+        epinephrine_dose_mg NUMERIC(5, 3) NOT NULL,
+        amiodarone_dose_mg NUMERIC(6, 2) NOT NULL,
+        normal_saline_bolus_ml INTEGER NOT NULL,
+        pim3_mortality_percent NUMERIC(5, 2),
+        pelod2_score INTEGER,
+        clinical_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_peds_patient ON pediatric_code_cases(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
