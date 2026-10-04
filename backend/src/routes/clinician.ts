@@ -46,6 +46,7 @@ import * as cathAlertService from '../services/cathAlert';
 import * as ecmoSupportService from '../services/ecmoSupport';
 import * as burnTraumaService from '../services/burnTrauma';
 import * as pediatricResuscitationService from '../services/pediatricResuscitation';
+import * as airwayIntubationService from '../services/airwayIntubation';
 
 const router = Router();
 
@@ -4182,6 +4183,87 @@ router.get('/pediatric/code-cases', async (req: AuthenticatedRequest, res: Respo
   } catch (err: any) {
     console.error('Get pediatric codes error:', err);
     res.status(500).json({ error: 'Failed to fetch pediatric code cases.' });
+  }
+});
+
+// ==========================================
+// Phase 57: Emergency Airway & Rapid Sequence Intubation (AIRWAY-CODE Hub)
+// ==========================================
+
+router.post('/airway/evaluate-lemon', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = airwayIntubationService.AirwayIntubationService.calculateLemonScore(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate LEMON score error:', err);
+    res.status(500).json({ error: 'Failed to evaluate LEMON difficult airway score.' });
+  }
+});
+
+router.post('/airway/evaluate-macocha', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = airwayIntubationService.AirwayIntubationService.calculateMacochaScore(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate MACOCHA score error:', err);
+    res.status(500).json({ error: 'Failed to evaluate MACOCHA ICU score.' });
+  }
+});
+
+router.post('/airway/calculate-rsi', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = airwayIntubationService.AirwayIntubationService.calculateRsiMedications(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Calculate RSI medications error:', err);
+    res.status(500).json({ error: 'Failed to calculate RSI medication dosing.' });
+  }
+});
+
+router.post('/airway/evaluate-attempt', (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = airwayIntubationService.AirwayIntubationService.evaluateAirwayAttempt(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate airway attempt error:', err);
+    res.status(500).json({ error: 'Failed to evaluate airway attempt.' });
+  }
+});
+
+router.post('/airway/events', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, eventData } = req.body;
+    if (!patientId || !eventData) {
+      res.status(400).json({ error: 'patientId and eventData are required' });
+      return;
+    }
+    const result = await airwayIntubationService.AirwayIntubationService.createIntubationEvent(Number(patientId), eventData);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Create intubation event error:', err);
+    res.status(500).json({ error: 'Failed to record intubation event.' });
+  }
+});
+
+router.post('/airway/events/:eventId/rsi', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { eventId } = req.params;
+    const result = await airwayIntubationService.AirwayIntubationService.recordRsiMedications(Number(eventId), req.body);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Record RSI medications error:', err);
+    res.status(500).json({ error: 'Failed to record RSI medications.' });
+  }
+});
+
+router.get('/airway/events', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patient_id ? Number(req.query.patient_id) : undefined;
+    const events = await airwayIntubationService.AirwayIntubationService.getIntubationEvents(patientId);
+    res.json(events);
+  } catch (err: any) {
+    console.error('Get intubation events error:', err);
+    res.status(500).json({ error: 'Failed to fetch intubation events.' });
   }
 });
 

@@ -1632,6 +1632,52 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_peds_patient ON pediatric_code_cases(patient_id);
     `);
 
+    // Create airway_intubation_events table (Phase 57)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS airway_intubation_events (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        indication VARCHAR(64) NOT NULL,
+        patient_weight_kg NUMERIC(5, 2) NOT NULL,
+        lemon_score INTEGER NOT NULL,
+        lemon_details JSONB NOT NULL,
+        macocha_score INTEGER,
+        device_used VARCHAR(64) NOT NULL,
+        blade_size VARCHAR(16) NOT NULL,
+        bougie_used BOOLEAN DEFAULT TRUE,
+        ett_size_mm NUMERIC(3, 1) NOT NULL,
+        ett_depth_cm NUMERIC(3, 1) NOT NULL,
+        cormack_lehane_grade INTEGER NOT NULL,
+        attempts_count INTEGER NOT NULL DEFAULT 1,
+        lowest_spo2_percent INTEGER NOT NULL,
+        etco2_confirmed BOOLEAN DEFAULT TRUE,
+        cico_emergency_triggered BOOLEAN DEFAULT FALSE,
+        surgical_airway_performed BOOLEAN DEFAULT FALSE,
+        intubation_status VARCHAR(32) DEFAULT 'successful',
+        operator_name VARCHAR(64),
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_airway_patient ON airway_intubation_events(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_airway_status ON airway_intubation_events(intubation_status);
+    `);
+
+    // Create rsi_medication_administrations table (Phase 57)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS rsi_medication_administrations (
+        id SERIAL PRIMARY KEY,
+        airway_event_id INTEGER REFERENCES airway_intubation_events(id) ON DELETE CASCADE,
+        induction_agent VARCHAR(64) NOT NULL,
+        induction_dose_mg NUMERIC(6, 2) NOT NULL,
+        paralytic_agent VARCHAR(64) NOT NULL,
+        paralytic_dose_mg NUMERIC(6, 2) NOT NULL,
+        sugammadex_administered BOOLEAN DEFAULT FALSE,
+        sugammadex_dose_mg NUMERIC(6, 2),
+        succinylcholine_contraindication_checked BOOLEAN DEFAULT TRUE,
+        administered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_rsi_airway ON rsi_medication_administrations(airway_event_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
