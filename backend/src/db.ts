@@ -1896,6 +1896,44 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_ad_case ON autonomic_dysreflexia_events(case_id);
     `);
 
+    // Create mci_triage_encounters table (Phase 63)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS mci_triage_encounters (
+        id SERIAL PRIMARY KEY,
+        incident_name VARCHAR(128) NOT NULL,
+        patient_identifier VARCHAR(64) NOT NULL,
+        is_pediatric BOOLEAN DEFAULT FALSE,
+        triage_category VARCHAR(16) NOT NULL,
+        can_walk BOOLEAN NOT NULL,
+        respiratory_rate INTEGER,
+        perfusion_intact BOOLEAN NOT NULL,
+        mental_status VARCHAR(32) NOT NULL,
+        airway_intervention_needed BOOLEAN DEFAULT FALSE,
+        decontamination_status VARCHAR(32) DEFAULT 'pending',
+        destination_facility_zone VARCHAR(64) DEFAULT 'acute_red_tent',
+        triaged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_mci_incident ON mci_triage_encounters(incident_name);
+      CREATE INDEX IF NOT EXISTS idx_mci_category ON mci_triage_encounters(triage_category);
+    `);
+
+    // Create cbrne_agent_exposures table (Phase 63)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS cbrne_agent_exposures (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES mci_triage_encounters(id) ON DELETE CASCADE,
+        cbrne_class VARCHAR(32) NOT NULL,
+        agent_identified VARCHAR(64) NOT NULL,
+        antidote_recommended VARCHAR(128) NOT NULL,
+        antidote_dose_instructions TEXT NOT NULL,
+        chempack_requested BOOLEAN DEFAULT FALSE,
+        decon_method_recommended VARCHAR(128) NOT NULL,
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cbrne_encounter ON cbrne_agent_exposures(encounter_id);
+      CREATE INDEX IF NOT EXISTS idx_cbrne_class ON cbrne_agent_exposures(cbrne_class);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

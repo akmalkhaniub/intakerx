@@ -52,6 +52,7 @@ import * as crrtNavigatorService from '../services/crrtNavigator';
 import * as radiationTheranosticsService from '../services/radiationTheranostics';
 import * as hemodynamicSwanGanzService from '../services/hemodynamicSwanGanz';
 import * as spinalCordInjuryService from '../services/spinalCordInjury';
+import * as cbrneTriageService from '../services/cbrneTriage';
 
 const router = Router();
 
@@ -4798,6 +4799,105 @@ router.get('/spine/cases/:caseId/ad-events', async (req: AuthenticatedRequest, r
   } catch (err: any) {
     console.error('Get AD events error:', err);
     res.status(500).json({ error: 'Failed to retrieve autonomic dysreflexia events.' });
+  }
+});
+
+// ==========================================
+// Phase 63: Disaster Triage, Mass Casualty Incident & CBRNE Defense (CBRNE-TRIAGE)
+// ==========================================
+
+// Evaluate Adult START Triage
+router.post('/cbrne/triage/start', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = cbrneTriageService.CBRNETriageService.evaluateSTART(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('START triage error:', err);
+    res.status(400).json({ error: err.message || 'Failed to evaluate START triage.' });
+  }
+});
+
+// Evaluate Pediatric JumpSTART Triage
+router.post('/cbrne/triage/jumpstart', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = cbrneTriageService.CBRNETriageService.evaluateJumpSTART(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('JumpSTART triage error:', err);
+    res.status(400).json({ error: err.message || 'Failed to evaluate JumpSTART triage.' });
+  }
+});
+
+// Match CBRNE Agent Threat & Antidote
+router.post('/cbrne/agents/match', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const assessment = cbrneTriageService.CBRNETriageService.matchCBRNEAgent(req.body);
+    res.json(assessment);
+  } catch (err: any) {
+    console.error('CBRNE agent match error:', err);
+    res.status(400).json({ error: err.message || 'Failed to evaluate CBRNE agent threat.' });
+  }
+});
+
+// Create MCI Triage Encounter
+router.post('/cbrne/encounters', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const encounter = await cbrneTriageService.CBRNETriageService.createEncounter(req.body);
+    res.status(201).json(encounter);
+  } catch (err: any) {
+    console.error('Create MCI encounter error:', err);
+    res.status(500).json({ error: 'Failed to record MCI triage encounter.' });
+  }
+});
+
+// List MCI Triage Encounters
+router.get('/cbrne/encounters', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const incidentName = req.query.incidentName as string | undefined;
+    const encounters = await cbrneTriageService.CBRNETriageService.listEncounters(incidentName);
+    res.json(encounters);
+  } catch (err: any) {
+    console.error('List MCI encounters error:', err);
+    res.status(500).json({ error: 'Failed to list MCI encounters.' });
+  }
+});
+
+// Record CBRNE Exposure
+router.post('/cbrne/encounters/:encounterId/exposures', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const encounterId = Number(req.params.encounterId);
+    const exposure = await cbrneTriageService.CBRNETriageService.recordExposure({
+      ...req.body,
+      encounterId
+    });
+    res.status(201).json(exposure);
+  } catch (err: any) {
+    console.error('Record CBRNE exposure error:', err);
+    res.status(500).json({ error: 'Failed to record CBRNE exposure.' });
+  }
+});
+
+// Get Exposures by Encounter
+router.get('/cbrne/encounters/:encounterId/exposures', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const encounterId = Number(req.params.encounterId);
+    const exposures = await cbrneTriageService.CBRNETriageService.getExposuresByEncounter(encounterId);
+    res.json(exposures);
+  } catch (err: any) {
+    console.error('Get CBRNE exposures error:', err);
+    res.status(500).json({ error: 'Failed to retrieve CBRNE exposures.' });
+  }
+});
+
+// Live Disaster Surge Capacity Statistics
+router.get('/cbrne/surge-stats', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const incidentName = req.query.incidentName as string | undefined;
+    const stats = await cbrneTriageService.CBRNETriageService.getSurgeCapacityStats(incidentName);
+    res.json(stats);
+  } catch (err: any) {
+    console.error('Get surge stats error:', err);
+    res.status(500).json({ error: 'Failed to calculate disaster surge statistics.' });
   }
 });
 
