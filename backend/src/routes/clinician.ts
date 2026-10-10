@@ -51,6 +51,7 @@ import * as medicalToxicologyService from '../services/medicalToxicology';
 import * as crrtNavigatorService from '../services/crrtNavigator';
 import * as radiationTheranosticsService from '../services/radiationTheranostics';
 import * as hemodynamicSwanGanzService from '../services/hemodynamicSwanGanz';
+import * as spinalCordInjuryService from '../services/spinalCordInjury';
 
 const router = Router();
 
@@ -4693,6 +4694,110 @@ router.get('/pac/patients/:patientId/safety', async (req: AuthenticatedRequest, 
   } catch (err: any) {
     console.error('Get PAC safety events error:', err);
     res.status(500).json({ error: 'Failed to retrieve PAC safety events.' });
+  }
+});
+
+// ==========================================
+// Phase 62: Acute Spinal Cord Injury & Neurotrauma Spine Command (SPINE-ALERT)
+// ==========================================
+
+// Classify ASIA / ISNCSCI Impairment Scale
+router.post('/spine/asia/classify', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const classification = spinalCordInjuryService.SpinalCordInjuryService.classifyASIA(req.body);
+    res.json(classification);
+  } catch (err: any) {
+    console.error('Classify ASIA error:', err);
+    res.status(400).json({ error: err.message || 'Failed to classify ASIA scale.' });
+  }
+});
+
+// Differentiate Neurogenic Shock vs Spinal Shock
+router.post('/spine/shock/differentiate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const assessment = spinalCordInjuryService.SpinalCordInjuryService.differentiateShock(req.body);
+    res.json(assessment);
+  } catch (err: any) {
+    console.error('Differentiate shock error:', err);
+    res.status(400).json({ error: err.message || 'Failed to evaluate shock state.' });
+  }
+});
+
+// Evaluate Autonomic Dysreflexia Emergency
+router.post('/spine/autonomic-dysreflexia/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const adResult = spinalCordInjuryService.SpinalCordInjuryService.evaluateAutonomicDysreflexia(req.body);
+    res.json(adResult);
+  } catch (err: any) {
+    console.error('Evaluate AD error:', err);
+    res.status(400).json({ error: err.message || 'Failed to evaluate autonomic dysreflexia.' });
+  }
+});
+
+// Evaluate Spine Instability (SLIC / TLICS)
+router.post('/spine/instability/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { scoreType, morphology, ligamentousComplex, neurologicalStatus } = req.body;
+    const instability = spinalCordInjuryService.SpinalCordInjuryService.evaluateSpineInstability(
+      scoreType,
+      Number(morphology),
+      Number(ligamentousComplex),
+      Number(neurologicalStatus)
+    );
+    res.json(instability);
+  } catch (err: any) {
+    console.error('Evaluate spine instability error:', err);
+    res.status(400).json({ error: err.message || 'Failed to evaluate spine instability.' });
+  }
+});
+
+// Create Spinal Cord Injury Case
+router.post('/spine/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const newCase = await spinalCordInjuryService.SpinalCordInjuryService.createCase(req.body);
+    res.status(201).json(newCase);
+  } catch (err: any) {
+    console.error('Create SCI case error:', err);
+    res.status(500).json({ error: 'Failed to create spinal cord injury case.' });
+  }
+});
+
+// Get Spinal Cord Injury Cases for Patient
+router.get('/spine/patients/:patientId/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const cases = await spinalCordInjuryService.SpinalCordInjuryService.getCasesByPatient(patientId);
+    res.json(cases);
+  } catch (err: any) {
+    console.error('Get SCI cases error:', err);
+    res.status(500).json({ error: 'Failed to retrieve spinal cord injury cases.' });
+  }
+});
+
+// Record Autonomic Dysreflexia Event
+router.post('/spine/cases/:caseId/ad-events', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const caseId = Number(req.params.caseId);
+    const event = await spinalCordInjuryService.SpinalCordInjuryService.recordADEvent({
+      ...req.body,
+      caseId
+    });
+    res.status(201).json(event);
+  } catch (err: any) {
+    console.error('Record AD event error:', err);
+    res.status(500).json({ error: 'Failed to record autonomic dysreflexia event.' });
+  }
+});
+
+// Get AD Events for Case
+router.get('/spine/cases/:caseId/ad-events', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const caseId = Number(req.params.caseId);
+    const events = await spinalCordInjuryService.SpinalCordInjuryService.getADEventsByCase(caseId);
+    res.json(events);
+  } catch (err: any) {
+    console.error('Get AD events error:', err);
+    res.status(500).json({ error: 'Failed to retrieve autonomic dysreflexia events.' });
   }
 });
 

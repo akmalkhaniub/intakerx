@@ -1849,6 +1849,53 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_pac_safety_type ON pac_catheter_safety_events(event_type);
     `);
 
+    // Create spinal_cord_injury_cases table (Phase 62)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS spinal_cord_injury_cases (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        injury_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        neurological_level_of_injury VARCHAR(32) NOT NULL,
+        asia_impairment_scale VARCHAR(8) NOT NULL,
+        motor_score_total INTEGER NOT NULL,
+        sensory_score_light_touch INTEGER NOT NULL,
+        sensory_score_pinprick INTEGER NOT NULL,
+        sacral_sparing_sensory BOOLEAN DEFAULT FALSE,
+        sacral_sparing_motor BOOLEAN DEFAULT FALSE,
+        bulbocavernosus_reflex_present BOOLEAN DEFAULT FALSE,
+        spinal_shock_active BOOLEAN DEFAULT TRUE,
+        neurogenic_shock_active BOOLEAN DEFAULT FALSE,
+        target_map_min_mmhg INTEGER DEFAULT 85,
+        target_map_max_mmhg INTEGER DEFAULT 90,
+        slic_or_tlics_score INTEGER,
+        surgical_indication VARCHAR(64) DEFAULT 'undetermined',
+        case_status VARCHAR(32) DEFAULT 'acute_resuscitation',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_sci_patient ON spinal_cord_injury_cases(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_sci_asia ON spinal_cord_injury_cases(asia_impairment_scale);
+      CREATE INDEX IF NOT EXISTS idx_sci_nli ON spinal_cord_injury_cases(neurological_level_of_injury);
+      ALTER TABLE spinal_cord_injury_cases ALTER COLUMN surgical_indication TYPE VARCHAR(64);
+    `);
+
+    // Create autonomic_dysreflexia_events table (Phase 62)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS autonomic_dysreflexia_events (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER REFERENCES spinal_cord_injury_cases(id) ON DELETE CASCADE,
+        systolic_bp INTEGER NOT NULL,
+        diastolic_bp INTEGER NOT NULL,
+        heart_rate INTEGER NOT NULL,
+        suspected_trigger VARCHAR(64) NOT NULL,
+        symptoms JSONB DEFAULT '[]'::jsonb,
+        interventions_applied JSONB DEFAULT '[]'::jsonb,
+        post_intervention_sbp INTEGER,
+        resolved BOOLEAN DEFAULT FALSE,
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ad_case ON autonomic_dysreflexia_events(case_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
