@@ -1806,6 +1806,49 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_theranostics_agent ON theranostic_cycles(radiopharmaceutical);
     `);
 
+    // Create pac_hemodynamic_records table (Phase 61)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS pac_hemodynamic_records (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        heart_rate INTEGER NOT NULL,
+        map_mmhg INTEGER NOT NULL,
+        cvp_mmhg INTEGER NOT NULL,
+        mpap_mmhg INTEGER NOT NULL,
+        pcwp_mmhg INTEGER NOT NULL,
+        cardiac_output_l_min NUMERIC(4, 2) NOT NULL,
+        cardiac_index NUMERIC(4, 2) NOT NULL,
+        svr_dynes NUMERIC(6, 1) NOT NULL,
+        pvr_dynes NUMERIC(6, 1) NOT NULL,
+        svo2_percent INTEGER NOT NULL,
+        do2_index NUMERIC(6, 1),
+        vo2_index NUMERIC(6, 1),
+        o2_extraction_ratio_percent NUMERIC(4, 1),
+        forrester_quadrant VARCHAR(32) NOT NULL,
+        therapeutic_recommendations JSONB,
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pac_patient ON pac_hemodynamic_records(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_pac_quadrant ON pac_hemodynamic_records(forrester_quadrant);
+    `);
+
+    // Create pac_catheter_safety_events table (Phase 61)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS pac_catheter_safety_events (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        event_type VARCHAR(64) NOT NULL,
+        severity VARCHAR(32) NOT NULL,
+        balloon_inflation_volume_ml NUMERIC(3, 2),
+        warning_message TEXT NOT NULL,
+        action_taken VARCHAR(128),
+        acknowledged_by VARCHAR(64),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pac_safety_patient ON pac_catheter_safety_events(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_pac_safety_type ON pac_catheter_safety_events(event_type);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

@@ -50,6 +50,7 @@ import * as airwayIntubationService from '../services/airwayIntubation';
 import * as medicalToxicologyService from '../services/medicalToxicology';
 import * as crrtNavigatorService from '../services/crrtNavigator';
 import * as radiationTheranosticsService from '../services/radiationTheranostics';
+import * as hemodynamicSwanGanzService from '../services/hemodynamicSwanGanz';
 
 const router = Router();
 
@@ -4611,6 +4612,87 @@ router.get('/radonc/cycles', async (req: AuthenticatedRequest, res: Response) =>
   } catch (err: any) {
     console.error('List theranostic cycles error:', err);
     res.status(500).json({ error: 'Failed to list theranostic cycles.' });
+  }
+});
+
+// ==========================================
+// Phase 61: Advanced Hemodynamic Monitoring & Swan-Ganz Fleet (HEMO-SWAN)
+// ==========================================
+
+// Calculate PAC Hemodynamic Profile & Forrester Quadrant
+router.post('/pac/calculate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const profile = hemodynamicSwanGanzService.HemodynamicSwanGanzService.calculateProfile(req.body);
+    res.json(profile);
+  } catch (err: any) {
+    console.error('Calculate PAC profile error:', err);
+    res.status(400).json({ error: err.message || 'Failed to calculate PAC hemodynamic profile.' });
+  }
+});
+
+// Save PAC record
+router.post('/pac/records', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const saved = await hemodynamicSwanGanzService.HemodynamicSwanGanzService.saveRecord(req.body);
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save PAC record error:', err);
+    res.status(500).json({ error: 'Failed to record PAC hemodynamic data.' });
+  }
+});
+
+// Get PAC records by patient
+router.get('/pac/patients/:patientId/records', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await hemodynamicSwanGanzService.HemodynamicSwanGanzService.getRecordsByPatient(patientId);
+    res.json(records);
+  } catch (err: any) {
+    console.error('Get PAC records error:', err);
+    res.status(500).json({ error: 'Failed to retrieve PAC records.' });
+  }
+});
+
+// Evaluate catheter safety watchdog
+router.post('/pac/safety/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const assessment = hemodynamicSwanGanzService.HemodynamicSwanGanzService.evaluateCatheterSafety(req.body);
+    res.json(assessment);
+  } catch (err: any) {
+    console.error('Evaluate PAC safety error:', err);
+    res.status(400).json({ error: err.message || 'Failed to evaluate catheter safety.' });
+  }
+});
+
+// Log catheter safety event
+router.post('/pac/safety/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, eventType, severity, warningMessage, actionTaken, balloonInflationVolumeMl, acknowledgedBy } = req.body;
+    const logged = await hemodynamicSwanGanzService.HemodynamicSwanGanzService.logSafetyEvent(
+      Number(patientId),
+      eventType,
+      severity,
+      warningMessage,
+      actionTaken,
+      balloonInflationVolumeMl ? Number(balloonInflationVolumeMl) : undefined,
+      acknowledgedBy
+    );
+    res.status(201).json(logged);
+  } catch (err: any) {
+    console.error('Log PAC safety event error:', err);
+    res.status(500).json({ error: 'Failed to log catheter safety event.' });
+  }
+});
+
+// Get catheter safety events by patient
+router.get('/pac/patients/:patientId/safety', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const events = await hemodynamicSwanGanzService.HemodynamicSwanGanzService.getSafetyEvents(patientId);
+    res.json(events);
+  } catch (err: any) {
+    console.error('Get PAC safety events error:', err);
+    res.status(500).json({ error: 'Failed to retrieve PAC safety events.' });
   }
 });
 
