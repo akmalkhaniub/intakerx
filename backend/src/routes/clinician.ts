@@ -55,6 +55,7 @@ import * as spinalCordInjuryService from '../services/spinalCordInjury';
 import * as cbrneTriageService from '../services/cbrneTriage';
 import * as hyperbaricMedicineService from '../services/hyperbaricMedicine';
 import * as liverSupportService from '../services/liverSupport';
+import * as cdsHooksFhirService from '../services/cdsHooksFhir';
 
 const router = Router();
 
@@ -5067,6 +5068,63 @@ router.get('/liver/patients/:patientId/profile', async (req: AuthenticatedReques
   } catch (err: any) {
     console.error('Get patient liver profile error:', err);
     res.status(500).json({ error: 'Failed to retrieve patient liver profile.' });
+  }
+});
+
+// Phase 66: SMART-on-FHIR & CDS Hooks Enterprise Integration Engine (CDS-HOOKS Hub)
+// CDS Services Discovery Endpoint
+router.get('/cds-services', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const catalog = cdsHooksFhirService.CdsHooksFhirService.getDiscoveryCatalog();
+    res.json(catalog);
+  } catch (err: any) {
+    console.error('CDS Discovery catalog error:', err);
+    res.status(500).json({ error: 'Failed to retrieve CDS discovery catalog.' });
+  }
+});
+
+// Execute CDS Hook Evaluator
+router.post('/cds-services/:serviceId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const cards = await cdsHooksFhirService.CdsHooksFhirService.evaluateHook(req.body);
+    res.json(cards);
+  } catch (err: any) {
+    console.error('CDS Hook evaluation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate CDS hook.' });
+  }
+});
+
+// Register SMART-on-FHIR Client
+router.post('/smart/clients', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const client = await cdsHooksFhirService.CdsHooksFhirService.registerSmartClient(req.body);
+    res.status(201).json(client);
+  } catch (err: any) {
+    console.error('Register SMART client error:', err);
+    res.status(500).json({ error: 'Failed to register SMART client.' });
+  }
+});
+
+// SMART OAuth2 Token Exchange
+router.post('/smart/token', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const tokenResponse = cdsHooksFhirService.CdsHooksFhirService.generateSmartTokenResponse(req.body);
+    res.json(tokenResponse);
+  } catch (err: any) {
+    console.error('SMART token generation error:', err);
+    res.status(500).json({ error: 'Failed to generate SMART token.' });
+  }
+});
+
+// Audit Logs for Hook Invocations
+router.get('/cds/invocations', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = req.query.patientId ? Number(req.query.patientId) : undefined;
+    const invocations = await cdsHooksFhirService.CdsHooksFhirService.getHookInvocations(patientId);
+    res.json(invocations);
+  } catch (err: any) {
+    console.error('Get CDS invocations error:', err);
+    res.status(500).json({ error: 'Failed to retrieve CDS hook invocations.' });
   }
 });
 

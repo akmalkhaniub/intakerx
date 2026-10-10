@@ -2015,6 +2015,35 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_alf_etiology ON acute_liver_failure_cases(etiology);
     `);
 
+    // Create smart_fhir_clients table (Phase 66)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS smart_fhir_clients (
+        id SERIAL PRIMARY KEY,
+        client_id VARCHAR(64) UNIQUE NOT NULL,
+        client_name VARCHAR(128) NOT NULL,
+        client_secret VARCHAR(128),
+        redirect_uris JSONB DEFAULT '[]'::jsonb,
+        scope VARCHAR(256) DEFAULT 'launch/patient patient/*.read openid fhirUser',
+        is_confidential BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Create cds_hook_invocations table (Phase 66)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS cds_hook_invocations (
+        id SERIAL PRIMARY KEY,
+        hook_name VARCHAR(64) NOT NULL,
+        hook_instance_id VARCHAR(64) NOT NULL,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        context_data JSONB DEFAULT '{}'::jsonb,
+        cards_returned JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cds_patient ON cds_hook_invocations(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_cds_hook_name ON cds_hook_invocations(hook_name);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
