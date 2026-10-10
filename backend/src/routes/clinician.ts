@@ -56,6 +56,7 @@ import * as cbrneTriageService from '../services/cbrneTriage';
 import * as hyperbaricMedicineService from '../services/hyperbaricMedicine';
 import * as liverSupportService from '../services/liverSupport';
 import * as cdsHooksFhirService from '../services/cdsHooksFhir';
+import * as teleIcuScribeService from '../services/teleIcuScribe';
 
 const router = Router();
 
@@ -5125,6 +5126,66 @@ router.get('/cds/invocations', async (req: AuthenticatedRequest, res: Response) 
   } catch (err: any) {
     console.error('Get CDS invocations error:', err);
     res.status(500).json({ error: 'Failed to retrieve CDS hook invocations.' });
+  }
+});
+
+// Phase 67: Ambient Bedside Scribe & Tele-ICU Virtual Command (TELE-ICU Hub)
+// Evaluate CPOT Pain Score
+router.post('/tele-icu/evaluate-cpot', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = teleIcuScribeService.TeleIcuScribeService.evaluateCpotScore(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate CPOT score error:', err);
+    res.status(500).json({ error: 'Failed to evaluate CPOT pain score.' });
+  }
+});
+
+// Extract SOAP Note from Ambient Transcript
+router.post('/tele-icu/extract-soap', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { rawTranscript, vitalsContext } = req.body;
+    const soap = teleIcuScribeService.TeleIcuScribeService.extractSoapFromTranscript(rawTranscript, vitalsContext);
+    res.json(soap);
+  } catch (err: any) {
+    console.error('Extract ambient SOAP error:', err);
+    res.status(500).json({ error: 'Failed to extract SOAP note from transcript.' });
+  }
+});
+
+// Create/Update Tele-ICU WebRTC Session
+router.post('/tele-icu/sessions', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const session = await teleIcuScribeService.TeleIcuScribeService.createTeleIcuSession(req.body);
+    res.status(201).json(session);
+  } catch (err: any) {
+    console.error('Create Tele-ICU session error:', err);
+    res.status(500).json({ error: 'Failed to create Tele-ICU session.' });
+  }
+});
+
+// Record Ambient Transcript
+router.post('/tele-icu/sessions/:sessionId/transcripts', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = Number(req.params.sessionId);
+    const { rawTranscript, vitalsContext } = req.body;
+    const record = await teleIcuScribeService.TeleIcuScribeService.recordScribeTranscript(sessionId, rawTranscript, vitalsContext);
+    res.status(201).json(record);
+  } catch (err: any) {
+    console.error('Record ambient transcript error:', err);
+    res.status(500).json({ error: 'Failed to record ambient transcript.' });
+  }
+});
+
+// Get Patient Tele-ICU History
+router.get('/tele-icu/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await teleIcuScribeService.TeleIcuScribeService.getPatientTeleIcuHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get patient Tele-ICU history error:', err);
+    res.status(500).json({ error: 'Failed to retrieve Tele-ICU history.' });
   }
 });
 

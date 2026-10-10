@@ -2044,6 +2044,40 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_cds_hook_name ON cds_hook_invocations(hook_name);
     `);
 
+    // Create tele_icu_sessions table (Phase 67)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS tele_icu_sessions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        bed_number VARCHAR(32) NOT NULL,
+        virtual_intensivist_name VARCHAR(128) NOT NULL,
+        webrtc_channel_id VARCHAR(64) NOT NULL UNIQUE,
+        connection_status VARCHAR(32) DEFAULT 'connected',
+        high_acuity_alert BOOLEAN DEFAULT FALSE,
+        cpot_pain_score INTEGER DEFAULT 0,
+        rass_agitation_score INTEGER DEFAULT 0,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ended_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_tele_icu_patient ON tele_icu_sessions(patient_id);
+    `);
+
+    // Create ambient_scribe_transcripts table (Phase 67)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS ambient_scribe_transcripts (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES tele_icu_sessions(id) ON DELETE CASCADE,
+        raw_ambient_audio_transcript TEXT NOT NULL,
+        subjective_summary TEXT,
+        objective_vitals_summary TEXT,
+        assessment_clinical_reasoning TEXT,
+        plan_action_items JSONB DEFAULT '[]'::jsonb,
+        critical_care_time_minutes INTEGER DEFAULT 35,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ambient_session ON ambient_scribe_transcripts(session_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
