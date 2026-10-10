@@ -54,6 +54,7 @@ import * as hemodynamicSwanGanzService from '../services/hemodynamicSwanGanz';
 import * as spinalCordInjuryService from '../services/spinalCordInjury';
 import * as cbrneTriageService from '../services/cbrneTriage';
 import * as hyperbaricMedicineService from '../services/hyperbaricMedicine';
+import * as liverSupportService from '../services/liverSupport';
 
 const router = Router();
 
@@ -4998,6 +4999,74 @@ router.get('/hbot/sessions/:sessionId/toxicity-logs', async (req: AuthenticatedR
   } catch (err: any) {
     console.error('Get toxicity logs error:', err);
     res.status(500).json({ error: 'Failed to retrieve toxicity logs.' });
+  }
+});
+
+// Phase 65: Molecular Adsorbent Liver Support & Acute Liver Failure (LIVER-ALIVE Hub)
+// Evaluate King's College Hospital Criteria
+router.post('/liver/evaluate-kings-college', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = liverSupportService.LiverSupportService.evaluateKingsCollegeCriteria(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate King\'s College error:', err);
+    res.status(500).json({ error: 'Failed to evaluate King\'s College criteria.' });
+  }
+});
+
+// Evaluate MARS Albumin Clearance
+router.post('/liver/evaluate-mars-clearance', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = liverSupportService.LiverSupportService.calculateMarsClearance(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate MARS clearance error:', err);
+    res.status(500).json({ error: 'Failed to evaluate MARS clearance.' });
+  }
+});
+
+// Evaluate Cerebral Edema Risk
+router.post('/liver/evaluate-cerebral-edema', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = liverSupportService.LiverSupportService.evaluateCerebralEdemaRisk(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate cerebral edema risk error:', err);
+    res.status(500).json({ error: 'Failed to evaluate cerebral edema risk.' });
+  }
+});
+
+// Record MARS Session
+router.post('/liver/mars-sessions', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const session = await liverSupportService.LiverSupportService.recordMarsSession(req.body);
+    res.status(201).json(session);
+  } catch (err: any) {
+    console.error('Record MARS session error:', err);
+    res.status(500).json({ error: 'Failed to record MARS session.' });
+  }
+});
+
+// Record Acute Liver Failure Case
+router.post('/liver/alf-cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const alfCase = await liverSupportService.LiverSupportService.recordAlfCase(req.body);
+    res.status(201).json(alfCase);
+  } catch (err: any) {
+    console.error('Record ALF case error:', err);
+    res.status(500).json({ error: 'Failed to record ALF case.' });
+  }
+});
+
+// Get Patient Liver Profile
+router.get('/liver/patients/:patientId/profile', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const profile = await liverSupportService.LiverSupportService.getPatientLiverProfile(patientId);
+    res.json(profile);
+  } catch (err: any) {
+    console.error('Get patient liver profile error:', err);
+    res.status(500).json({ error: 'Failed to retrieve patient liver profile.' });
   }
 });
 

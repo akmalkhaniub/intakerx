@@ -1971,6 +1971,50 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_hbot_tox_session ON hbot_toxicity_logs(session_id);
     `);
 
+    // Create mars_liver_sessions table (Phase 65)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS mars_liver_sessions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        dialysis_system VARCHAR(32) NOT NULL DEFAULT 'MARS',
+        prescribed_hours NUMERIC(4, 1) NOT NULL DEFAULT 6.0,
+        blood_flow_rate_ml_min INTEGER NOT NULL DEFAULT 150,
+        albumin_dialysate_flow_ml_min INTEGER NOT NULL DEFAULT 150,
+        initial_total_bilirubin_mg_dl NUMERIC(5, 2) NOT NULL,
+        final_total_bilirubin_mg_dl NUMERIC(5, 2),
+        initial_ammonia_umol_l INTEGER NOT NULL,
+        final_ammonia_umol_l INTEGER,
+        bilirubin_clearance_percent NUMERIC(5, 2),
+        ammonia_clearance_percent NUMERIC(5, 2),
+        session_status VARCHAR(32) DEFAULT 'active',
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ended_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_mars_patient ON mars_liver_sessions(patient_id);
+    `);
+
+    // Create acute_liver_failure_cases table (Phase 65)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS acute_liver_failure_cases (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        etiology VARCHAR(64) NOT NULL,
+        west_haven_he_grade VARCHAR(16) NOT NULL DEFAULT 'Grade_0',
+        inr NUMERIC(4, 2) NOT NULL,
+        total_bilirubin_mg_dl NUMERIC(5, 2) NOT NULL,
+        serum_creatinine_mg_dl NUMERIC(5, 2) NOT NULL,
+        arterial_ph NUMERIC(4, 2) NOT NULL,
+        arterial_lactate_mmol_l NUMERIC(4, 2) NOT NULL,
+        serum_ammonia_umol_l INTEGER NOT NULL,
+        kings_college_criteria_met BOOLEAN DEFAULT FALSE,
+        urgent_transplant_listed BOOLEAN DEFAULT FALSE,
+        icp_elevation_risk VARCHAR(32) DEFAULT 'low',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_alf_patient ON acute_liver_failure_cases(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_alf_etiology ON acute_liver_failure_cases(etiology);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
