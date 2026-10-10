@@ -1934,6 +1934,43 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_cbrne_class ON cbrne_agent_exposures(cbrne_class);
     `);
 
+    // Create hbot_treatment_sessions table (Phase 64)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS hbot_treatment_sessions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        indication VARCHAR(64) NOT NULL,
+        treatment_table VARCHAR(32) NOT NULL,
+        chamber_type VARCHAR(32) DEFAULT 'multiplace',
+        max_depth_fsw INTEGER NOT NULL,
+        pressure_ata NUMERIC(4, 2) NOT NULL,
+        total_duration_minutes INTEGER NOT NULL,
+        air_breaks_count INTEGER DEFAULT 2,
+        initial_cohb_percent NUMERIC(4, 1),
+        final_cohb_percent NUMERIC(4, 1),
+        session_status VARCHAR(32) DEFAULT 'completed',
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ended_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_hbot_patient ON hbot_treatment_sessions(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_hbot_indication ON hbot_treatment_sessions(indication);
+    `);
+
+    // Create hbot_toxicity_logs table (Phase 64)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS hbot_toxicity_logs (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES hbot_treatment_sessions(id) ON DELETE CASCADE,
+        cumulative_uptd NUMERIC(6, 1) NOT NULL,
+        cns_symptoms_observed JSONB DEFAULT '[]'::jsonb,
+        air_break_instituted BOOLEAN DEFAULT TRUE,
+        chamber_ascent_initiated BOOLEAN DEFAULT FALSE,
+        notes TEXT,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_hbot_tox_session ON hbot_toxicity_logs(session_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

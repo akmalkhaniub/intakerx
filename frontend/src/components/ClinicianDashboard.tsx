@@ -44,6 +44,7 @@ import { TheranosticsHub } from './TheranosticsHub';
 import { HemoSwanHub } from './HemoSwanHub';
 import { SpineAlertHub } from './SpineAlertHub';
 import { CbrneTriageHub } from './CbrneTriageHub';
+import { HbotSafeHub } from './HbotSafeHub';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -99,7 +100,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control' | 'meds_to_beds' | 'genomic_tumor_board' | 'behavioral_health' | 'icu_shock' | 'autonomous_cdi' | 'organ_transplant' | 'labor_delivery' | 'cleanroom_compounding' | 'code_stroke' | 'hemo_surge' | 'cath_alert' | 'mcs_hub' | 'trauma_one' | 'nrp_safe' | 'airway_code' | 'tox_alert' | 'crrt_navigator' | 'theranostics' | 'hemo_swan' | 'spine_alert' | 'cbrne_triage'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control' | 'meds_to_beds' | 'genomic_tumor_board' | 'behavioral_health' | 'icu_shock' | 'autonomous_cdi' | 'organ_transplant' | 'labor_delivery' | 'cleanroom_compounding' | 'code_stroke' | 'hemo_surge' | 'cath_alert' | 'mcs_hub' | 'trauma_one' | 'nrp_safe' | 'airway_code' | 'tox_alert' | 'crrt_navigator' | 'theranostics' | 'hemo_swan' | 'spine_alert' | 'cbrne_triage' | 'hbot_safe'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -2927,6 +2928,14 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderHbotSafeHub = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <HbotSafeHub />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -4041,6 +4050,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 ☣️ CBRNE-TRIAGE
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('hbot_safe')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'hbot_safe' ? '#06b6d4' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'hbot_safe' ? '2.5px solid #06b6d4' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🫧 HBOT-SAFE
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -4373,6 +4400,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderSpineAlertHub()
             ) : currentTab === 'cbrne_triage' ? (
               renderCbrneTriageHub()
+            ) : currentTab === 'hbot_safe' ? (
+              renderHbotSafeHub()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

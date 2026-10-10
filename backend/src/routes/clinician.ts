@@ -53,6 +53,7 @@ import * as radiationTheranosticsService from '../services/radiationTheranostics
 import * as hemodynamicSwanGanzService from '../services/hemodynamicSwanGanz';
 import * as spinalCordInjuryService from '../services/spinalCordInjury';
 import * as cbrneTriageService from '../services/cbrneTriage';
+import * as hyperbaricMedicineService from '../services/hyperbaricMedicine';
 
 const router = Router();
 
@@ -4898,6 +4899,105 @@ router.get('/cbrne/surge-stats', async (req: AuthenticatedRequest, res: Response
   } catch (err: any) {
     console.error('Get surge stats error:', err);
     res.status(500).json({ error: 'Failed to calculate disaster surge statistics.' });
+  }
+});
+
+// ==========================================
+// Phase 64: Hyperbaric Medicine & Diving Emergency Fleet (HBOT-SAFE)
+// ==========================================
+
+// Calculate CO Elimination Kinetics
+router.post('/hbot/co-kinetics', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { initialCohbPercent, elapsedMinutes, fio2Fraction, pressureAta, lossOfConsciousness, cardiacIschemia, pregnancy, neurologicalDeficit } = req.body;
+    const profile = hyperbaricMedicineService.HyperbaricMedicineService.calculateCOElimination(
+      Number(initialCohbPercent),
+      Number(elapsedMinutes),
+      Number(fio2Fraction),
+      Number(pressureAta),
+      Boolean(lossOfConsciousness),
+      Boolean(cardiacIschemia),
+      Boolean(pregnancy),
+      Boolean(neurologicalDeficit)
+    );
+    res.json(profile);
+  } catch (err: any) {
+    console.error('CO kinetics error:', err);
+    res.status(400).json({ error: err.message || 'Failed to calculate CO clearance kinetics.' });
+  }
+});
+
+// Select Treatment Table
+router.post('/hbot/tables/select', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { indication, isSevereOrAGE } = req.body;
+    const table = hyperbaricMedicineService.HyperbaricMedicineService.selectTreatmentTable(indication, Boolean(isSevereOrAGE));
+    res.json(table);
+  } catch (err: any) {
+    console.error('Select table error:', err);
+    res.status(400).json({ error: err.message || 'Failed to select treatment table.' });
+  }
+});
+
+// Evaluate Oxygen Toxicity (UPTD & CNS)
+router.post('/hbot/toxicity/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { segments, cnsSymptoms } = req.body;
+    const assessment = hyperbaricMedicineService.HyperbaricMedicineService.calculateOxygenToxicity(segments, cnsSymptoms || []);
+    res.json(assessment);
+  } catch (err: any) {
+    console.error('Evaluate toxicity error:', err);
+    res.status(400).json({ error: err.message || 'Failed to calculate oxygen toxicity.' });
+  }
+});
+
+// Create HBOT Session
+router.post('/hbot/sessions', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const session = await hyperbaricMedicineService.HyperbaricMedicineService.createSession(req.body);
+    res.status(201).json(session);
+  } catch (err: any) {
+    console.error('Create HBOT session error:', err);
+    res.status(500).json({ error: 'Failed to record hyperbaric treatment session.' });
+  }
+});
+
+// List HBOT Sessions for Patient
+router.get('/hbot/patients/:patientId/sessions', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const sessions = await hyperbaricMedicineService.HyperbaricMedicineService.listSessionsByPatient(patientId);
+    res.json(sessions);
+  } catch (err: any) {
+    console.error('List HBOT sessions error:', err);
+    res.status(500).json({ error: 'Failed to retrieve hyperbaric sessions.' });
+  }
+});
+
+// Log HBOT Toxicity Event
+router.post('/hbot/sessions/:sessionId/toxicity-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = Number(req.params.sessionId);
+    const log = await hyperbaricMedicineService.HyperbaricMedicineService.logToxicityEvent({
+      ...req.body,
+      sessionId
+    });
+    res.status(201).json(log);
+  } catch (err: any) {
+    console.error('Log toxicity event error:', err);
+    res.status(500).json({ error: 'Failed to log toxicity event.' });
+  }
+});
+
+// Get Toxicity Logs for Session
+router.get('/hbot/sessions/:sessionId/toxicity-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const sessionId = Number(req.params.sessionId);
+    const logs = await hyperbaricMedicineService.HyperbaricMedicineService.getToxicityLogsBySession(sessionId);
+    res.json(logs);
+  } catch (err: any) {
+    console.error('Get toxicity logs error:', err);
+    res.status(500).json({ error: 'Failed to retrieve toxicity logs.' });
   }
 });
 
