@@ -60,6 +60,7 @@ import * as teleIcuScribeService from '../services/teleIcuScribe';
 import * as neuroCriticalCareService from '../services/neuroCriticalCare';
 import * as cellularImmunotherapyService from '../services/cellularImmunotherapy';
 import * as ecprResuscitationService from '../services/ecprResuscitation';
+import * as digitalTwinOperationsService from '../services/digitalTwinOperations';
 
 const router = Router();
 
@@ -5393,6 +5394,74 @@ router.get('/ecpr/patients/:patientId/profile', async (req: AuthenticatedRequest
   } catch (err: any) {
     console.error('Get patient E-CPR profile error:', err);
     res.status(500).json({ error: 'Failed to retrieve E-CPR profile.' });
+  }
+});
+
+// Phase 71: Hospital Operations Master Digital Twin & Predictive Flow (TWIN-ORCHESTRA Hub)
+
+// Get all hospital units with census & ratio metrics
+router.get('/digital-twin/units', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const units = await digitalTwinOperationsService.DigitalTwinOperationsService.getHospitalUnits();
+    res.json(units);
+  } catch (err: any) {
+    console.error('Get digital twin units error:', err);
+    res.status(500).json({ error: 'Failed to retrieve hospital digital twin units.' });
+  }
+});
+
+// Update single unit census / staffing / diversion
+router.patch('/digital-twin/units/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const unitId = Number(req.params.id);
+    const updated = await digitalTwinOperationsService.DigitalTwinOperationsService.updateUnitCensus(unitId, req.body);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update unit census error:', err);
+    res.status(500).json({ error: 'Failed to update hospital unit census.' });
+  }
+});
+
+// Run flow simulation scenario
+router.post('/digital-twin/simulate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      scenario_name,
+      ed_arrival_rate_per_hr,
+      icu_stepdown_transfer_rate,
+      or_addon_surgeries_count,
+      simulation_duration_hours
+    } = req.body;
+
+    if (!scenario_name || ed_arrival_rate_per_hr === undefined || icu_stepdown_transfer_rate === undefined) {
+      res.status(400).json({ error: 'scenario_name, ed_arrival_rate_per_hr, and icu_stepdown_transfer_rate are required.' });
+      return;
+    }
+
+    const result = await digitalTwinOperationsService.DigitalTwinOperationsService.runFlowSimulation({
+      scenario_name,
+      ed_arrival_rate_per_hr: Number(ed_arrival_rate_per_hr),
+      icu_stepdown_transfer_rate: Number(icu_stepdown_transfer_rate),
+      or_addon_surgeries_count: Number(or_addon_surgeries_count || 0),
+      simulation_duration_hours: Number(simulation_duration_hours || 24)
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Run flow simulation error:', err);
+    res.status(500).json({ error: 'Failed to run hospital flow simulation.' });
+  }
+});
+
+// Get simulation history
+router.get('/digital-twin/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const limit = Number(req.query.limit) || 10;
+    const history = await digitalTwinOperationsService.DigitalTwinOperationsService.getSimulationHistory(limit);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get simulation history error:', err);
+    res.status(500).json({ error: 'Failed to retrieve simulation history.' });
   }
 });
 

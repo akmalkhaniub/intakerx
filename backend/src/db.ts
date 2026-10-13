@@ -2186,6 +2186,58 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_ttm_case ON ttm_temperature_logs(case_id);
     `);
 
+    // Create digital_twin_hospital_units table (Phase 71)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS digital_twin_hospital_units (
+        id SERIAL PRIMARY KEY,
+        unit_name VARCHAR(100) NOT NULL UNIQUE,
+        unit_type VARCHAR(32) NOT NULL,
+        total_beds INTEGER NOT NULL,
+        occupied_beds INTEGER NOT NULL DEFAULT 0,
+        staffed_nurses INTEGER NOT NULL DEFAULT 1,
+        target_nurse_to_patient_ratio NUMERIC(3, 1) DEFAULT 1.0,
+        pending_admissions INTEGER DEFAULT 0,
+        pending_discharges INTEGER DEFAULT 0,
+        diversion_status BOOLEAN DEFAULT FALSE,
+        surge_capacity_available INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_digital_twin_units_type ON digital_twin_hospital_units(unit_type);
+    `);
+
+    // Create bed_flow_simulation_runs table (Phase 71)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS bed_flow_simulation_runs (
+        id SERIAL PRIMARY KEY,
+        scenario_name VARCHAR(128) NOT NULL,
+        ed_arrival_rate_per_hr NUMERIC(5, 2) NOT NULL,
+        icu_stepdown_transfer_rate NUMERIC(5, 2) NOT NULL,
+        or_addon_surgeries_count INTEGER NOT NULL DEFAULT 0,
+        simulation_duration_hours INTEGER NOT NULL DEFAULT 24,
+        projected_divert_hours NUMERIC(4, 1) DEFAULT 0,
+        predicted_boarding_time_hours NUMERIC(4, 1) DEFAULT 0,
+        bottleneck_unit VARCHAR(100),
+        divert_risk_probability NUMERIC(4, 3) NOT NULL,
+        recommended_reallocations JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Seed standard units if empty
+    await migrationPool.query(`
+      INSERT INTO digital_twin_hospital_units 
+        (unit_name, unit_type, total_beds, occupied_beds, staffed_nurses, target_nurse_to_patient_ratio, pending_admissions, pending_discharges, diversion_status, surge_capacity_available)
+      VALUES
+        ('Emergency Department (ED)', 'ED', 45, 41, 12, 0.33, 8, 3, FALSE, 5),
+        ('Medical Intensive Care (MICU)', 'ICU', 24, 22, 11, 0.5, 4, 2, FALSE, 2),
+        ('Surgical Intensive Care (SICU)', 'ICU', 20, 18, 9, 0.5, 3, 1, FALSE, 2),
+        ('Stepdown Telemetry', 'STEPDOWN', 32, 29, 8, 0.25, 5, 4, FALSE, 4),
+        ('Acute General Med-Surg', 'MEDSURG', 80, 74, 15, 0.2, 7, 9, FALSE, 10),
+        ('Post-Anesthesia Care Unit (PACU)', 'PACU', 16, 12, 6, 0.5, 2, 3, FALSE, 3)
+      ON CONFLICT (unit_name) DO NOTHING;
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
