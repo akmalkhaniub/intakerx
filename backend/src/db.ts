@@ -2151,6 +2151,41 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_crs_case ON cytokine_release_events(case_id);
     `);
 
+    // Create ecpr_resuscitation_cases table (Phase 70)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS ecpr_resuscitation_cases (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        arrest_witnessed BOOLEAN NOT NULL DEFAULT TRUE,
+        bystander_cpr_duration_minutes INTEGER NOT NULL,
+        initial_rhythm VARCHAR(32) NOT NULL DEFAULT 'VF',
+        end_tidal_co2_mmhg NUMERIC(4, 1) NOT NULL,
+        arterial_ph NUMERIC(4, 2) NOT NULL,
+        arterial_lactate_mmol_l NUMERIC(4, 2) NOT NULL,
+        cannulation_time_to_flow_minutes INTEGER NOT NULL,
+        inclusion_criteria_met BOOLEAN DEFAULT TRUE,
+        va_ecmo_flow_l_min NUMERIC(4, 2) DEFAULT 3.5,
+        target_temperature_celsius NUMERIC(3, 1) DEFAULT 33.0,
+        bsas_shivering_score INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ecpr_patient ON ecpr_resuscitation_cases(patient_id);
+    `);
+
+    // Create ttm_temperature_logs table (Phase 70)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS ttm_temperature_logs (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER REFERENCES ecpr_resuscitation_cases(id) ON DELETE CASCADE,
+        core_temperature_celsius NUMERIC(3, 1) NOT NULL,
+        cooling_phase VARCHAR(32) NOT NULL DEFAULT 'maintenance',
+        shivering_suppression_agent VARCHAR(64),
+        rewarming_rate_c_per_hr NUMERIC(3, 2) DEFAULT 0.25,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ttm_case ON ttm_temperature_logs(case_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

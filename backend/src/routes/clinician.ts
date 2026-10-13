@@ -59,6 +59,7 @@ import * as cdsHooksFhirService from '../services/cdsHooksFhir';
 import * as teleIcuScribeService from '../services/teleIcuScribe';
 import * as neuroCriticalCareService from '../services/neuroCriticalCare';
 import * as cellularImmunotherapyService from '../services/cellularImmunotherapy';
+import * as ecprResuscitationService from '../services/ecprResuscitation';
 
 const router = Router();
 
@@ -5335,6 +5336,63 @@ router.get('/cart/patients/:patientId/profile', async (req: AuthenticatedRequest
   } catch (err: any) {
     console.error('Get patient CAR-T profile error:', err);
     res.status(500).json({ error: 'Failed to retrieve CAR-T profile.' });
+  }
+});
+
+// Phase 70: Extracorporeal Cardiopulmonary Resuscitation & Refractory Arrest (E-CPR Command)
+// Evaluate E-CPR Inclusion Criteria
+router.post('/ecpr/evaluate-inclusion', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = ecprResuscitationService.EcprResuscitationService.evaluateInclusionCriteria(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate E-CPR inclusion error:', err);
+    res.status(500).json({ error: 'Failed to evaluate E-CPR inclusion criteria.' });
+  }
+});
+
+// Evaluate Targeted Temperature Management Protocol
+router.post('/ecpr/evaluate-ttm', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = ecprResuscitationService.EcprResuscitationService.evaluateTtmProtocol(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate TTM protocol error:', err);
+    res.status(500).json({ error: 'Failed to evaluate TTM protocol.' });
+  }
+});
+
+// Record E-CPR Resuscitation Case
+router.post('/ecpr/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const ecprCase = await ecprResuscitationService.EcprResuscitationService.recordEcprCase(req.body);
+    res.status(201).json(ecprCase);
+  } catch (err: any) {
+    console.error('Record E-CPR case error:', err);
+    res.status(500).json({ error: 'Failed to record E-CPR resuscitation case.' });
+  }
+});
+
+// Record TTM Temperature Log
+router.post('/ecpr/temperature-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const log = await ecprResuscitationService.EcprResuscitationService.recordTtmLog(req.body);
+    res.status(201).json(log);
+  } catch (err: any) {
+    console.error('Record TTM log error:', err);
+    res.status(500).json({ error: 'Failed to record TTM temperature log.' });
+  }
+});
+
+// Get Patient E-CPR Profile
+router.get('/ecpr/patients/:patientId/profile', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const profile = await ecprResuscitationService.EcprResuscitationService.getPatientEcprProfile(patientId);
+    res.json(profile);
+  } catch (err: any) {
+    console.error('Get patient E-CPR profile error:', err);
+    res.status(500).json({ error: 'Failed to retrieve E-CPR profile.' });
   }
 });
 
