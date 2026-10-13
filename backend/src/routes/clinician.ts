@@ -58,6 +58,7 @@ import * as liverSupportService from '../services/liverSupport';
 import * as cdsHooksFhirService from '../services/cdsHooksFhir';
 import * as teleIcuScribeService from '../services/teleIcuScribe';
 import * as neuroCriticalCareService from '../services/neuroCriticalCare';
+import * as cellularImmunotherapyService from '../services/cellularImmunotherapy';
 
 const router = Router();
 
@@ -5266,6 +5267,74 @@ router.get('/neurocrit/patients/:patientId/profile', async (req: AuthenticatedRe
   } catch (err: any) {
     console.error('Get patient neuro profile error:', err);
     res.status(500).json({ error: 'Failed to retrieve neuro profile.' });
+  }
+});
+
+// Phase 69: Cellular Immunotherapy, CAR-T & Cytokine Release Command (CELL-SHIELD Hub)
+// Evaluate ASTCT CRS Grade
+router.post('/cart/evaluate-crs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = cellularImmunotherapyService.CellularImmunotherapyService.evaluateCrs(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate CRS error:', err);
+    res.status(500).json({ error: 'Failed to evaluate CRS grade.' });
+  }
+});
+
+// Evaluate ASTCT ICANS Grade
+router.post('/cart/evaluate-icans', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = cellularImmunotherapyService.CellularImmunotherapyService.evaluateIcans(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate ICANS error:', err);
+    res.status(500).json({ error: 'Failed to evaluate ICANS grade.' });
+  }
+});
+
+// Calculate HScore for Secondary HLH/MAS
+router.post('/cart/evaluate-hscore', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = cellularImmunotherapyService.CellularImmunotherapyService.calculateHScore(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate HScore error:', err);
+    res.status(500).json({ error: 'Failed to calculate HScore.' });
+  }
+});
+
+// Record CAR-T Therapy Case
+router.post('/cart/cases', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const cartCase = await cellularImmunotherapyService.CellularImmunotherapyService.recordCartCase(req.body);
+    res.status(201).json(cartCase);
+  } catch (err: any) {
+    console.error('Record CAR-T case error:', err);
+    res.status(500).json({ error: 'Failed to record CAR-T therapy case.' });
+  }
+});
+
+// Record Cytokine Release Event
+router.post('/cart/events', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const event = await cellularImmunotherapyService.CellularImmunotherapyService.recordCrsEvent(req.body);
+    res.status(201).json(event);
+  } catch (err: any) {
+    console.error('Record CRS event error:', err);
+    res.status(500).json({ error: 'Failed to record CRS event.' });
+  }
+});
+
+// Get Patient CAR-T Profile
+router.get('/cart/patients/:patientId/profile', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const profile = await cellularImmunotherapyService.CellularImmunotherapyService.getPatientCartProfile(patientId);
+    res.json(profile);
+  } catch (err: any) {
+    console.error('Get patient CAR-T profile error:', err);
+    res.status(500).json({ error: 'Failed to retrieve CAR-T profile.' });
   }
 });
 

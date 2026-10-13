@@ -2115,6 +2115,42 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_icp_events_session ON intracranial_hypertension_events(session_id);
     `);
 
+    // Create cart_cellular_therapy_cases table (Phase 69)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS cart_cellular_therapy_cases (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        product_name VARCHAR(64) NOT NULL,
+        infusion_date DATE NOT NULL,
+        crs_grade VARCHAR(16) NOT NULL DEFAULT 'Grade_0',
+        icans_grade VARCHAR(16) NOT NULL DEFAULT 'Grade_0',
+        ice_neuro_score INTEGER DEFAULT 10,
+        hscore_hlh_risk NUMERIC(5, 1) DEFAULT 0.0,
+        tocilizumab_doses_given INTEGER DEFAULT 0,
+        dexamethasone_active BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cart_patient ON cart_cellular_therapy_cases(patient_id);
+    `);
+
+    // Create cytokine_release_events table (Phase 69)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS cytokine_release_events (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER REFERENCES cart_cellular_therapy_cases(id) ON DELETE CASCADE,
+        temperature_celsius NUMERIC(4, 1) NOT NULL,
+        systolic_bp_mmhg INTEGER NOT NULL,
+        vasopressor_required BOOLEAN DEFAULT FALSE,
+        fio2_oxygen_requirement NUMERIC(4, 2) NOT NULL DEFAULT 0.21,
+        ferritin_ng_ml NUMERIC(8, 1),
+        il6_pg_ml NUMERIC(8, 1),
+        crp_mg_dl NUMERIC(6, 1),
+        intervention_administered VARCHAR(128) NOT NULL,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_crs_case ON cytokine_release_events(case_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
