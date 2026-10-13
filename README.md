@@ -153,6 +153,10 @@ graph TD
 | **Phase 65** | **Molecular Adsorbent Liver Support & Acute Liver Failure (LIVER-ALIVE Hub)** | MARS (AlbuMax) & Prometheus (FPSA) albumin dialysis kinetics (target bilirubin clearance >= 25%, ammonia >= 30%), King's College Hospital Criteria (Acetaminophen vs Non-Acetaminophen urgent UNOS Status 1A transplant listing), West Haven Hepatic Encephalopathy grading (Grades 0-IV), and hyperammonemic cerebral edema / intracranial hypertension watchdog (CPP 60-80 mmHg). | `test_liver_support.ts` (All 23 Passed) |
 | **Phase 66** | **SMART-on-FHIR & CDS Hooks Enterprise Integration Engine (CDS-HOOKS Hub)** | HL7 CDS Hooks 2.0 discovery catalog endpoint (`/cds-services`), patient-view, order-select, and order-sign hook evaluators returning SMART decision support cards with suggestions and links, SMART App Launch OAuth2 token exchange with OpenID Connect ID token, and audit logging. | `test_cds_hooks_fhir.ts` (All 20 Passed) |
 | **Phase 67** | **Ambient Bedside Scribe & Tele-ICU Virtual Command (TELE-ICU Hub)** | Continuous WebRTC bi-directional audio/video telepresence signaling coordinator, multi-speaker ambient audio natural language parsing into structured clinical SOAP progress notes with CPT 99291 critical care time attestation, and Critical-Care Pain Observation Tool (CPOT) with PADIS multimodal analgesia triggers. | `test_tele_icu_scribe.ts` (All 19 Passed) |
+| **Phase 68** | **Acute Neurological Resuscitation & Multimodal Neuro-Monitoring (NEURO-CRIT Hub)** | Lundberg wave & ICP-CPP autoregulation (PRx index, CPPopt 60-70 mmHg), Brain Tissue Oxygenation (PbtO2 < 20 mmHg hypoxia, LPR > 40 energy crisis), Hunt & Hess / Fisher SAH vasospasm watchdog (Lindegaard ratio > 6), and continuous EEG status epilepticus burst suppression tracker (>= 80%). | `test_neuro_critical_care.ts` (All 28 Passed) |
+| **Phase 69** | **Cellular Immunotherapy, CAR-T & Cytokine Release Command (CELL-SHIELD Hub)** | ASTCT consensus CRS grading (Grades 1-4) with Tocilizumab 8 mg/kg / Dexamethasone protocols, ICANS 10-point ICE neurotoxicity staging with high-dose methylprednisolone pulse, and HScore secondary HLH/MAS emergency sentinel (score >= 169) with Anakinra IL-1 antagonist protocol. | `test_cellular_immunotherapy.ts` (All 23 Passed) |
+| **Phase 70** | **Extracorporeal Cardiopulmonary Resuscitation & Refractory Arrest (E-CPR Command)** | ELSO 15-minute time-to-cannulation checklist (witnessed arrest, no-flow <= 5m, initial VF/pVT, EtCO2 > 10 mmHg, age <= 65), VA-ECMO flow calculation, and closed-loop Targeted Temperature Management (TTM 33°C/36°C) with Bedside Shivering Assessment Scale (BSAS) suppression and controlled rewarming (0.25°C/hr). | `test_ecpr_resuscitation.ts` (All 19 Passed) |
+| **Phase 71** | **Hospital Operations Master Digital Twin & Predictive Flow (TWIN-ORCHESTRA Hub)** | Erlang-C multi-server queuing theory engine (Poisson arrivals, delay probability C(c,A), average boarding time Wq), dynamic elective surgical block re-allocator for emergent OR add-ons with PACU/SICU bed recovery, and 6-hour predictive ED divert risk engine (P(divert) >= 70% threshold) with live unit digital twin board. | `test_digital_twin_operations.ts` (All 32 Passed) |
 
 ---
 
@@ -293,6 +297,10 @@ npx ts-node src/test_hyperbaric_medicine.ts    # Hyperbaric Medicine & Diving Em
 npx ts-node src/test_liver_support.ts          # Molecular Adsorbent Liver Support & ALF (Phase 65)
 npx ts-node src/test_cds_hooks_fhir.ts         # SMART-on-FHIR & CDS Hooks Engine (Phase 66)
 npx ts-node src/test_tele_icu_scribe.ts        # Ambient Bedside Scribe & Tele-ICU Command (Phase 67)
+npx ts-node src/test_neuro_critical_care.ts    # Acute Neurological Resuscitation & Multimodal Neuro-Monitoring (Phase 68)
+npx ts-node src/test_cellular_immunotherapy.ts # Cellular Immunotherapy, CAR-T & Cytokine Release (Phase 69)
+npx ts-node src/test_ecpr_resuscitation.ts     # Extracorporeal CPR & Targeted Temperature Management (Phase 70)
+npx ts-node src/test_digital_twin_operations.ts # Hospital Operations Master Digital Twin & Predictive Flow (Phase 71)
 ```
 
 ---
