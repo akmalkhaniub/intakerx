@@ -2078,6 +2078,43 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_ambient_session ON ambient_scribe_transcripts(session_id);
     `);
 
+    // Create neurocrit_monitoring_sessions table (Phase 68)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS neurocrit_monitoring_sessions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        diagnosis_category VARCHAR(64) NOT NULL,
+        mean_icp_mmhg NUMERIC(5, 2) NOT NULL,
+        map_mmhg NUMERIC(5, 2) NOT NULL,
+        cpp_mmhg NUMERIC(5, 2) NOT NULL,
+        prx_autoregulation_index NUMERIC(4, 2) NOT NULL,
+        optimal_cpp_target_mmhg NUMERIC(5, 2) NOT NULL,
+        pbto2_brain_oxygen_mmhg NUMERIC(5, 2),
+        lactate_pyruvate_ratio NUMERIC(5, 2),
+        lindegaard_ratio NUMERIC(5, 2),
+        eeg_burst_suppression_ratio NUMERIC(4, 1),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_neurocrit_patient ON neurocrit_monitoring_sessions(patient_id);
+    `);
+
+    // Create intracranial_hypertension_events table (Phase 68)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS intracranial_hypertension_events (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES neurocrit_monitoring_sessions(id) ON DELETE CASCADE,
+        peak_icp_mmhg NUMERIC(5, 2) NOT NULL,
+        duration_minutes INTEGER NOT NULL,
+        lundberg_wave_type VARCHAR(16) NOT NULL DEFAULT 'A_wave',
+        tier_intervention_applied VARCHAR(64) NOT NULL,
+        hyperosmolar_agent VARCHAR(64),
+        eeg_status_epilepticus_detected BOOLEAN DEFAULT FALSE,
+        outcome_status VARCHAR(32) DEFAULT 'controlled',
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_icp_events_session ON intracranial_hypertension_events(session_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

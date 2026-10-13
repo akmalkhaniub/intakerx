@@ -57,6 +57,7 @@ import * as hyperbaricMedicineService from '../services/hyperbaricMedicine';
 import * as liverSupportService from '../services/liverSupport';
 import * as cdsHooksFhirService from '../services/cdsHooksFhir';
 import * as teleIcuScribeService from '../services/teleIcuScribe';
+import * as neuroCriticalCareService from '../services/neuroCriticalCare';
 
 const router = Router();
 
@@ -5186,6 +5187,85 @@ router.get('/tele-icu/patients/:patientId/history', async (req: AuthenticatedReq
   } catch (err: any) {
     console.error('Get patient Tele-ICU history error:', err);
     res.status(500).json({ error: 'Failed to retrieve Tele-ICU history.' });
+  }
+});
+
+// Phase 68: Acute Neurological Resuscitation & Multimodal Neuro-Monitoring (NEURO-CRIT Hub)
+// Evaluate Cerebral Autoregulation & PRx Index
+router.post('/neurocrit/evaluate-autoregulation', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = neuroCriticalCareService.NeuroCriticalCareService.evaluateAutoregulation(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate autoregulation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate autoregulation.' });
+  }
+});
+
+// Evaluate Multimodal Neurometabolism (PbtO2 & LPR)
+router.post('/neurocrit/evaluate-metabolism', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = neuroCriticalCareService.NeuroCriticalCareService.evaluateMultimodalMetabolism(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate metabolism error:', err);
+    res.status(500).json({ error: 'Failed to evaluate neurometabolism.' });
+  }
+});
+
+// Evaluate SAH TCD & Lindegaard Ratio
+router.post('/neurocrit/evaluate-sah-vasospasm', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = neuroCriticalCareService.NeuroCriticalCareService.evaluateSahVasospasm(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate SAH vasospasm error:', err);
+    res.status(500).json({ error: 'Failed to evaluate SAH vasospasm.' });
+  }
+});
+
+// Evaluate Status Epilepticus Continuous EEG
+router.post('/neurocrit/evaluate-eeg', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = neuroCriticalCareService.NeuroCriticalCareService.evaluateEegBurstSuppression(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate EEG burst suppression error:', err);
+    res.status(500).json({ error: 'Failed to evaluate EEG burst suppression.' });
+  }
+});
+
+// Record Neurocritical Care Monitoring Session
+router.post('/neurocrit/sessions', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const session = await neuroCriticalCareService.NeuroCriticalCareService.recordMonitoringSession(req.body);
+    res.status(201).json(session);
+  } catch (err: any) {
+    console.error('Record neurocrit session error:', err);
+    res.status(500).json({ error: 'Failed to record monitoring session.' });
+  }
+});
+
+// Record Intracranial Hypertension Event
+router.post('/neurocrit/events', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const event = await neuroCriticalCareService.NeuroCriticalCareService.recordHypertensionEvent(req.body);
+    res.status(201).json(event);
+  } catch (err: any) {
+    console.error('Record intracranial event error:', err);
+    res.status(500).json({ error: 'Failed to record intracranial hypertension event.' });
+  }
+});
+
+// Get Patient Neuro Profile
+router.get('/neurocrit/patients/:patientId/profile', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const profile = await neuroCriticalCareService.NeuroCriticalCareService.getPatientNeuroProfile(patientId);
+    res.json(profile);
+  } catch (err: any) {
+    console.error('Get patient neuro profile error:', err);
+    res.status(500).json({ error: 'Failed to retrieve neuro profile.' });
   }
 });
 
