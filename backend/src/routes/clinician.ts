@@ -61,6 +61,7 @@ import * as neuroCriticalCareService from '../services/neuroCriticalCare';
 import * as cellularImmunotherapyService from '../services/cellularImmunotherapy';
 import * as ecprResuscitationService from '../services/ecprResuscitation';
 import * as digitalTwinOperationsService from '../services/digitalTwinOperations';
+import * as vascularLimbService from '../services/vascularLimb';
 
 const router = Router();
 
@@ -5462,6 +5463,92 @@ router.get('/digital-twin/history', async (req: AuthenticatedRequest, res: Respo
   } catch (err: any) {
     console.error('Get simulation history error:', err);
     res.status(500).json({ error: 'Failed to retrieve simulation history.' });
+  }
+});
+
+// Phase 72: Acute Limb Ischemia, Compartment Syndrome & Microvascular Free-Flap (VASCULAR-LIMB Command)
+
+// Evaluate Rutherford Acute Limb Ischemia
+router.post('/vascular-limb/evaluate-rutherford', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = vascularLimbService.evaluateRutherfordClassification(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate Rutherford error:', err);
+    res.status(500).json({ error: 'Failed to evaluate Rutherford classification.' });
+  }
+});
+
+// Evaluate Compartment Pressure & Delta-P
+router.post('/vascular-limb/evaluate-compartment', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = vascularLimbService.evaluateCompartmentPressure(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate compartment pressure error:', err);
+    res.status(500).json({ error: 'Failed to evaluate compartment pressure.' });
+  }
+});
+
+// Evaluate Microvascular Free-Flap Perfusion
+router.post('/vascular-limb/evaluate-free-flap', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = vascularLimbService.evaluateFreeFlapPerfusion(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate free flap error:', err);
+    res.status(500).json({ error: 'Failed to evaluate microvascular free flap.' });
+  }
+});
+
+// Save Vascular Limb Encounter
+router.post('/vascular-limb/encounters', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patient_id, ...assessmentInput } = req.body;
+    if (!patient_id) {
+      res.status(400).json({ error: 'patient_id is required.' });
+      return;
+    }
+    const result = await vascularLimbService.VascularLimbService.evaluateAndSaveEncounter(
+      Number(patient_id),
+      assessmentInput
+    );
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Save vascular encounter error:', err);
+    res.status(500).json({ error: 'Failed to record vascular limb encounter.' });
+  }
+});
+
+// Log Compartment Pressure & Optional Flap Monitoring
+router.post('/vascular-limb/compartment-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { encounter_id, compartment_input, free_flap_input } = req.body;
+    if (!encounter_id || !compartment_input) {
+      res.status(400).json({ error: 'encounter_id and compartment_input are required.' });
+      return;
+    }
+    const result = await vascularLimbService.VascularLimbService.logCompartmentPressure(
+      Number(encounter_id),
+      compartment_input,
+      free_flap_input
+    );
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Log compartment pressure error:', err);
+    res.status(500).json({ error: 'Failed to log compartment pressure.' });
+  }
+});
+
+// Get Patient Vascular History
+router.get('/vascular-limb/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await vascularLimbService.VascularLimbService.getPatientVascularHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get vascular history error:', err);
+    res.status(500).json({ error: 'Failed to retrieve vascular limb history.' });
   }
 });
 

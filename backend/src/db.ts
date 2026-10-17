@@ -2238,6 +2238,40 @@ export async function bootstrap() {
       ON CONFLICT (unit_name) DO NOTHING;
     `);
 
+    // Create vascular_limb_encounters table (Phase 72)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS vascular_limb_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        limb_affected VARCHAR(64) NOT NULL,
+        rutherford_category VARCHAR(16) NOT NULL,
+        sensory_loss VARCHAR(64) NOT NULL,
+        motor_deficit VARCHAR(64) NOT NULL,
+        arterial_doppler_audible BOOLEAN DEFAULT TRUE,
+        venous_doppler_audible BOOLEAN DEFAULT TRUE,
+        recommended_intervention VARCHAR(128) NOT NULL,
+        thrombolysis_contraindications JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_vascular_limb_patient ON vascular_limb_encounters(patient_id);
+    `);
+
+    // Create compartment_pressure_logs table (Phase 72)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS compartment_pressure_logs (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES vascular_limb_encounters(id) ON DELETE CASCADE,
+        compartment_name VARCHAR(64) NOT NULL,
+        measured_pressure_mmhg NUMERIC(4, 1) NOT NULL,
+        diastolic_bp_mmhg NUMERIC(4, 1) NOT NULL,
+        delta_p_mmhg NUMERIC(4, 1) NOT NULL,
+        fasciotomy_indicated BOOLEAN DEFAULT FALSE,
+        free_flap_monitoring JSONB,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_compartment_encounter ON compartment_pressure_logs(encounter_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
