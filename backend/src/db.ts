@@ -2315,6 +2315,44 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_insulin_log_encounter ON insulin_infusion_logs(encounter_id);
     `);
 
+    // Create coag_rotem_assays table (Phase 74)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS coag_rotem_assays (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        assay_type VARCHAR(16) NOT NULL,
+        clinical_scenario VARCHAR(64) NOT NULL,
+        extem_ct_sec NUMERIC(5, 1),
+        intem_ct_sec NUMERIC(5, 1),
+        fibtem_mcf_mm NUMERIC(4, 1),
+        extem_mcf_mm NUMERIC(4, 1),
+        maximum_lysis_percent NUMERIC(4, 1),
+        heparinase_correction_ratio NUMERIC(4, 2),
+        deficiency_pattern VARCHAR(64) NOT NULL,
+        blood_products_prescribed JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_coag_rotem_patient ON coag_rotem_assays(patient_id);
+    `);
+
+    // Create anticoagulant_reversal_events table (Phase 74)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS anticoagulant_reversal_events (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        target_agent VARCHAR(64) NOT NULL,
+        last_dose_hours_ago NUMERIC(4, 1) NOT NULL,
+        anti_xa_level_iu_ml NUMERIC(4, 2),
+        inr NUMERIC(4, 2),
+        bleeding_severity VARCHAR(32) NOT NULL,
+        reversal_agent VARCHAR(64) NOT NULL,
+        prescribed_dose VARCHAR(128) NOT NULL,
+        administration_guidelines JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_reversal_patient ON anticoagulant_reversal_events(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

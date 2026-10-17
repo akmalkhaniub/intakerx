@@ -63,6 +63,7 @@ import * as ecprResuscitationService from '../services/ecprResuscitation';
 import * as digitalTwinOperationsService from '../services/digitalTwinOperations';
 import * as vascularLimbService from '../services/vascularLimb';
 import * as metabolicKetoService from '../services/metabolicKeto';
+import * as coagRotemService from '../services/coagRotem';
 
 const router = Router();
 
@@ -5624,6 +5625,80 @@ router.get('/metabolic-keto/patients/:patientId/history', async (req: Authentica
   } catch (err: any) {
     console.error('Get metabolic history error:', err);
     res.status(500).json({ error: 'Failed to retrieve metabolic keto history.' });
+  }
+});
+
+// Phase 74: Viscoelastic Point-of-Care Hemostasis, TEG/ROTEM & Targeted DOAC Reversal (COAG-ROTEM Command)
+
+// Evaluate ROTEM / TEG viscoelastic assay
+router.post('/coag-rotem/evaluate-rotem', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = coagRotemService.evaluateRotemAssay(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate ROTEM error:', err);
+    res.status(500).json({ error: 'Failed to evaluate viscoelastic assay.' });
+  }
+});
+
+// Evaluate Anticoagulant Reversal Protocol
+router.post('/coag-rotem/evaluate-reversal', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = coagRotemService.evaluateAnticoagulantReversal(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate reversal error:', err);
+    res.status(500).json({ error: 'Failed to evaluate anticoagulant reversal.' });
+  }
+});
+
+// Save ROTEM Assay
+router.post('/coag-rotem/assays', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patient_id, ...assayInput } = req.body;
+    if (!patient_id) {
+      res.status(400).json({ error: 'patient_id is required.' });
+      return;
+    }
+    const result = await coagRotemService.CoagRotemService.evaluateAndSaveAssay(
+      Number(patient_id),
+      assayInput
+    );
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Save ROTEM assay error:', err);
+    res.status(500).json({ error: 'Failed to record viscoelastic assay.' });
+  }
+});
+
+// Save Anticoagulant Reversal Event
+router.post('/coag-rotem/reversals', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patient_id, ...reversalInput } = req.body;
+    if (!patient_id) {
+      res.status(400).json({ error: 'patient_id is required.' });
+      return;
+    }
+    const result = await coagRotemService.CoagRotemService.evaluateAndSaveReversal(
+      Number(patient_id),
+      reversalInput
+    );
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Save reversal event error:', err);
+    res.status(500).json({ error: 'Failed to record anticoagulant reversal event.' });
+  }
+});
+
+// Get Patient Coagulation History
+router.get('/coag-rotem/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await coagRotemService.CoagRotemService.getPatientCoagHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get coag history error:', err);
+    res.status(500).json({ error: 'Failed to retrieve coagulation history.' });
   }
 });
 
