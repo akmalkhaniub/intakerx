@@ -2353,6 +2353,40 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_reversal_patient ON anticoagulant_reversal_events(patient_id);
     `);
 
+    // Create icu_rounding_checklists table (Phase 75)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS icu_rounding_checklists (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        bed_number VARCHAR(32) NOT NULL,
+        fast_hug_bid_bundle JSONB NOT NULL,
+        compliance_score_percent NUMERIC(4, 1) NOT NULL,
+        cam_icu_delirium_status VARCHAR(32) NOT NULL,
+        cam_icu_subtype VARCHAR(32),
+        qtc_interval_ms INTEGER,
+        qtc_risk_alert BOOLEAN DEFAULT FALSE,
+        antimicrobial_timeout_due BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_icu_rounding_patient ON icu_rounding_checklists(patient_id);
+    `);
+
+    // Create invasive_device_trackers table (Phase 75)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS invasive_device_trackers (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        device_type VARCHAR(64) NOT NULL,
+        insertion_timestamp TIMESTAMP NOT NULL,
+        device_days NUMERIC(4, 1) NOT NULL,
+        daily_indication_present BOOLEAN DEFAULT TRUE,
+        infection_bundle_compliant BOOLEAN DEFAULT TRUE,
+        removal_recommended BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_device_tracker_patient ON invasive_device_trackers(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

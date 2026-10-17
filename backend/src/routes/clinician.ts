@@ -64,6 +64,7 @@ import * as digitalTwinOperationsService from '../services/digitalTwinOperations
 import * as vascularLimbService from '../services/vascularLimb';
 import * as metabolicKetoService from '../services/metabolicKeto';
 import * as coagRotemService from '../services/coagRotem';
+import * as icuRoundingService from '../services/icuRounding';
 
 const router = Router();
 
@@ -5699,6 +5700,140 @@ router.get('/coag-rotem/patients/:patientId/history', async (req: AuthenticatedR
   } catch (err: any) {
     console.error('Get coag history error:', err);
     res.status(500).json({ error: 'Failed to retrieve coagulation history.' });
+  }
+});
+
+// Phase 75: ROUNDING-HUD - Evaluate FAST-HUG-BID Bundle
+router.post('/icu-rounding/evaluate-fasthug', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { bundle } = req.body;
+    if (!bundle) {
+      res.status(400).json({ error: 'bundle is required.' });
+      return;
+    }
+    const result = icuRoundingService.IcuRoundingService.evaluateFastHugBid(bundle);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate FAST-HUG-BID error:', err);
+    res.status(500).json({ error: 'Failed to evaluate FAST-HUG-BID bundle.' });
+  }
+});
+
+// Phase 75: ROUNDING-HUD - Evaluate CAM-ICU Delirium
+router.post('/icu-rounding/evaluate-camicu', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { features, qtc_interval_ms, baseline_qtc_ms } = req.body;
+    if (!features) {
+      res.status(400).json({ error: 'features object is required.' });
+      return;
+    }
+    const result = icuRoundingService.IcuRoundingService.evaluateCamIcu(features, qtc_interval_ms, baseline_qtc_ms);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate CAM-ICU error:', err);
+    res.status(500).json({ error: 'Failed to evaluate CAM-ICU delirium.' });
+  }
+});
+
+// Phase 75: ROUNDING-HUD - Evaluate Invasive Device Days & Risk
+router.post('/icu-rounding/evaluate-device', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const deviceInput = req.body;
+    if (!deviceInput || !deviceInput.device_type) {
+      res.status(400).json({ error: 'device_type is required.' });
+      return;
+    }
+    const result = icuRoundingService.IcuRoundingService.evaluateDevice(deviceInput);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate device error:', err);
+    res.status(500).json({ error: 'Failed to evaluate invasive device status.' });
+  }
+});
+
+// Phase 75: ROUNDING-HUD - Save Rounding Checklist
+router.post('/icu-rounding/checklists', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patient_id,
+      bed_number,
+      fast_hug_bid_bundle,
+      compliance_score_percent,
+      cam_icu_delirium_status,
+      cam_icu_subtype,
+      qtc_interval_ms,
+      qtc_risk_alert,
+      antimicrobial_timeout_due
+    } = req.body;
+
+    if (!patient_id || !bed_number || !fast_hug_bid_bundle) {
+      res.status(400).json({ error: 'patient_id, bed_number, and fast_hug_bid_bundle are required.' });
+      return;
+    }
+
+    const saved = await icuRoundingService.IcuRoundingService.saveRoundingChecklist({
+      patient_id: Number(patient_id),
+      bed_number,
+      fast_hug_bid_bundle,
+      compliance_score_percent: Number(compliance_score_percent),
+      cam_icu_delirium_status,
+      cam_icu_subtype,
+      qtc_interval_ms: qtc_interval_ms ? Number(qtc_interval_ms) : undefined,
+      qtc_risk_alert: Boolean(qtc_risk_alert),
+      antimicrobial_timeout_due: Boolean(antimicrobial_timeout_due)
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save rounding checklist error:', err);
+    res.status(500).json({ error: 'Failed to record rounding checklist.' });
+  }
+});
+
+// Phase 75: ROUNDING-HUD - Track Invasive Device
+router.post('/icu-rounding/devices', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patient_id,
+      device_type,
+      insertion_timestamp,
+      device_days,
+      daily_indication_present,
+      infection_bundle_compliant,
+      removal_recommended
+    } = req.body;
+
+    if (!patient_id || !device_type || !insertion_timestamp) {
+      res.status(400).json({ error: 'patient_id, device_type, and insertion_timestamp are required.' });
+      return;
+    }
+
+    const saved = await icuRoundingService.IcuRoundingService.trackInvasiveDevice({
+      patient_id: Number(patient_id),
+      device_type,
+      insertion_timestamp,
+      device_days: Number(device_days || 0),
+      daily_indication_present: daily_indication_present !== undefined ? Boolean(daily_indication_present) : true,
+      infection_bundle_compliant: infection_bundle_compliant !== undefined ? Boolean(infection_bundle_compliant) : true,
+      removal_recommended: Boolean(removal_recommended)
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save device tracker error:', err);
+    res.status(500).json({ error: 'Failed to record invasive device tracker.' });
+  }
+});
+
+// Phase 75: ROUNDING-HUD - Get Patient Rounding History
+router.get('/icu-rounding/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await icuRoundingService.IcuRoundingService.getPatientRoundingHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get rounding history error:', err);
+    res.status(500).json({ error: 'Failed to retrieve rounding history.' });
   }
 });
 
