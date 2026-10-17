@@ -157,6 +157,10 @@ graph TD
 | **Phase 69** | **Cellular Immunotherapy, CAR-T & Cytokine Release Command (CELL-SHIELD Hub)** | ASTCT consensus CRS grading (Grades 1-4) with Tocilizumab 8 mg/kg / Dexamethasone protocols, ICANS 10-point ICE neurotoxicity staging with high-dose methylprednisolone pulse, and HScore secondary HLH/MAS emergency sentinel (score >= 169) with Anakinra IL-1 antagonist protocol. | `test_cellular_immunotherapy.ts` (All 23 Passed) |
 | **Phase 70** | **Extracorporeal Cardiopulmonary Resuscitation & Refractory Arrest (E-CPR Command)** | ELSO 15-minute time-to-cannulation checklist (witnessed arrest, no-flow <= 5m, initial VF/pVT, EtCO2 > 10 mmHg, age <= 65), VA-ECMO flow calculation, and closed-loop Targeted Temperature Management (TTM 33°C/36°C) with Bedside Shivering Assessment Scale (BSAS) suppression and controlled rewarming (0.25°C/hr). | `test_ecpr_resuscitation.ts` (All 19 Passed) |
 | **Phase 71** | **Hospital Operations Master Digital Twin & Predictive Flow (TWIN-ORCHESTRA Hub)** | Erlang-C multi-server queuing theory engine (Poisson arrivals, delay probability C(c,A), average boarding time Wq), dynamic elective surgical block re-allocator for emergent OR add-ons with PACU/SICU bed recovery, and 6-hour predictive ED divert risk engine (P(divert) >= 70% threshold) with live unit digital twin board. | `test_digital_twin_operations.ts` (All 32 Passed) |
+| **Phase 72** | **Vascular Emergencies, Acute Limb Ischemia & Compartment Syndrome (VASCULAR-LIMB Hub)** | Rutherford Acute Limb Ischemia staging (Category I Viable, IIa Marginally Threatened, IIb Immediately Threatened, III Irreversible), Compartment Syndrome Delta-P calculator (Diastolic BP - Intracompartmental Pressure <= 30 mmHg emergent fasciotomy trigger), and Microvascular Free-Flap NIRS Salvage watchdog (StO2 < 40% or drop > 20%/hr). | `test_vascular_limb.ts` (All 36 Passed) |
+| **Phase 73** | **Endocrine & Complex Metabolic Emergencies (METABOLIC-KETO Hub)** | Joint ADA/EASD DKA & HHS diagnostic engine (Mild/Mod/Severe DKA vs HHS, Anion Gap, Effective Serum Osmolality), Potassium Safety Interlock (K+ < 3.3 mEq/L mandatory insulin hold), Two-Bag Fluid transition protocol (D5W/D10W addition when glucose <= 200-250 mg/dL), and SubQ Basal Insulin transition bridging checklist. | `test_metabolic_keto.ts` (All 30 Passed) |
+| **Phase 74** | **Viscoelastic Hemostasis & Targeted Anticoagulant Reversal (COAG-ROTEM Hub)** | Real-time ROTEM/TEG profile classifier (EXTEM/INTEM CT, FIBTEM MCF, hyperfibrinolysis ML > 15%, heparin effect HEPTEM correction), algorithm-guided blood product prescription (Cryoprecipitate, Platelets, 4F-PCC, FFP, TXA), and targeted reversal protocols (Idarucizumab for Dabigatran, Andexanet alfa for Apixaban/Rivaroxaban, 4F-PCC for Warfarin, Protamine for Heparin). | `test_coag_rotem.ts` (All 28 Passed) |
+| **Phase 75** | **Virtual-ICU Multidisciplinary Rounds & Stewardship (ROUNDING-HUD Hub)** | 10-point FAST-HUG-BID bundle safety engine (Feeding, Analgesia, Sedation SAT, Thromboprophylaxis, HOB 30-45°, Ulcer ppx, Glucose 140-180, Breathing SBT, Indwelling lines, De-escalation), CAM-ICU delirium evaluation with QTc interlock (> 500 ms Haloperidol contraindication), and invasive device-days HAI surveillance (CAUTI, CLABSI, VAP). | `test_icu_rounding.ts` (All 36 Passed) |
 
 ---
 
@@ -301,6 +305,10 @@ npx ts-node src/test_neuro_critical_care.ts    # Acute Neurological Resuscitatio
 npx ts-node src/test_cellular_immunotherapy.ts # Cellular Immunotherapy, CAR-T & Cytokine Release (Phase 69)
 npx ts-node src/test_ecpr_resuscitation.ts     # Extracorporeal CPR & Targeted Temperature Management (Phase 70)
 npx ts-node src/test_digital_twin_operations.ts # Hospital Operations Master Digital Twin & Predictive Flow (Phase 71)
+npx ts-node src/test_vascular_limb.ts        # Vascular Emergencies & Compartment Syndrome (Phase 72)
+npx ts-node src/test_metabolic_keto.ts       # Complex DKA/HHS & Two-Bag Fluid Navigation (Phase 73)
+npx ts-node src/test_coag_rotem.ts           # Viscoelastic ROTEM & Anticoagulant Reversal (Phase 74)
+npx ts-node src/test_icu_rounding.ts         # Virtual-ICU FAST-HUG-BID & Stewardship (Phase 75)
 ```
 
 ---
