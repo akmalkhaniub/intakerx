@@ -2272,6 +2272,49 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_compartment_encounter ON compartment_pressure_logs(encounter_id);
     `);
 
+    // Create metabolic_keto_encounters table (Phase 73)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS metabolic_keto_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        presentation_type VARCHAR(32) NOT NULL,
+        blood_glucose_mg_dl NUMERIC(5, 1) NOT NULL,
+        arterial_ph NUMERIC(4, 2) NOT NULL,
+        serum_bicarbonate_meq_l NUMERIC(4, 1) NOT NULL,
+        beta_hydroxybutyrate_mmol_l NUMERIC(4, 2) NOT NULL,
+        serum_sodium_meq_l NUMERIC(4, 1) NOT NULL,
+        serum_potassium_meq_l NUMERIC(4, 1) NOT NULL,
+        serum_chloride_meq_l NUMERIC(4, 1) NOT NULL,
+        bun_mg_dl NUMERIC(4, 1) NOT NULL,
+        anion_gap NUMERIC(4, 1) NOT NULL,
+        effective_osmolality_mosm_kg NUMERIC(5, 1) NOT NULL,
+        corrected_sodium_meq_l NUMERIC(4, 1) NOT NULL,
+        sglt2i_inhibitor_exposure BOOLEAN DEFAULT FALSE,
+        two_bag_fluid_composition JSONB,
+        insulin_rate_units_hr NUMERIC(4, 2) NOT NULL,
+        subcutaneous_bridge_ready BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_metabolic_keto_patient ON metabolic_keto_encounters(patient_id);
+    `);
+
+    // Create insulin_infusion_logs table (Phase 73)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS insulin_infusion_logs (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES metabolic_keto_encounters(id) ON DELETE CASCADE,
+        hourly_glucose_mg_dl NUMERIC(5, 1) NOT NULL,
+        glucose_drop_rate_mg_dl_hr NUMERIC(5, 1) NOT NULL,
+        insulin_infusion_units_hr NUMERIC(4, 2) NOT NULL,
+        current_potassium_meq_l NUMERIC(4, 1) NOT NULL,
+        potassium_infusion_meq_hr NUMERIC(4, 1) NOT NULL,
+        dextrose_fluid_active BOOLEAN DEFAULT FALSE,
+        anion_gap_closed BOOLEAN DEFAULT FALSE,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_insulin_log_encounter ON insulin_infusion_logs(encounter_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

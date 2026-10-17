@@ -62,6 +62,7 @@ import * as cellularImmunotherapyService from '../services/cellularImmunotherapy
 import * as ecprResuscitationService from '../services/ecprResuscitation';
 import * as digitalTwinOperationsService from '../services/digitalTwinOperations';
 import * as vascularLimbService from '../services/vascularLimb';
+import * as metabolicKetoService from '../services/metabolicKeto';
 
 const router = Router();
 
@@ -5549,6 +5550,80 @@ router.get('/vascular-limb/patients/:patientId/history', async (req: Authenticat
   } catch (err: any) {
     console.error('Get vascular history error:', err);
     res.status(500).json({ error: 'Failed to retrieve vascular limb history.' });
+  }
+});
+
+// Phase 73: Complex DKA, HHS, Euglycemic SGLT2i & Dynamic Insulin Fleet (METABOLIC-KETO Command)
+
+// Evaluate DKA vs HHS presentation & protocols
+router.post('/metabolic-keto/evaluate-presentation', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = metabolicKetoService.evaluateMetabolicKeto(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate metabolic keto error:', err);
+    res.status(500).json({ error: 'Failed to evaluate metabolic keto presentation.' });
+  }
+});
+
+// Evaluate Hourly Insulin Titration
+router.post('/metabolic-keto/evaluate-titration', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const evaluation = metabolicKetoService.evaluateHourlyTitration(req.body);
+    res.json(evaluation);
+  } catch (err: any) {
+    console.error('Evaluate hourly titration error:', err);
+    res.status(500).json({ error: 'Failed to evaluate insulin titration.' });
+  }
+});
+
+// Save Metabolic Encounter
+router.post('/metabolic-keto/encounters', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patient_id, ...assessmentInput } = req.body;
+    if (!patient_id) {
+      res.status(400).json({ error: 'patient_id is required.' });
+      return;
+    }
+    const result = await metabolicKetoService.MetabolicKetoService.evaluateAndSaveEncounter(
+      Number(patient_id),
+      assessmentInput
+    );
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Save metabolic encounter error:', err);
+    res.status(500).json({ error: 'Failed to record metabolic keto encounter.' });
+  }
+});
+
+// Log Hourly Insulin Titration
+router.post('/metabolic-keto/titration-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { encounter_id, ...titrationInput } = req.body;
+    if (!encounter_id) {
+      res.status(400).json({ error: 'encounter_id is required.' });
+      return;
+    }
+    const result = await metabolicKetoService.MetabolicKetoService.logTitration(
+      Number(encounter_id),
+      titrationInput
+    );
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('Log titration error:', err);
+    res.status(500).json({ error: 'Failed to log insulin titration.' });
+  }
+});
+
+// Get Patient Metabolic History
+router.get('/metabolic-keto/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await metabolicKetoService.MetabolicKetoService.getPatientMetabolicHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get metabolic history error:', err);
+    res.status(500).json({ error: 'Failed to retrieve metabolic keto history.' });
   }
 });
 
