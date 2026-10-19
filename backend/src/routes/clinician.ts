@@ -65,6 +65,7 @@ import * as vascularLimbService from '../services/vascularLimb';
 import * as metabolicKetoService from '../services/metabolicKeto';
 import * as coagRotemService from '../services/coagRotem';
 import * as icuRoundingService from '../services/icuRounding';
+import * as acutePancreatitisService from '../services/acutePancreatitis';
 
 const router = Router();
 
@@ -5834,6 +5835,163 @@ router.get('/icu-rounding/patients/:patientId/history', async (req: Authenticate
   } catch (err: any) {
     console.error('Get rounding history error:', err);
     res.status(500).json({ error: 'Failed to retrieve rounding history.' });
+  }
+});
+
+// Phase 76: PANCREAS-ALERT - Evaluate Atlanta Classification
+router.post('/pancreatitis/evaluate-atlanta', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const assessment = acutePancreatitisService.AcutePancreatitisService.evaluateAtlantaClassification(req.body);
+    res.json(assessment);
+  } catch (err: any) {
+    console.error('Evaluate Atlanta classification error:', err);
+    res.status(500).json({ error: 'Failed to evaluate Atlanta classification.' });
+  }
+});
+
+// Phase 76: PANCREAS-ALERT - Evaluate BISAP Score
+router.post('/pancreatitis/evaluate-bisap', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = acutePancreatitisService.AcutePancreatitisService.evaluateBisapScore(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate BISAP error:', err);
+    res.status(500).json({ error: 'Failed to evaluate BISAP score.' });
+  }
+});
+
+// Phase 76: PANCREAS-ALERT - Evaluate Fluid Resuscitation
+router.post('/pancreatitis/evaluate-fluid', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = acutePancreatitisService.AcutePancreatitisService.evaluateFluidResuscitation(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate fluid error:', err);
+    res.status(500).json({ error: 'Failed to evaluate fluid resuscitation.' });
+  }
+});
+
+// Phase 76: PANCREAS-ALERT - Evaluate Dutch Step-Up Approach
+router.post('/pancreatitis/evaluate-stepup', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = acutePancreatitisService.AcutePancreatitisService.evaluateDutchStepUp(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate step-up error:', err);
+    res.status(500).json({ error: 'Failed to evaluate Dutch Step-Up approach.' });
+  }
+});
+
+// Phase 76: PANCREAS-ALERT - Evaluate Tokyo TG18 Cholangitis
+router.post('/pancreatitis/evaluate-tg18', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = acutePancreatitisService.AcutePancreatitisService.evaluateTg18Cholangitis(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate TG18 error:', err);
+    res.status(500).json({ error: 'Failed to evaluate Tokyo TG18 guidelines.' });
+  }
+});
+
+// Phase 76: PANCREAS-ALERT - Save Pancreatitis Encounter
+router.post('/pancreatitis/encounters', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patient_id,
+      etiology,
+      atlanta_severity,
+      bisap_score,
+      glasgow_imrie_score,
+      sirs_present,
+      organ_failure_persistent,
+      fluid_rate_ml_hr,
+      fluid_type,
+      hematocrit_percent,
+      bun_mg_dl,
+      urine_output_ml_kg_hr,
+      gallstone_cholangitis_suspected,
+      tg18_severity,
+      ercp_recommended_within_24h
+    } = req.body;
+
+    if (!patient_id || !etiology || !atlanta_severity || bisap_score === undefined || fluid_rate_ml_hr === undefined) {
+      res.status(400).json({ error: 'Missing mandatory acute pancreatitis parameters.' });
+      return;
+    }
+
+    const saved = await acutePancreatitisService.AcutePancreatitisService.savePancreatitisEncounter({
+      patient_id: Number(patient_id),
+      etiology,
+      atlanta_severity,
+      bisap_score: Number(bisap_score),
+      glasgow_imrie_score: glasgow_imrie_score !== undefined ? Number(glasgow_imrie_score) : undefined,
+      sirs_present: Boolean(sirs_present),
+      organ_failure_persistent: Boolean(organ_failure_persistent),
+      fluid_rate_ml_hr: Number(fluid_rate_ml_hr),
+      fluid_type,
+      hematocrit_percent: hematocrit_percent !== undefined ? Number(hematocrit_percent) : undefined,
+      bun_mg_dl: bun_mg_dl !== undefined ? Number(bun_mg_dl) : undefined,
+      urine_output_ml_kg_hr: urine_output_ml_kg_hr !== undefined ? Number(urine_output_ml_kg_hr) : undefined,
+      gallstone_cholangitis_suspected: Boolean(gallstone_cholangitis_suspected),
+      tg18_severity,
+      ercp_recommended_within_24h: Boolean(ercp_recommended_within_24h)
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save pancreatitis encounter error:', err);
+    res.status(500).json({ error: 'Failed to record pancreatitis encounter.' });
+  }
+});
+
+// Phase 76: PANCREAS-ALERT - Save Step-Up Intervention Log
+router.post('/pancreatitis/stepup-interventions', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounter_id,
+      patient_id,
+      necrosis_type,
+      gas_on_ct,
+      current_step,
+      clinical_response,
+      drainage_output_ml_24h,
+      next_recommended_step,
+      antimicrobial_regimen
+    } = req.body;
+
+    if (!encounter_id || !patient_id || !necrosis_type || !current_step || !clinical_response || !next_recommended_step) {
+      res.status(400).json({ error: 'Missing mandatory step-up intervention parameters.' });
+      return;
+    }
+
+    const saved = await acutePancreatitisService.AcutePancreatitisService.saveStepUpIntervention({
+      encounter_id: Number(encounter_id),
+      patient_id: Number(patient_id),
+      necrosis_type,
+      gas_on_ct: Boolean(gas_on_ct),
+      current_step,
+      clinical_response,
+      drainage_output_ml_24h: drainage_output_ml_24h !== undefined ? Number(drainage_output_ml_24h) : undefined,
+      next_recommended_step,
+      antimicrobial_regimen
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save step-up intervention error:', err);
+    res.status(500).json({ error: 'Failed to record step-up intervention.' });
+  }
+});
+
+// Phase 76: PANCREAS-ALERT - Get Patient Pancreatitis History
+router.get('/pancreatitis/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await acutePancreatitisService.AcutePancreatitisService.getPatientPancreatitisHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get pancreatitis history error:', err);
+    res.status(500).json({ error: 'Failed to retrieve pancreatitis history.' });
   }
 });
 

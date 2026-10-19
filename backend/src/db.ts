@@ -2387,6 +2387,49 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_device_tracker_patient ON invasive_device_trackers(patient_id);
     `);
 
+    // Create acute_pancreatitis_encounters table (Phase 76)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS acute_pancreatitis_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        etiology VARCHAR(64) NOT NULL,
+        atlanta_severity VARCHAR(32) NOT NULL,
+        bisap_score INTEGER NOT NULL,
+        glasgow_imrie_score INTEGER,
+        sirs_present BOOLEAN DEFAULT FALSE,
+        organ_failure_persistent BOOLEAN DEFAULT FALSE,
+        fluid_rate_ml_hr NUMERIC(5, 1) NOT NULL,
+        fluid_type VARCHAR(64) DEFAULT 'Lactated Ringers',
+        hematocrit_percent NUMERIC(4, 1),
+        bun_mg_dl NUMERIC(5, 1),
+        urine_output_ml_kg_hr NUMERIC(4, 2),
+        gallstone_cholangitis_suspected BOOLEAN DEFAULT FALSE,
+        tg18_severity VARCHAR(16),
+        ercp_recommended_within_24h BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pancreatitis_patient ON acute_pancreatitis_encounters(patient_id);
+    `);
+
+    // Create pancreatic_stepup_interventions table (Phase 76)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS pancreatic_stepup_interventions (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES acute_pancreatitis_encounters(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        necrosis_type VARCHAR(32) NOT NULL,
+        gas_on_ct BOOLEAN DEFAULT FALSE,
+        current_step VARCHAR(64) NOT NULL,
+        clinical_response VARCHAR(32) NOT NULL,
+        drainage_output_ml_24h NUMERIC(6, 1),
+        next_recommended_step VARCHAR(64) NOT NULL,
+        antimicrobial_regimen VARCHAR(128),
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_stepup_encounter ON pancreatic_stepup_interventions(encounter_id);
+      CREATE INDEX IF NOT EXISTS idx_stepup_patient ON pancreatic_stepup_interventions(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
