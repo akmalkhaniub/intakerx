@@ -2470,6 +2470,50 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_exchange_log_patient ON plasma_exchange_logs(patient_id);
     `);
 
+    // Create mechanical_vad_devices table (Phase 78)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS mechanical_vad_devices (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        device_category VARCHAR(32) NOT NULL,
+        implant_date DATE NOT NULL,
+        set_speed_rpm INTEGER NOT NULL,
+        current_p_level VARCHAR(8),
+        purge_fluid_type VARCHAR(64),
+        baseline_power_watts NUMERIC(4, 2),
+        baseline_pi NUMERIC(3, 1),
+        target_map_mmhg_min INTEGER DEFAULT 70,
+        target_map_mmhg_max INTEGER DEFAULT 80,
+        active_status BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_vad_device_patient ON mechanical_vad_devices(patient_id);
+    `);
+
+    // Create vad_telemetry_alarms table (Phase 78)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS vad_telemetry_alarms (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES mechanical_vad_devices(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        flow_l_min NUMERIC(4, 2) NOT NULL,
+        power_watts NUMERIC(4, 2) NOT NULL,
+        pulsatility_index NUMERIC(3, 1),
+        doppler_map_mmhg INTEGER NOT NULL,
+        ldh_u_l INTEGER,
+        plasma_free_hgb_mg_dl NUMERIC(5, 1),
+        cvp_mmhg INTEGER,
+        pcwp_mmhg INTEGER,
+        papi_score NUMERIC(4, 2),
+        alarm_type VARCHAR(64) NOT NULL,
+        thrombosis_risk_alert BOOLEAN DEFAULT FALSE,
+        rv_failure_alert BOOLEAN DEFAULT FALSE,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_vad_alarm_device ON vad_telemetry_alarms(device_id);
+      CREATE INDEX IF NOT EXISTS idx_vad_alarm_patient ON vad_telemetry_alarms(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

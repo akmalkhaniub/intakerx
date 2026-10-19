@@ -67,6 +67,7 @@ import * as coagRotemService from '../services/coagRotem';
 import * as icuRoundingService from '../services/icuRounding';
 import * as acutePancreatitisService from '../services/acutePancreatitis';
 import * as therapeuticApheresisService from '../services/therapeuticApheresis';
+import * as vadPulseService from '../services/vadPulse';
 
 const router = Router();
 
@@ -6138,6 +6139,222 @@ router.get('/apheresis/patients/:patientId/history', async (req: AuthenticatedRe
   } catch (err: any) {
     console.error('Get apheresis history error:', err);
     res.status(500).json({ error: 'Failed to retrieve apheresis history.' });
+  }
+});
+
+// Phase 78: VAD-PULSE - Evaluate Impella Microaxial Performance
+router.post('/vad/evaluate-impella', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      device_model,
+      current_p_level,
+      flow_rate_l_min,
+      motor_current_ma,
+      purge_pressure_mmhg,
+      purge_flow_ml_hr,
+      suction_alarm_active,
+      map_mmhg,
+      cvp_mmhg,
+      pcwp_mmhg
+    } = req.body;
+
+    if (!device_model || !current_p_level || flow_rate_l_min === undefined || purge_pressure_mmhg === undefined || purge_flow_ml_hr === undefined) {
+      return res.status(400).json({ error: 'device_model, current_p_level, flow_rate_l_min, purge_pressure_mmhg, and purge_flow_ml_hr are required.' });
+    }
+
+    const result = vadPulseService.VadPulseService.evaluateImpella({
+      device_model,
+      current_p_level,
+      flow_rate_l_min: Number(flow_rate_l_min),
+      motor_current_ma: motor_current_ma !== undefined ? Number(motor_current_ma) : undefined,
+      purge_pressure_mmhg: Number(purge_pressure_mmhg),
+      purge_flow_ml_hr: Number(purge_flow_ml_hr),
+      suction_alarm_active: Boolean(suction_alarm_active),
+      map_mmhg: Number(map_mmhg || 75),
+      cvp_mmhg: cvp_mmhg !== undefined ? Number(cvp_mmhg) : undefined,
+      pcwp_mmhg: pcwp_mmhg !== undefined ? Number(pcwp_mmhg) : undefined
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Impella error:', err);
+    res.status(500).json({ error: 'Failed to evaluate Impella telemetry.' });
+  }
+});
+
+// Phase 78: VAD-PULSE - Evaluate Durable LVAD & Thrombosis Sentinel
+router.post('/vad/evaluate-durable', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      device_type,
+      speed_rpm,
+      flow_l_min,
+      power_watts,
+      baseline_power_watts,
+      pulsatility_index,
+      baseline_pi,
+      doppler_map_mmhg,
+      ldh_u_l,
+      plasma_free_hgb_mg_dl,
+      hematuria_or_dark_urine
+    } = req.body;
+
+    if (!device_type || speed_rpm === undefined || flow_l_min === undefined || power_watts === undefined || baseline_power_watts === undefined || pulsatility_index === undefined || baseline_pi === undefined || doppler_map_mmhg === undefined) {
+      return res.status(400).json({ error: 'device_type, speed_rpm, flow_l_min, power_watts, baseline_power_watts, pulsatility_index, baseline_pi, and doppler_map_mmhg are required.' });
+    }
+
+    const result = vadPulseService.VadPulseService.evaluateDurableLvad({
+      device_type,
+      speed_rpm: Number(speed_rpm),
+      flow_l_min: Number(flow_l_min),
+      power_watts: Number(power_watts),
+      baseline_power_watts: Number(baseline_power_watts),
+      pulsatility_index: Number(pulsatility_index),
+      baseline_pi: Number(baseline_pi),
+      doppler_map_mmhg: Number(doppler_map_mmhg),
+      ldh_u_l: ldh_u_l !== undefined ? Number(ldh_u_l) : undefined,
+      plasma_free_hgb_mg_dl: plasma_free_hgb_mg_dl !== undefined ? Number(plasma_free_hgb_mg_dl) : undefined,
+      hematuria_or_dark_urine: Boolean(hematuria_or_dark_urine)
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Durable LVAD error:', err);
+    res.status(500).json({ error: 'Failed to evaluate durable LVAD telemetry.' });
+  }
+});
+
+// Phase 78: VAD-PULSE - Evaluate Post-LVAD RV Failure
+router.post('/vad/evaluate-rv-failure', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      cvp_mmhg,
+      pcwp_mmhg,
+      systolic_pap_mmhg,
+      diastolic_pap_mmhg,
+      inotropic_support_active,
+      signs_of_systemic_congestion
+    } = req.body;
+
+    if (cvp_mmhg === undefined || pcwp_mmhg === undefined || systolic_pap_mmhg === undefined || diastolic_pap_mmhg === undefined) {
+      return res.status(400).json({ error: 'cvp_mmhg, pcwp_mmhg, systolic_pap_mmhg, and diastolic_pap_mmhg are required.' });
+    }
+
+    const result = vadPulseService.VadPulseService.evaluatePostLvadRvFailure({
+      cvp_mmhg: Number(cvp_mmhg),
+      pcwp_mmhg: Number(pcwp_mmhg),
+      systolic_pap_mmhg: Number(systolic_pap_mmhg),
+      diastolic_pap_mmhg: Number(diastolic_pap_mmhg),
+      inotropic_support_active: Boolean(inotropic_support_active),
+      signs_of_systemic_congestion: Boolean(signs_of_systemic_congestion)
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Post-LVAD RV Failure error:', err);
+    res.status(500).json({ error: 'Failed to evaluate post-LVAD RV failure.' });
+  }
+});
+
+// Phase 78: VAD-PULSE - Register Mechanical VAD Device
+router.post('/vad/devices', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patient_id,
+      device_category,
+      implant_date,
+      set_speed_rpm,
+      current_p_level,
+      purge_fluid_type,
+      baseline_power_watts,
+      baseline_pi,
+      target_map_mmhg_min,
+      target_map_mmhg_max,
+      active_status
+    } = req.body;
+
+    if (!patient_id || !device_category || !implant_date || set_speed_rpm === undefined) {
+      return res.status(400).json({ error: 'patient_id, device_category, implant_date, and set_speed_rpm are required.' });
+    }
+
+    const device = await vadPulseService.VadPulseService.registerVadDevice({
+      patient_id: Number(patient_id),
+      device_category,
+      implant_date,
+      set_speed_rpm: Number(set_speed_rpm),
+      current_p_level,
+      purge_fluid_type,
+      baseline_power_watts: baseline_power_watts !== undefined ? Number(baseline_power_watts) : undefined,
+      baseline_pi: baseline_pi !== undefined ? Number(baseline_pi) : undefined,
+      target_map_mmhg_min: target_map_mmhg_min !== undefined ? Number(target_map_mmhg_min) : undefined,
+      target_map_mmhg_max: target_map_mmhg_max !== undefined ? Number(target_map_mmhg_max) : undefined,
+      active_status: active_status !== undefined ? Boolean(active_status) : true
+    });
+
+    res.status(201).json(device);
+  } catch (err: any) {
+    console.error('Register VAD Device error:', err);
+    res.status(500).json({ error: 'Failed to register VAD device.' });
+  }
+});
+
+// Phase 78: VAD-PULSE - Log VAD Telemetry & Alarms
+router.post('/vad/telemetry-alarms', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      device_id,
+      patient_id,
+      flow_l_min,
+      power_watts,
+      pulsatility_index,
+      doppler_map_mmhg,
+      ldh_u_l,
+      plasma_free_hgb_mg_dl,
+      cvp_mmhg,
+      pcwp_mmhg,
+      papi_score,
+      alarm_type,
+      thrombosis_risk_alert,
+      rv_failure_alert
+    } = req.body;
+
+    if (!device_id || !patient_id || flow_l_min === undefined || power_watts === undefined || doppler_map_mmhg === undefined || !alarm_type) {
+      return res.status(400).json({ error: 'device_id, patient_id, flow_l_min, power_watts, doppler_map_mmhg, and alarm_type are required.' });
+    }
+
+    const alarmLog = await vadPulseService.VadPulseService.logVadTelemetryAlarm({
+      device_id: Number(device_id),
+      patient_id: Number(patient_id),
+      flow_l_min: Number(flow_l_min),
+      power_watts: Number(power_watts),
+      pulsatility_index: pulsatility_index !== undefined ? Number(pulsatility_index) : undefined,
+      doppler_map_mmhg: Number(doppler_map_mmhg),
+      ldh_u_l: ldh_u_l !== undefined ? Number(ldh_u_l) : undefined,
+      plasma_free_hgb_mg_dl: plasma_free_hgb_mg_dl !== undefined ? Number(plasma_free_hgb_mg_dl) : undefined,
+      cvp_mmhg: cvp_mmhg !== undefined ? Number(cvp_mmhg) : undefined,
+      pcwp_mmhg: pcwp_mmhg !== undefined ? Number(pcwp_mmhg) : undefined,
+      papi_score: papi_score !== undefined ? Number(papi_score) : undefined,
+      alarm_type,
+      thrombosis_risk_alert: Boolean(thrombosis_risk_alert),
+      rv_failure_alert: Boolean(rv_failure_alert)
+    });
+
+    res.status(201).json(alarmLog);
+  } catch (err: any) {
+    console.error('Log VAD Telemetry error:', err);
+    res.status(500).json({ error: 'Failed to record VAD telemetry alarm.' });
+  }
+});
+
+// Phase 78: VAD-PULSE - Get Patient VAD History
+router.get('/vad/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await vadPulseService.VadPulseService.getPatientVadHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get VAD History error:', err);
+    res.status(500).json({ error: 'Failed to retrieve VAD history.' });
   }
 });
 
