@@ -161,6 +161,10 @@ graph TD
 | **Phase 73** | **Endocrine & Complex Metabolic Emergencies (METABOLIC-KETO Hub)** | Joint ADA/EASD DKA & HHS diagnostic engine (Mild/Mod/Severe DKA vs HHS, Anion Gap, Effective Serum Osmolality), Potassium Safety Interlock (K+ < 3.3 mEq/L mandatory insulin hold), Two-Bag Fluid transition protocol (D5W/D10W addition when glucose <= 200-250 mg/dL), and SubQ Basal Insulin transition bridging checklist. | `test_metabolic_keto.ts` (All 30 Passed) |
 | **Phase 74** | **Viscoelastic Hemostasis & Targeted Anticoagulant Reversal (COAG-ROTEM Hub)** | Real-time ROTEM/TEG profile classifier (EXTEM/INTEM CT, FIBTEM MCF, hyperfibrinolysis ML > 15%, heparin effect HEPTEM correction), algorithm-guided blood product prescription (Cryoprecipitate, Platelets, 4F-PCC, FFP, TXA), and targeted reversal protocols (Idarucizumab for Dabigatran, Andexanet alfa for Apixaban/Rivaroxaban, 4F-PCC for Warfarin, Protamine for Heparin). | `test_coag_rotem.ts` (All 28 Passed) |
 | **Phase 75** | **Virtual-ICU Multidisciplinary Rounds & Stewardship (ROUNDING-HUD Hub)** | 10-point FAST-HUG-BID bundle safety engine (Feeding, Analgesia, Sedation SAT, Thromboprophylaxis, HOB 30-45°, Ulcer ppx, Glucose 140-180, Breathing SBT, Indwelling lines, De-escalation), CAM-ICU delirium evaluation with QTc interlock (> 500 ms Haloperidol contraindication), and invasive device-days HAI surveillance (CAUTI, CLABSI, VAP). | `test_icu_rounding.ts` (All 36 Passed) |
+| **Phase 76** | **Acute Pancreatitis, Biliary Emergencies & Necrosectomy Step-Up (PANCREAS-ALERT Hub)** | Revised Atlanta classification (Mild/Mod/Severe), BISAP 0-5 score, Goal-Directed Lactated Ringer's resuscitation (200-250 mL/h titrated to Hct/BUN), Dutch Step-Up necrosectomy protocol (percutaneous drainage -> VARD -> open), and Tokyo Guidelines TG18 for acute cholangitis / urgent ERCP timing (< 24h). | `test_acute_pancreatitis.ts` (All 45 Passed) |
+| **Phase 77** | **Therapeutic Plasma Exchange & Neuro-Immunology (PHERESIS-CMD Hub)** | ASFA Category I/II indication matrix (TTP, GBS, Myasthenia Gravis, Anti-GBM, NMO), PLASMIC score (>= 6) & TTP Interlock (strict platelet transfusion contraindication), Total Plasma Volume (TPV) calculator ($TPV = [0.07 \times W] \times [1 - Hct]$), and ACD-A citrate-induced hypocalcemia watchdog ($iCa^{2+} < 0.9$ mmol/L) with IV calcium replacement. | `test_therapeutic_apheresis.ts` (All 42 Passed) |
+| **Phase 78** | **Impella & Durable LVAD Emergency Navigator (VAD-PULSE Hub)** | Impella microaxial flow pump hemodynamic management (P1-P9 titration, purge pressure 300-1100 mmHg / flow 2-30 mL/hr, automated suction alarm stepdown), Durable LVAD (HeartMate 3 / HVAD) thrombosis sentinel (power spike >= 2.0W, LDH >= 625 U/L / 2.5x ULN, Doppler MAP 70-80 mmHg), and post-LVAD RV failure watchdog (CVP/PCWP > 0.63, PAPi < 2.0, temporary RVAD triggers). | `test_vad_pulse.ts` (All 49 Passed) |
+| **Phase 79** | **Inpatient Palliative Care & Complex Symptom Control (COMFORT-CARE Hub)** | ESAS-r multi-domain symptom tracker (0-90 total distress score, physical/psych domains), Opioid Equianalgesic Converter with 25-50% incomplete cross-tolerance reduction and breakthrough PRN calculation, terminal symptom protocols (refractory dyspnea sublingual morphine & trigeminal fan, death rattle glycopyrrolate/avoid suctioning, terminal delirium haloperidol/midazolam), and POLST concordance & Palliative Performance Scale (PPS v2) trajectory. | `test_comfort_care.ts` (All 51 Passed) |
 
 ---
 
@@ -309,6 +313,10 @@ npx ts-node src/test_vascular_limb.ts        # Vascular Emergencies & Compartmen
 npx ts-node src/test_metabolic_keto.ts       # Complex DKA/HHS & Two-Bag Fluid Navigation (Phase 73)
 npx ts-node src/test_coag_rotem.ts           # Viscoelastic ROTEM & Anticoagulant Reversal (Phase 74)
 npx ts-node src/test_icu_rounding.ts         # Virtual-ICU FAST-HUG-BID & Stewardship (Phase 75)
+npx ts-node src/test_acute_pancreatitis.ts   # Acute Pancreatitis, BISAP & Dutch Step-Up (Phase 76)
+npx ts-node src/test_therapeutic_apheresis.ts # Therapeutic Plasma Exchange & ASFA/TTP (Phase 77)
+npx ts-node src/test_vad_pulse.ts           # Impella & Durable LVAD Thrombosis Sentinel (Phase 78)
+npx ts-node src/test_comfort_care.ts        # Palliative Care, ESAS-r & Opioid Converter (Phase 79)
 ```
 
 ---
