@@ -68,6 +68,7 @@ import * as icuRoundingService from '../services/icuRounding';
 import * as acutePancreatitisService from '../services/acutePancreatitis';
 import * as therapeuticApheresisService from '../services/therapeuticApheresis';
 import * as vadPulseService from '../services/vadPulse';
+import * as comfortCareService from '../services/comfortCare';
 
 const router = Router();
 
@@ -6355,6 +6356,184 @@ router.get('/vad/patients/:patientId/history', async (req: AuthenticatedRequest,
   } catch (err: any) {
     console.error('Get VAD History error:', err);
     res.status(500).json({ error: 'Failed to retrieve VAD history.' });
+  }
+});
+
+// Phase 79: COMFORT-CARE - Evaluate ESAS-r Multi-Domain Symptoms
+router.post('/palliative/evaluate-esas-r', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { scores } = req.body;
+    if (!scores || typeof scores !== 'object') {
+      return res.status(400).json({ error: 'scores object containing symptom ratings 0-10 is required.' });
+    }
+
+    const result = comfortCareService.ComfortCareService.evaluateEsasR(scores);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate ESAS-r error:', err);
+    res.status(500).json({ error: 'Failed to evaluate ESAS-r symptoms.' });
+  }
+});
+
+// Phase 79: COMFORT-CARE - Opioid Equianalgesic Converter & Cross-Tolerance
+router.post('/palliative/convert-opioid', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      from_opioid,
+      from_dose_mg_24h,
+      from_route,
+      to_opioid,
+      to_route,
+      cross_tolerance_reduction_percent,
+      renal_hepatic_impairment
+    } = req.body;
+
+    if (!from_opioid || from_dose_mg_24h === undefined || !from_route || !to_opioid || !to_route) {
+      return res.status(400).json({ error: 'from_opioid, from_dose_mg_24h, from_route, to_opioid, and to_route are required.' });
+    }
+
+    const result = comfortCareService.ComfortCareService.convertOpioidEquianalgesic({
+      from_opioid,
+      from_dose_mg_24h: Number(from_dose_mg_24h),
+      from_route,
+      to_opioid,
+      to_route,
+      cross_tolerance_reduction_percent: cross_tolerance_reduction_percent !== undefined ? Number(cross_tolerance_reduction_percent) : undefined,
+      renal_hepatic_impairment: Boolean(renal_hepatic_impairment)
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Convert Opioid error:', err);
+    res.status(500).json({ error: 'Failed to calculate opioid conversion.' });
+  }
+});
+
+// Phase 79: COMFORT-CARE - Evaluate Terminal Symptoms & POLST Trajectory
+router.post('/palliative/evaluate-terminal-symptoms', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      refractory_dyspnea_present,
+      respiratory_rate_breaths_min,
+      spo2_percent,
+      death_rattle_secretions_present,
+      terminal_agitation_delirium_present,
+      urinary_retention_ruled_out,
+      bowel_impaction_ruled_out,
+      pps_v2_percent,
+      polst_code_status
+    } = req.body;
+
+    if (pps_v2_percent === undefined || !polst_code_status) {
+      return res.status(400).json({ error: 'pps_v2_percent and polst_code_status are required.' });
+    }
+
+    const result = comfortCareService.ComfortCareService.evaluateTerminalSymptoms({
+      refractory_dyspnea_present: Boolean(refractory_dyspnea_present),
+      respiratory_rate_breaths_min: respiratory_rate_breaths_min !== undefined ? Number(respiratory_rate_breaths_min) : undefined,
+      spo2_percent: spo2_percent !== undefined ? Number(spo2_percent) : undefined,
+      death_rattle_secretions_present: Boolean(death_rattle_secretions_present),
+      terminal_agitation_delirium_present: Boolean(terminal_agitation_delirium_present),
+      urinary_retention_ruled_out: Boolean(urinary_retention_ruled_out),
+      bowel_impaction_ruled_out: Boolean(bowel_impaction_ruled_out),
+      pps_v2_percent: Number(pps_v2_percent),
+      polst_code_status
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Terminal Symptoms error:', err);
+    res.status(500).json({ error: 'Failed to assess terminal symptoms.' });
+  }
+});
+
+// Phase 79: COMFORT-CARE - Save Palliative Care Encounter
+router.post('/palliative/encounters', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patient_id,
+      pps_v2_score,
+      esas_r_scores,
+      polst_code_status,
+      goals_of_care_trajectory,
+      terminal_symptoms,
+      care_plan_recommendations
+    } = req.body;
+
+    if (!patient_id || pps_v2_score === undefined || !esas_r_scores || !polst_code_status || !goals_of_care_trajectory) {
+      return res.status(400).json({ error: 'patient_id, pps_v2_score, esas_r_scores, polst_code_status, and goals_of_care_trajectory are required.' });
+    }
+
+    const saved = await comfortCareService.ComfortCareService.savePalliativeEncounter({
+      patient_id: Number(patient_id),
+      pps_v2_score: Number(pps_v2_score),
+      esas_r_scores,
+      polst_code_status,
+      goals_of_care_trajectory,
+      terminal_symptoms,
+      care_plan_recommendations
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save Palliative Encounter error:', err);
+    res.status(500).json({ error: 'Failed to record palliative encounter.' });
+  }
+});
+
+// Phase 79: COMFORT-CARE - Log Opioid Rotation
+router.post('/palliative/opioid-rotations', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounter_id,
+      patient_id,
+      from_opioid,
+      from_dose_mg_24h,
+      from_route,
+      to_opioid,
+      to_route,
+      calculated_equianalgesic_mg,
+      cross_tolerance_reduction_percent,
+      prescribed_dose_mg_24h,
+      breakthrough_dose_mg,
+      breakthrough_interval_hours
+    } = req.body;
+
+    if (!patient_id || !from_opioid || from_dose_mg_24h === undefined || !from_route || !to_opioid || !to_route || prescribed_dose_mg_24h === undefined) {
+      return res.status(400).json({ error: 'patient_id, from_opioid, from_dose_mg_24h, from_route, to_opioid, to_route, and prescribed_dose_mg_24h are required.' });
+    }
+
+    const saved = await comfortCareService.ComfortCareService.logOpioidRotation({
+      encounter_id: encounter_id ? Number(encounter_id) : undefined,
+      patient_id: Number(patient_id),
+      from_opioid,
+      from_dose_mg_24h: Number(from_dose_mg_24h),
+      from_route,
+      to_opioid,
+      to_route,
+      calculated_equianalgesic_mg: Number(calculated_equianalgesic_mg),
+      cross_tolerance_reduction_percent: Number(cross_tolerance_reduction_percent),
+      prescribed_dose_mg_24h: Number(prescribed_dose_mg_24h),
+      breakthrough_dose_mg: Number(breakthrough_dose_mg),
+      breakthrough_interval_hours
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Log Opioid Rotation error:', err);
+    res.status(500).json({ error: 'Failed to log opioid rotation.' });
+  }
+});
+
+// Phase 79: COMFORT-CARE - Get Patient Palliative History
+router.get('/palliative/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await comfortCareService.ComfortCareService.getPatientPalliativeHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get Palliative History error:', err);
+    res.status(500).json({ error: 'Failed to retrieve palliative history.' });
   }
 });
 

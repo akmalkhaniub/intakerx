@@ -2514,6 +2514,45 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_vad_alarm_patient ON vad_telemetry_alarms(patient_id);
     `);
 
+    // Create palliative_care_encounters table (Phase 79)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS palliative_care_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        pps_v2_score INTEGER NOT NULL,
+        esas_r_scores JSONB NOT NULL,
+        polst_code_status VARCHAR(64) NOT NULL,
+        goals_of_care_trajectory VARCHAR(64) NOT NULL,
+        terminal_symptoms JSONB DEFAULT '{}'::jsonb,
+        care_plan_recommendations JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_palliative_patient ON palliative_care_encounters(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_palliative_polst ON palliative_care_encounters(polst_code_status);
+    `);
+
+    // Create opioid_rotation_logs table (Phase 79)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS opioid_rotation_logs (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES palliative_care_encounters(id) ON DELETE SET NULL,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        from_opioid VARCHAR(64) NOT NULL,
+        from_dose_mg_24h NUMERIC(8, 2) NOT NULL,
+        from_route VARCHAR(32) NOT NULL,
+        to_opioid VARCHAR(64) NOT NULL,
+        to_route VARCHAR(32) NOT NULL,
+        calculated_equianalgesic_mg NUMERIC(8, 2) NOT NULL,
+        cross_tolerance_reduction_percent NUMERIC(5, 2) NOT NULL,
+        prescribed_dose_mg_24h NUMERIC(8, 2) NOT NULL,
+        breakthrough_dose_mg NUMERIC(8, 2) NOT NULL,
+        breakthrough_interval_hours VARCHAR(32) DEFAULT 'q2-3h PRN',
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_opioid_rotation_encounter ON opioid_rotation_logs(encounter_id);
+      CREATE INDEX IF NOT EXISTS idx_opioid_rotation_patient ON opioid_rotation_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
