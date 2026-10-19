@@ -66,6 +66,7 @@ import * as metabolicKetoService from '../services/metabolicKeto';
 import * as coagRotemService from '../services/coagRotem';
 import * as icuRoundingService from '../services/icuRounding';
 import * as acutePancreatitisService from '../services/acutePancreatitis';
+import * as therapeuticApheresisService from '../services/therapeuticApheresis';
 
 const router = Router();
 
@@ -5992,6 +5993,151 @@ router.get('/pancreatitis/patients/:patientId/history', async (req: Authenticate
   } catch (err: any) {
     console.error('Get pancreatitis history error:', err);
     res.status(500).json({ error: 'Failed to retrieve pancreatitis history.' });
+  }
+});
+
+// Phase 77: PHERESIS-CMD - Evaluate ASFA Indication & Category
+router.post('/apheresis/evaluate-asfa', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { indication } = req.body;
+    if (!indication) {
+      res.status(400).json({ error: 'indication is required.' });
+      return;
+    }
+    const result = therapeuticApheresisService.TherapeuticApheresisService.evaluateAsfaGuidance(indication);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate ASFA error:', err);
+    res.status(500).json({ error: 'Failed to evaluate ASFA guidance.' });
+  }
+});
+
+// Phase 77: PHERESIS-CMD - Evaluate PLASMIC Score & TTP Protocol
+router.post('/apheresis/evaluate-plasmic', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = therapeuticApheresisService.TherapeuticApheresisService.evaluatePlasmicScore(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate PLASMIC error:', err);
+    res.status(500).json({ error: 'Failed to evaluate PLASMIC score.' });
+  }
+});
+
+// Phase 77: PHERESIS-CMD - Calculate Total Plasma Volume (TPV) & Exchange Dose
+router.post('/apheresis/calculate-volume', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = therapeuticApheresisService.TherapeuticApheresisService.calculatePlasmaVolume(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Calculate plasma volume error:', err);
+    res.status(500).json({ error: 'Failed to calculate plasma volume.' });
+  }
+});
+
+// Phase 77: PHERESIS-CMD - Evaluate Citrate-Induced Hypocalcemia Safety
+router.post('/apheresis/evaluate-calcium', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = therapeuticApheresisService.TherapeuticApheresisService.evaluateCitrateCalciumSafety(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate calcium safety error:', err);
+    res.status(500).json({ error: 'Failed to evaluate citrate calcium safety.' });
+  }
+});
+
+// Phase 77: PHERESIS-CMD - Save Apheresis Procedure Order
+router.post('/apheresis/procedures', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patient_id,
+      asfa_indication,
+      asfa_category,
+      plasmic_score,
+      adamts13_activity_percent,
+      total_plasma_volume_ml,
+      prescribed_exchange_tpv_fraction,
+      total_exchange_volume_ml,
+      replacement_fluid,
+      platelet_transfusion_contraindicated,
+      calcium_infusion_active
+    } = req.body;
+
+    if (!patient_id || !asfa_indication || !asfa_category || !total_plasma_volume_ml || !replacement_fluid) {
+      res.status(400).json({ error: 'Missing mandatory apheresis procedure parameters.' });
+      return;
+    }
+
+    const saved = await therapeuticApheresisService.TherapeuticApheresisService.saveApheresisProcedure({
+      patient_id: Number(patient_id),
+      asfa_indication,
+      asfa_category,
+      plasmic_score: plasmic_score !== undefined ? Number(plasmic_score) : undefined,
+      adamts13_activity_percent: adamts13_activity_percent !== undefined ? Number(adamts13_activity_percent) : undefined,
+      total_plasma_volume_ml: Number(total_plasma_volume_ml),
+      prescribed_exchange_tpv_fraction: Number(prescribed_exchange_tpv_fraction || 1.0),
+      total_exchange_volume_ml: Number(total_exchange_volume_ml),
+      replacement_fluid,
+      platelet_transfusion_contraindicated: Boolean(platelet_transfusion_contraindicated),
+      calcium_infusion_active: calcium_infusion_active !== undefined ? Boolean(calcium_infusion_active) : true
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save apheresis procedure error:', err);
+    res.status(500).json({ error: 'Failed to record apheresis procedure.' });
+  }
+});
+
+// Phase 77: PHERESIS-CMD - Log Real-time Exchange Telemetry
+router.post('/apheresis/telemetry-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      procedure_id,
+      patient_id,
+      blood_processed_ml,
+      plasma_removed_ml,
+      replacement_administered_ml,
+      acda_citrate_volume_ml,
+      systemic_ionized_calcium_mmol_l,
+      calcium_gluconate_infused_g,
+      hypocalcemia_alert,
+      circuit_pressure_inlet_mmhg
+    } = req.body;
+
+    if (!procedure_id || !patient_id || blood_processed_ml === undefined || systemic_ionized_calcium_mmol_l === undefined) {
+      res.status(400).json({ error: 'Missing mandatory telemetry parameters.' });
+      return;
+    }
+
+    const saved = await therapeuticApheresisService.TherapeuticApheresisService.logPlasmaExchangeTelemetry({
+      procedure_id: Number(procedure_id),
+      patient_id: Number(patient_id),
+      blood_processed_ml: Number(blood_processed_ml),
+      plasma_removed_ml: Number(plasma_removed_ml),
+      replacement_administered_ml: Number(replacement_administered_ml),
+      acda_citrate_volume_ml: Number(acda_citrate_volume_ml),
+      systemic_ionized_calcium_mmol_l: Number(systemic_ionized_calcium_mmol_l),
+      calcium_gluconate_infused_g: Number(calcium_gluconate_infused_g),
+      hypocalcemia_alert: Boolean(hypocalcemia_alert),
+      circuit_pressure_inlet_mmhg: circuit_pressure_inlet_mmhg !== undefined ? Number(circuit_pressure_inlet_mmhg) : undefined
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save exchange telemetry error:', err);
+    res.status(500).json({ error: 'Failed to record plasma exchange telemetry.' });
+  }
+});
+
+// Phase 77: PHERESIS-CMD - Get Patient Apheresis History
+router.get('/apheresis/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await therapeuticApheresisService.TherapeuticApheresisService.getPatientApheresisHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get apheresis history error:', err);
+    res.status(500).json({ error: 'Failed to retrieve apheresis history.' });
   }
 });
 

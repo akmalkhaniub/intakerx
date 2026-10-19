@@ -2430,6 +2430,46 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_stepup_patient ON pancreatic_stepup_interventions(patient_id);
     `);
 
+    // Create apheresis_procedures table (Phase 77)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS apheresis_procedures (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        asfa_indication VARCHAR(64) NOT NULL,
+        asfa_category VARCHAR(16) NOT NULL,
+        plasmic_score INTEGER,
+        adamts13_activity_percent NUMERIC(4, 1),
+        total_plasma_volume_ml NUMERIC(6, 1) NOT NULL,
+        prescribed_exchange_tpv_fraction NUMERIC(3, 2) NOT NULL,
+        total_exchange_volume_ml NUMERIC(6, 1) NOT NULL,
+        replacement_fluid VARCHAR(64) NOT NULL,
+        platelet_transfusion_contraindicated BOOLEAN DEFAULT FALSE,
+        calcium_infusion_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_apheresis_patient ON apheresis_procedures(patient_id);
+    `);
+
+    // Create plasma_exchange_logs table (Phase 77)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS plasma_exchange_logs (
+        id SERIAL PRIMARY KEY,
+        procedure_id INTEGER REFERENCES apheresis_procedures(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        blood_processed_ml NUMERIC(6, 1) NOT NULL,
+        plasma_removed_ml NUMERIC(6, 1) NOT NULL,
+        replacement_administered_ml NUMERIC(6, 1) NOT NULL,
+        acda_citrate_volume_ml NUMERIC(5, 1) NOT NULL,
+        systemic_ionized_calcium_mmol_l NUMERIC(4, 2) NOT NULL,
+        calcium_gluconate_infused_g NUMERIC(4, 2) NOT NULL,
+        hypocalcemia_alert BOOLEAN DEFAULT FALSE,
+        circuit_pressure_inlet_mmhg INTEGER,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_exchange_log_procedure ON plasma_exchange_logs(procedure_id);
+      CREATE INDEX IF NOT EXISTS idx_exchange_log_patient ON plasma_exchange_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
