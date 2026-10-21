@@ -2597,6 +2597,43 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_code_cycle_code_id ON code_cycle_logs(code_id);
     `);
 
+    // Create thoracic_drainage_tubes table (Phase 81: PNEUMO-DRAIN)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS thoracic_drainage_tubes (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        insertion_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        anatomical_side VARCHAR(16) NOT NULL,
+        tube_size_fr INTEGER NOT NULL,
+        indication VARCHAR(64) NOT NULL,
+        initial_output_ml INTEGER NOT NULL,
+        current_suction_cmh2o INTEGER DEFAULT -20,
+        water_seal_trial_active BOOLEAN DEFAULT FALSE,
+        active_status BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_tube_patient ON thoracic_drainage_tubes(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_tube_status ON thoracic_drainage_tubes(active_status);
+    `);
+
+    // Create pleural_fluid_drainage_logs table (Phase 81: PNEUMO-DRAIN)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS pleural_fluid_drainage_logs (
+        id SERIAL PRIMARY KEY,
+        tube_id INTEGER REFERENCES thoracic_drainage_tubes(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        hourly_output_ml INTEGER NOT NULL,
+        cumulative_24h_output_ml INTEGER NOT NULL,
+        fluid_character VARCHAR(32) NOT NULL,
+        air_leak_grade VARCHAR(32) NOT NULL,
+        massive_hemothorax_alert BOOLEAN DEFAULT FALSE,
+        emergent_thoracotomy_indicated BOOLEAN DEFAULT FALSE,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pleural_tube ON pleural_fluid_drainage_logs(tube_id);
+      CREATE INDEX IF NOT EXISTS idx_pleural_patient ON pleural_fluid_drainage_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

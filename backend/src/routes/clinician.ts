@@ -70,6 +70,7 @@ import * as therapeuticApheresisService from '../services/therapeuticApheresis';
 import * as vadPulseService from '../services/vadPulse';
 import * as comfortCareService from '../services/comfortCare';
 import * as codeNavigatorService from '../services/codeNavigator';
+import * as pneumoDrainService from '../services/pneumoDrain';
 
 const router = Router();
 
@@ -6714,6 +6715,215 @@ router.get('/code/patients/:patientId/history', async (req: AuthenticatedRequest
   } catch (err: any) {
     console.error('Get Code History error:', err);
     res.status(500).json({ error: 'Failed to retrieve code history.' });
+  }
+});
+
+// Phase 81: PNEUMO-DRAIN - Evaluate Tension Pneumothorax
+router.post('/thoracic/evaluate-tension', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      hemodynamic_instability,
+      unilateral_absent_breath_sounds,
+      tracheal_deviation,
+      severe_dyspnea_cyanosis,
+      anatomical_side,
+      subcutaneous_emphysema
+    } = req.body;
+
+    if (!anatomical_side || unilateral_absent_breath_sounds === undefined) {
+      return res.status(400).json({ error: 'anatomical_side and unilateral_absent_breath_sounds are required.' });
+    }
+
+    const result = pneumoDrainService.PneumoDrainService.evaluateTensionPneumo({
+      hemodynamic_instability: Boolean(hemodynamic_instability),
+      unilateral_absent_breath_sounds: Boolean(unilateral_absent_breath_sounds),
+      tracheal_deviation: Boolean(tracheal_deviation),
+      severe_dyspnea_cyanosis: Boolean(severe_dyspnea_cyanosis),
+      anatomical_side,
+      subcutaneous_emphysema: Boolean(subcutaneous_emphysema)
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Tension Pneumothorax error:', err);
+    res.status(500).json({ error: 'Failed to evaluate tension pneumothorax.' });
+  }
+});
+
+// Phase 81: PNEUMO-DRAIN - Evaluate Pleural Drainage & Thoracotomy Triggers
+router.post('/thoracic/evaluate-drainage', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      initial_insertion_output_ml,
+      hourly_drainage_ml,
+      hours_monitoring,
+      fluid_character,
+      air_leak_grade,
+      current_suction_cmh2o,
+      water_seal_trial_active,
+      sbp_mmhg
+    } = req.body;
+
+    if (initial_insertion_output_ml === undefined || hourly_drainage_ml === undefined || !fluid_character || !air_leak_grade) {
+      return res.status(400).json({ error: 'initial_insertion_output_ml, hourly_drainage_ml, fluid_character, and air_leak_grade are required.' });
+    }
+
+    const result = pneumoDrainService.PneumoDrainService.evaluatePleuralDrainage({
+      initial_insertion_output_ml: Number(initial_insertion_output_ml),
+      hourly_drainage_ml: Number(hourly_drainage_ml),
+      hours_monitoring: Number(hours_monitoring || 1),
+      fluid_character,
+      air_leak_grade,
+      current_suction_cmh2o: Number(current_suction_cmh2o || -20),
+      water_seal_trial_active: Boolean(water_seal_trial_active),
+      sbp_mmhg: sbp_mmhg !== undefined ? Number(sbp_mmhg) : undefined
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Pleural Drainage error:', err);
+    res.status(500).json({ error: 'Failed to evaluate pleural drainage.' });
+  }
+});
+
+// Phase 81: PNEUMO-DRAIN - Evaluate Rib Fractures & Flail Chest
+router.post('/thoracic/evaluate-rib-fractures', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      fractured_ribs_count,
+      flail_segment_present,
+      bilateral_fractures,
+      pulmonary_contusion_present,
+      patient_age,
+      pain_score_10,
+      respiratory_failure_intubated
+    } = req.body;
+
+    if (fractured_ribs_count === undefined || patient_age === undefined || pain_score_10 === undefined) {
+      return res.status(400).json({ error: 'fractured_ribs_count, patient_age, and pain_score_10 are required.' });
+    }
+
+    const result = pneumoDrainService.PneumoDrainService.evaluateRibFractures({
+      fractured_ribs_count: Number(fractured_ribs_count),
+      flail_segment_present: Boolean(flail_segment_present),
+      bilateral_fractures: Boolean(bilateral_fractures),
+      pulmonary_contusion_present: Boolean(pulmonary_contusion_present),
+      patient_age: Number(patient_age),
+      pain_score_10: Number(pain_score_10),
+      respiratory_failure_intubated: Boolean(respiratory_failure_intubated)
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Rib Fractures error:', err);
+    res.status(500).json({ error: 'Failed to evaluate rib fractures and flail chest.' });
+  }
+});
+
+// Phase 81: PNEUMO-DRAIN - Insert Thoracic Drainage Tube
+router.post('/thoracic/tubes', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patient_id,
+      anatomical_side,
+      tube_size_fr,
+      indication,
+      initial_output_ml,
+      current_suction_cmh2o,
+      water_seal_trial_active,
+      active_status
+    } = req.body;
+
+    if (!patient_id || !anatomical_side || !tube_size_fr || !indication || initial_output_ml === undefined) {
+      return res.status(400).json({ error: 'patient_id, anatomical_side, tube_size_fr, indication, and initial_output_ml are required.' });
+    }
+
+    const saved = await pneumoDrainService.PneumoDrainService.insertThoracicTube({
+      patient_id: Number(patient_id),
+      anatomical_side,
+      tube_size_fr: Number(tube_size_fr),
+      indication,
+      initial_output_ml: Number(initial_output_ml),
+      current_suction_cmh2o: current_suction_cmh2o !== undefined ? Number(current_suction_cmh2o) : undefined,
+      water_seal_trial_active: water_seal_trial_active !== undefined ? Boolean(water_seal_trial_active) : undefined,
+      active_status: active_status !== undefined ? Boolean(active_status) : undefined
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Insert Thoracic Tube error:', err);
+    res.status(500).json({ error: 'Failed to record thoracic tube insertion.' });
+  }
+});
+
+// Phase 81: PNEUMO-DRAIN - Log Pleural Drainage
+router.post('/thoracic/drainage-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      tube_id,
+      patient_id,
+      hourly_output_ml,
+      cumulative_24h_output_ml,
+      fluid_character,
+      air_leak_grade,
+      massive_hemothorax_alert,
+      emergent_thoracotomy_indicated
+    } = req.body;
+
+    if (!tube_id || !patient_id || hourly_output_ml === undefined || cumulative_24h_output_ml === undefined || !fluid_character || !air_leak_grade) {
+      return res.status(400).json({ error: 'tube_id, patient_id, hourly_output_ml, cumulative_24h_output_ml, fluid_character, and air_leak_grade are required.' });
+    }
+
+    const saved = await pneumoDrainService.PneumoDrainService.logPleuralDrainage({
+      tube_id: Number(tube_id),
+      patient_id: Number(patient_id),
+      hourly_output_ml: Number(hourly_output_ml),
+      cumulative_24h_output_ml: Number(cumulative_24h_output_ml),
+      fluid_character,
+      air_leak_grade,
+      massive_hemothorax_alert: Boolean(massive_hemothorax_alert),
+      emergent_thoracotomy_indicated: Boolean(emergent_thoracotomy_indicated)
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Log Pleural Drainage error:', err);
+    res.status(500).json({ error: 'Failed to record pleural fluid drainage log.' });
+  }
+});
+
+// Phase 81: PNEUMO-DRAIN - Update Tube Suction Status
+router.patch('/thoracic/tubes/:tubeId/suction', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const tubeId = Number(req.params.tubeId);
+    const { current_suction_cmh2o, water_seal_trial_active } = req.body;
+
+    if (current_suction_cmh2o === undefined || water_seal_trial_active === undefined) {
+      return res.status(400).json({ error: 'current_suction_cmh2o and water_seal_trial_active are required.' });
+    }
+
+    const updated = await pneumoDrainService.PneumoDrainService.updateTubeSuctionStatus(
+      tubeId,
+      Number(current_suction_cmh2o),
+      Boolean(water_seal_trial_active)
+    );
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update Tube Suction error:', err);
+    res.status(500).json({ error: 'Failed to update thoracic tube suction status.' });
+  }
+});
+
+// Phase 81: PNEUMO-DRAIN - Get Patient Thoracic History
+router.get('/thoracic/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await pneumoDrainService.PneumoDrainService.getPatientThoracicHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get Thoracic History error:', err);
+    res.status(500).json({ error: 'Failed to retrieve thoracic history.' });
   }
 });
 
