@@ -63,6 +63,7 @@ import { ComfortCareHub } from './ComfortCareHub';
 import { CodeNavigatorHub } from './CodeNavigatorHub';
 import { PneumoDrainHub } from './PneumoDrainHub';
 import { StatusPulmoHub } from './StatusPulmoHub';
+import { AortaCodeHub } from './AortaCodeHub';
 
 interface ClinicianDashboardProps {
   backendUrl: string;
@@ -118,7 +119,7 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
 
   // Security Observability States
-  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control' | 'meds_to_beds' | 'genomic_tumor_board' | 'behavioral_health' | 'icu_shock' | 'autonomous_cdi' | 'organ_transplant' | 'labor_delivery' | 'cleanroom_compounding' | 'code_stroke' | 'hemo_surge' | 'cath_alert' | 'mcs_hub' | 'trauma_one' | 'nrp_safe' | 'airway_code' | 'tox_alert' | 'crrt_navigator' | 'theranostics' | 'hemo_swan' | 'spine_alert' | 'cbrne_triage' | 'hbot_safe' | 'liver_alive' | 'cds_hooks' | 'tele_icu' | 'neuro_crit' | 'cell_shield' | 'ecpr_command' | 'twin_orchestra' | 'vascular_limb' | 'metabolic_keto' | 'coag_rotem' | 'rounding_hud' | 'pancreas_alert' | 'pheresis_cmd' | 'vad_pulse' | 'comfort_care' | 'code_navigator' | 'pneumo_drain' | 'status_pulmo'>('workspace');
+  const [currentTab, setCurrentTab] = useState<'workspace' | 'security' | 'analytics' | 'ehr_sandbox' | 'ambient_scribe' | 'followup_tracker' | 'orders' | 'telehealth' | 'waiting_room' | 'trials' | 'conference' | 'billing_prior_auth' | 'specialized_triage' | 'cac_coding' | 'antimicrobial_pgx' | 'referrals' | 'ipass_rounding' | 'population_health' | 'sepsis_watchdog' | 'revcycle_appeals' | 'hospital_at_home' | 'voice_biomarkers' | 'transfer_center' | 'perioperative' | 'infection_control' | 'meds_to_beds' | 'genomic_tumor_board' | 'behavioral_health' | 'icu_shock' | 'autonomous_cdi' | 'organ_transplant' | 'labor_delivery' | 'cleanroom_compounding' | 'code_stroke' | 'hemo_surge' | 'cath_alert' | 'mcs_hub' | 'trauma_one' | 'nrp_safe' | 'airway_code' | 'tox_alert' | 'crrt_navigator' | 'theranostics' | 'hemo_swan' | 'spine_alert' | 'cbrne_triage' | 'hbot_safe' | 'liver_alive' | 'cds_hooks' | 'tele_icu' | 'neuro_crit' | 'cell_shield' | 'ecpr_command' | 'twin_orchestra' | 'vascular_limb' | 'metabolic_keto' | 'coag_rotem' | 'rounding_hud' | 'pancreas_alert' | 'pheresis_cmd' | 'vad_pulse' | 'comfort_care' | 'code_navigator' | 'pneumo_drain' | 'status_pulmo' | 'aorta_code'>('workspace');
   const [securityData, setSecurityData] = useState<any>(null);
   const [isLoadingSecurity, setIsLoadingSecurity] = useState<boolean>(false);
 
@@ -3098,6 +3099,14 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
     );
   };
 
+  const renderAortaCodeHub = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', flex: 1, overflowY: 'auto' }}>
+        <AortaCodeHub />
+      </div>
+    );
+  };
+
   const renderSecurityObservability = () => {
     if (isLoadingSecurity && !securityData) {
       return (
@@ -4554,6 +4563,24 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               >
                 💨 STATUS-PULMO
               </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('aorta_code')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: currentTab === 'aorta_code' ? '#f43f5e' : 'var(--text-muted)',
+                  borderBottom: currentTab === 'aorta_code' ? '2.5px solid #f43f5e' : 'none',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+              >
+                🩸 AORTA-CODE
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -4924,6 +4951,8 @@ export default function ClinicianDashboard({ backendUrl }: ClinicianDashboardPro
               renderPneumoDrainHub()
             ) : currentTab === 'status_pulmo' ? (
               renderStatusPulmoHub()
+            ) : currentTab === 'aorta_code' ? (
+              renderAortaCodeHub()
             ) : (
               <div style={styles.workspace}>
           {/* Left Panel: Sessions List */}

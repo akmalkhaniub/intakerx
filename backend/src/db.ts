@@ -2679,6 +2679,51 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_vent_patient ON obstructive_vent_settings(patient_id);
     `);
 
+    // Create aortic_syndrome_encounters table (Phase 83: AORTA-CODE)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS aortic_syndrome_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        stanford_type VARCHAR(16) NOT NULL,
+        debakey_type VARCHAR(16) NOT NULL,
+        aortic_diameter_mm NUMERIC(5,1) NOT NULL,
+        intimal_tear_location VARCHAR(64) NOT NULL,
+        cardiac_tamponade_present BOOLEAN DEFAULT FALSE,
+        aortic_regurg_severity VARCHAR(32) DEFAULT 'NONE',
+        coronary_involvement BOOLEAN DEFAULT FALSE,
+        refractory_pain BOOLEAN DEFAULT FALSE,
+        rapid_expansion BOOLEAN DEFAULT FALSE,
+        malperfusion_syndromes JSONB,
+        surgical_consult_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        tevar_indicated BOOLEAN DEFAULT FALSE,
+        clinical_disposition VARCHAR(64) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_aorta_patient ON aortic_syndrome_encounters(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_aorta_type ON aortic_syndrome_encounters(stanford_type);
+    `);
+
+    // Create anti_impulse_telemetry_logs table (Phase 83: AORTA-CODE)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS anti_impulse_telemetry_logs (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES aortic_syndrome_encounters(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        heart_rate_bpm INTEGER NOT NULL,
+        systolic_bp_mmhg INTEGER NOT NULL,
+        diastolic_bp_mmhg INTEGER NOT NULL,
+        mean_arterial_pressure_mmhg INTEGER NOT NULL,
+        dp_dt_controlled BOOLEAN DEFAULT FALSE,
+        beta_blocker_active BOOLEAN DEFAULT FALSE,
+        vasodilator_active BOOLEAN DEFAULT FALSE,
+        reflex_tachycardia_risk BOOLEAN DEFAULT FALSE,
+        active_medications JSONB,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_telemetry_encounter ON anti_impulse_telemetry_logs(encounter_id);
+      CREATE INDEX IF NOT EXISTS idx_telemetry_patient ON anti_impulse_telemetry_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

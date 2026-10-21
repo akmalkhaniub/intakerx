@@ -72,6 +72,7 @@ import * as comfortCareService from '../services/comfortCare';
 import * as codeNavigatorService from '../services/codeNavigator';
 import * as pneumoDrainService from '../services/pneumoDrain';
 import * as statusPulmoService from '../services/statusPulmo';
+import * as aortaCodeService from '../services/aortaCode';
 
 const router = Router();
 
@@ -7166,6 +7167,206 @@ router.get('/pulmo/encounter/:encounterId/vent-settings', async (req: Authentica
   } catch (err: any) {
     console.error('Get Encounter Vent Settings error:', err);
     res.status(500).json({ error: 'Failed to retrieve encounter vent settings.' });
+  }
+});
+
+// ==========================================
+// Phase 83: AORTA-CODE Endpoints
+// ==========================================
+
+// Evaluate Aortic Dissection Classification & Malperfusion
+router.post('/aorta/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      involvesAscendingAorta,
+      involvesAorticArch,
+      involvesDescendingAorta,
+      extendsBelowDiaphragm,
+      aorticDiameterMm,
+      intimalTearLocation,
+      cardiacTamponadePresent,
+      aorticRegurgSeverity,
+      refractoryPain,
+      refractoryHypertension,
+      rapidExpansion,
+      pericardialEffusionOrRupture,
+      malperfusion
+    } = req.body;
+
+    if (!patientId || aorticDiameterMm === undefined) {
+      return res.status(400).json({ error: 'patientId and aorticDiameterMm are required.' });
+    }
+
+    const result = aortaCodeService.AortaCodeService.evaluateAorticDissection({
+      patientId: Number(patientId),
+      involvesAscendingAorta: Boolean(involvesAscendingAorta),
+      involvesAorticArch: Boolean(involvesAorticArch),
+      involvesDescendingAorta: Boolean(involvesDescendingAorta),
+      extendsBelowDiaphragm: Boolean(extendsBelowDiaphragm),
+      aorticDiameterMm: Number(aorticDiameterMm),
+      intimalTearLocation: intimalTearLocation || 'Aortic Root',
+      cardiacTamponadePresent: Boolean(cardiacTamponadePresent),
+      aorticRegurgSeverity,
+      refractoryPain: Boolean(refractoryPain),
+      refractoryHypertension: Boolean(refractoryHypertension),
+      rapidExpansion: Boolean(rapidExpansion),
+      pericardialEffusionOrRupture: Boolean(pericardialEffusionOrRupture),
+      malperfusion
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Aorta Evaluate error:', err);
+    res.status(500).json({ error: 'Failed to evaluate aortic dissection.' });
+  }
+});
+
+// Analyze Anti-Impulse Hemodynamics & Shear Stress
+router.post('/aorta/anti-impulse', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounterId,
+      patientId,
+      heartRateBpm,
+      systolicBpMmhg,
+      diastolicBpMmhg,
+      betaBlockerActive,
+      vasodilatorActive,
+      activeMedications
+    } = req.body;
+
+    if (!patientId || heartRateBpm === undefined || systolicBpMmhg === undefined || diastolicBpMmhg === undefined) {
+      return res.status(400).json({ error: 'Missing required hemodynamics parameters.' });
+    }
+
+    const result = aortaCodeService.AortaCodeService.analyzeAntiImpulseHemodynamics({
+      encounterId: encounterId ? Number(encounterId) : undefined,
+      patientId: Number(patientId),
+      heartRateBpm: Number(heartRateBpm),
+      systolicBpMmhg: Number(systolicBpMmhg),
+      diastolicBpMmhg: Number(diastolicBpMmhg),
+      betaBlockerActive: Boolean(betaBlockerActive),
+      vasodilatorActive: Boolean(vasodilatorActive),
+      activeMedications
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Anti-Impulse Analysis error:', err);
+    res.status(500).json({ error: 'Failed to analyze anti-impulse hemodynamics.' });
+  }
+});
+
+// Save Aortic Syndrome Encounter
+router.post('/aorta/encounter', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      stanfordType,
+      debakeyType,
+      aorticDiameterMm,
+      intimalTearLocation,
+      cardiacTamponadePresent,
+      aorticRegurgSeverity,
+      coronaryInvolvement,
+      refractoryPain,
+      rapidExpansion,
+      malperfusionSyndromes,
+      tevarIndicated,
+      clinicalDisposition
+    } = req.body;
+
+    if (!patientId || !stanfordType || !debakeyType || aorticDiameterMm === undefined) {
+      return res.status(400).json({ error: 'Missing required encounter parameters.' });
+    }
+
+    const saved = await aortaCodeService.AortaCodeService.saveAorticEncounter({
+      patientId: Number(patientId),
+      stanfordType,
+      debakeyType,
+      aorticDiameterMm: Number(aorticDiameterMm),
+      intimalTearLocation: intimalTearLocation || 'Ascending',
+      cardiacTamponadePresent: Boolean(cardiacTamponadePresent),
+      aorticRegurgSeverity,
+      coronaryInvolvement: Boolean(coronaryInvolvement),
+      refractoryPain: Boolean(refractoryPain),
+      rapidExpansion: Boolean(rapidExpansion),
+      malperfusionSyndromes,
+      tevarIndicated: Boolean(tevarIndicated),
+      clinicalDisposition: clinicalDisposition || 'ICU'
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save Aorta Encounter error:', err);
+    res.status(500).json({ error: 'Failed to save aortic encounter.' });
+  }
+});
+
+// Log Anti-Impulse Telemetry Readings
+router.post('/aorta/telemetry', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounterId,
+      patientId,
+      heartRateBpm,
+      systolicBpMmhg,
+      diastolicBpMmhg,
+      meanArterialPressureMmhg,
+      dpDtControlled,
+      betaBlockerActive,
+      vasodilatorActive,
+      reflexTachycardiaRisk,
+      activeMedications
+    } = req.body;
+
+    if (!encounterId || !patientId || heartRateBpm === undefined || systolicBpMmhg === undefined) {
+      return res.status(400).json({ error: 'Missing required telemetry log parameters.' });
+    }
+
+    const saved = await aortaCodeService.AortaCodeService.logAntiImpulseTelemetry({
+      encounterId: Number(encounterId),
+      patientId: Number(patientId),
+      heartRateBpm: Number(heartRateBpm),
+      systolicBpMmhg: Number(systolicBpMmhg),
+      diastolicBpMmhg: Number(diastolicBpMmhg),
+      meanArterialPressureMmhg: Number(meanArterialPressureMmhg),
+      dpDtControlled: Boolean(dpDtControlled),
+      betaBlockerActive: Boolean(betaBlockerActive),
+      vasodilatorActive: Boolean(vasodilatorActive),
+      reflexTachycardiaRisk: Boolean(reflexTachycardiaRisk),
+      activeMedications
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Log Telemetry error:', err);
+    res.status(500).json({ error: 'Failed to log telemetry.' });
+  }
+});
+
+// Get Patient Aorta History
+router.get('/aorta/patient/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await aortaCodeService.AortaCodeService.getPatientAortaHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get Aorta History error:', err);
+    res.status(500).json({ error: 'Failed to retrieve aorta history.' });
+  }
+});
+
+// Get Telemetry Logs for Encounter
+router.get('/aorta/encounter/:encounterId/telemetry', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const encounterId = Number(req.params.encounterId);
+    const logs = await aortaCodeService.AortaCodeService.getEncounterTelemetryLogs(encounterId);
+    res.json(logs);
+  } catch (err: any) {
+    console.error('Get Telemetry Logs error:', err);
+    res.status(500).json({ error: 'Failed to retrieve telemetry logs.' });
   }
 });
 
