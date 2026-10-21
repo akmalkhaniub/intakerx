@@ -71,6 +71,7 @@ import * as vadPulseService from '../services/vadPulse';
 import * as comfortCareService from '../services/comfortCare';
 import * as codeNavigatorService from '../services/codeNavigator';
 import * as pneumoDrainService from '../services/pneumoDrain';
+import * as statusPulmoService from '../services/statusPulmo';
 
 const router = Router();
 
@@ -6924,6 +6925,247 @@ router.get('/thoracic/patients/:patientId/history', async (req: AuthenticatedReq
   } catch (err: any) {
     console.error('Get Thoracic History error:', err);
     res.status(500).json({ error: 'Failed to retrieve thoracic history.' });
+  }
+});
+
+// ==========================================
+// Phase 82: STATUS-PULMO Endpoints
+// ==========================================
+
+// Evaluate Status Asthmaticus Severity
+router.post('/pulmo/assess', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      pefPercent,
+      speech,
+      accessoryMuscleUse,
+      silentChest,
+      pulsusParadoxusMmhg,
+      paco2Mmhg,
+      ph,
+      pao2Mmhg,
+      fio2Percent,
+      mentalStatus,
+      heartRate,
+      respiratoryRate,
+      spo2Percent,
+      intubated,
+      notes
+    } = req.body;
+
+    const result = statusPulmoService.StatusPulmoService.assessAsthmaSeverity({
+      patientId: Number(patientId),
+      pefPercent: pefPercent !== undefined ? Number(pefPercent) : undefined,
+      speech,
+      accessoryMuscleUse: Boolean(accessoryMuscleUse),
+      silentChest: Boolean(silentChest),
+      pulsusParadoxusMmhg: pulsusParadoxusMmhg !== undefined ? Number(pulsusParadoxusMmhg) : undefined,
+      paco2Mmhg: paco2Mmhg !== undefined ? Number(paco2Mmhg) : undefined,
+      ph: ph !== undefined ? Number(ph) : undefined,
+      pao2Mmhg: pao2Mmhg !== undefined ? Number(pao2Mmhg) : undefined,
+      fio2Percent: fio2Percent !== undefined ? Number(fio2Percent) : undefined,
+      mentalStatus,
+      heartRate: heartRate !== undefined ? Number(heartRate) : undefined,
+      respiratoryRate: respiratoryRate !== undefined ? Number(respiratoryRate) : undefined,
+      spo2Percent: spo2Percent !== undefined ? Number(spo2Percent) : undefined,
+      intubated: Boolean(intubated),
+      notes
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Pulmo Assess error:', err);
+    res.status(500).json({ error: 'Failed to assess status asthmaticus.' });
+  }
+});
+
+// Calculate Ventilator Dynamics & Physics
+router.post('/pulmo/vent-physics', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounterId,
+      patientId,
+      weightKg,
+      heightCm,
+      gender,
+      tidalVolumeMl,
+      respiratoryRateBpm,
+      inspiratoryFlowLpm,
+      appliedPeep,
+      autoPeepCmh2o,
+      plateauPressureCmh2o,
+      peakPressureCmh2o,
+      ph,
+      paco2Mmhg,
+      hasAcuteTbiOrElevatedIcp,
+      ventilatorMode
+    } = req.body;
+
+    if (!patientId || !weightKg || !heightCm || !gender || !tidalVolumeMl || !respiratoryRateBpm || !inspiratoryFlowLpm) {
+      return res.status(400).json({ error: 'Missing required ventilator physics parameters.' });
+    }
+
+    const result = statusPulmoService.StatusPulmoService.calculateVentilatorPhysics({
+      encounterId: encounterId ? Number(encounterId) : undefined,
+      patientId: Number(patientId),
+      weightKg: Number(weightKg),
+      heightCm: Number(heightCm),
+      gender,
+      tidalVolumeMl: Number(tidalVolumeMl),
+      respiratoryRateBpm: Number(respiratoryRateBpm),
+      inspiratoryFlowLpm: Number(inspiratoryFlowLpm),
+      appliedPeep: Number(appliedPeep || 0),
+      autoPeepCmh2o: Number(autoPeepCmh2o || 0),
+      plateauPressureCmh2o: Number(plateauPressureCmh2o || 0),
+      peakPressureCmh2o: Number(peakPressureCmh2o || 0),
+      ph: ph !== undefined ? Number(ph) : undefined,
+      paco2Mmhg: paco2Mmhg !== undefined ? Number(paco2Mmhg) : undefined,
+      hasAcuteTbiOrElevatedIcp: Boolean(hasAcuteTbiOrElevatedIcp),
+      ventilatorMode
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Pulmo Vent Physics error:', err);
+    res.status(500).json({ error: 'Failed to calculate ventilator physics.' });
+  }
+});
+
+// Evaluate Medical Escalation
+router.post('/pulmo/escalation', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { severity, currentMeds, refractoryDurationMin, intubated, spo2Percent } = req.body;
+    if (!severity) {
+      return res.status(400).json({ error: 'severity is required.' });
+    }
+
+    const plan = statusPulmoService.StatusPulmoService.generateMedicalEscalation({
+      severity,
+      currentMeds: currentMeds || [],
+      refractoryDurationMin: Number(refractoryDurationMin || 0),
+      intubated: Boolean(intubated),
+      spo2Percent: spo2Percent ? Number(spo2Percent) : undefined
+    });
+
+    res.json(plan);
+  } catch (err: any) {
+    console.error('Pulmo Escalation error:', err);
+    res.status(500).json({ error: 'Failed to evaluate medical escalation.' });
+  }
+});
+
+// Save Pulmo Encounter
+router.post('/pulmo/encounter', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      severity,
+      pefPercent,
+      silentChest,
+      pulsusParadoxusMmhg,
+      paco2Mmhg,
+      ph,
+      pao2Mmhg,
+      fio2Percent,
+      intubated,
+      dynamicHyperinflationRisk,
+      rescueMedications,
+      clinicalNotes
+    } = req.body;
+
+    if (!patientId || !severity) {
+      return res.status(400).json({ error: 'patientId and severity are required.' });
+    }
+
+    const saved = await statusPulmoService.StatusPulmoService.savePulmoEncounter({
+      patientId: Number(patientId),
+      severity,
+      pefPercent: pefPercent ? Number(pefPercent) : undefined,
+      silentChest: Boolean(silentChest),
+      pulsusParadoxusMmhg: pulsusParadoxusMmhg ? Number(pulsusParadoxusMmhg) : undefined,
+      paco2Mmhg: paco2Mmhg ? Number(paco2Mmhg) : undefined,
+      ph: ph ? Number(ph) : undefined,
+      pao2Mmhg: pao2Mmhg ? Number(pao2Mmhg) : undefined,
+      fio2Percent: fio2Percent ? Number(fio2Percent) : undefined,
+      intubated: Boolean(intubated),
+      dynamicHyperinflationRisk,
+      rescueMedications,
+      clinicalNotes
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save Pulmo Encounter error:', err);
+    res.status(500).json({ error: 'Failed to save pulmo encounter.' });
+  }
+});
+
+// Log Obstructive Vent Settings
+router.post('/pulmo/vent-settings', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounterId,
+      patientId,
+      tidalVolumeMl,
+      respiratoryRateBpm,
+      inspiratoryFlowLpm,
+      ieRatio,
+      appliedPeep,
+      autoPeepCmh2o,
+      plateauPressureCmh2o,
+      peakPressureCmh2o,
+      dynamicHyperinflationAlert,
+      ventilatorMode
+    } = req.body;
+
+    if (!encounterId || !patientId || !tidalVolumeMl || !respiratoryRateBpm || !inspiratoryFlowLpm) {
+      return res.status(400).json({ error: 'Missing required vent log parameters.' });
+    }
+
+    const saved = await statusPulmoService.StatusPulmoService.logVentSettings({
+      encounterId: Number(encounterId),
+      patientId: Number(patientId),
+      tidalVolumeMl: Number(tidalVolumeMl),
+      respiratoryRateBpm: Number(respiratoryRateBpm),
+      inspiratoryFlowLpm: Number(inspiratoryFlowLpm),
+      ieRatio: ieRatio || '1:4',
+      appliedPeep: Number(appliedPeep || 0),
+      autoPeepCmh2o: Number(autoPeepCmh2o || 0),
+      plateauPressureCmh2o: Number(plateauPressureCmh2o || 0),
+      peakPressureCmh2o: Number(peakPressureCmh2o || 0),
+      dynamicHyperinflationAlert: Boolean(dynamicHyperinflationAlert),
+      ventilatorMode
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Log Vent Settings error:', err);
+    res.status(500).json({ error: 'Failed to log ventilator settings.' });
+  }
+});
+
+// Get Patient Pulmo History
+router.get('/pulmo/patient/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await statusPulmoService.StatusPulmoService.getPatientPulmoHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get Pulmo History error:', err);
+    res.status(500).json({ error: 'Failed to retrieve pulmo history.' });
+  }
+});
+
+// Get Encounter Vent Settings
+router.get('/pulmo/encounter/:encounterId/vent-settings', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const encounterId = Number(req.params.encounterId);
+    const settings = await statusPulmoService.StatusPulmoService.getEncounterVentSettings(encounterId);
+    res.json(settings);
+  } catch (err: any) {
+    console.error('Get Encounter Vent Settings error:', err);
+    res.status(500).json({ error: 'Failed to retrieve encounter vent settings.' });
   }
 });
 

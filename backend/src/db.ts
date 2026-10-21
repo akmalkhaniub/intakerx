@@ -2634,6 +2634,51 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_pleural_patient ON pleural_fluid_drainage_logs(patient_id);
     `);
 
+    // Create status_pulmo_encounters table (Phase 82: STATUS-PULMO)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS status_pulmo_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        severity VARCHAR(32) NOT NULL,
+        pef_percent NUMERIC(5,2),
+        silent_chest BOOLEAN DEFAULT FALSE,
+        pulsus_paradoxus_mmhg NUMERIC(5,2),
+        paco2_mmhg NUMERIC(5,2),
+        ph NUMERIC(4,2),
+        pao2_mmhg NUMERIC(5,2),
+        fio2_percent NUMERIC(5,2),
+        intubated BOOLEAN DEFAULT FALSE,
+        dynamic_hyperinflation_risk VARCHAR(32),
+        rescue_medications JSONB,
+        clinical_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pulmo_patient ON status_pulmo_encounters(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_pulmo_severity ON status_pulmo_encounters(severity);
+    `);
+
+    // Create obstructive_vent_settings table (Phase 82: STATUS-PULMO)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS obstructive_vent_settings (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES status_pulmo_encounters(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        tidal_volume_ml NUMERIC(6,2) NOT NULL,
+        respiratory_rate_bpm NUMERIC(4,1) NOT NULL,
+        inspiratory_flow_lpm NUMERIC(5,1) NOT NULL,
+        ie_ratio VARCHAR(16) NOT NULL,
+        applied_peep NUMERIC(4,1) NOT NULL,
+        auto_peep_cmh2o NUMERIC(4,1) NOT NULL,
+        plateau_pressure_cmh2o NUMERIC(4,1) NOT NULL,
+        peak_pressure_cmh2o NUMERIC(4,1) NOT NULL,
+        dynamic_hyperinflation_alert BOOLEAN DEFAULT FALSE,
+        ventilator_mode VARCHAR(32) DEFAULT 'VCV',
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_vent_encounter ON obstructive_vent_settings(encounter_id);
+      CREATE INDEX IF NOT EXISTS idx_vent_patient ON obstructive_vent_settings(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
