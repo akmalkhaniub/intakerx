@@ -2553,6 +2553,50 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_opioid_rotation_patient ON opioid_rotation_logs(patient_id);
     `);
 
+    // Create code_arrest_events table (Phase 80: CODE-NAVIGATOR)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS code_arrest_events (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        code_start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        initial_rhythm VARCHAR(32) NOT NULL,
+        current_rhythm VARCHAR(32) NOT NULL,
+        cycle_count INTEGER DEFAULT 1,
+        total_shocks_delivered INTEGER DEFAULT 0,
+        epinephrine_total_doses INTEGER DEFAULT 0,
+        amiodarone_total_mg INTEGER DEFAULT 0,
+        lidocaine_total_mg INTEGER DEFAULT 0,
+        current_etco2_mmhg NUMERIC(5, 1),
+        compression_fraction_percent NUMERIC(5, 2),
+        rosc_achieved BOOLEAN DEFAULT FALSE,
+        rosc_timestamp TIMESTAMP,
+        h_and_t_checklist JSONB DEFAULT '{}'::jsonb,
+        code_status VARCHAR(32) DEFAULT 'ACTIVE',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_code_patient ON code_arrest_events(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_code_status ON code_arrest_events(code_status);
+    `);
+
+    // Create code_cycle_logs table (Phase 80: CODE-NAVIGATOR)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS code_cycle_logs (
+        id SERIAL PRIMARY KEY,
+        code_id INTEGER REFERENCES code_arrest_events(id) ON DELETE CASCADE,
+        cycle_number INTEGER NOT NULL,
+        rhythm_assessed VARCHAR(32) NOT NULL,
+        shock_delivered BOOLEAN DEFAULT FALSE,
+        shock_energy_joules INTEGER,
+        drug_administered VARCHAR(64),
+        cycle_etco2_mmhg NUMERIC(5, 1),
+        cycle_ccf_percent NUMERIC(5, 2),
+        reversible_causes_addressed JSONB DEFAULT '[]'::jsonb,
+        notes TEXT,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_code_cycle_code_id ON code_cycle_logs(code_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

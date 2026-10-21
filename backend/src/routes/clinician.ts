@@ -69,6 +69,7 @@ import * as acutePancreatitisService from '../services/acutePancreatitis';
 import * as therapeuticApheresisService from '../services/therapeuticApheresis';
 import * as vadPulseService from '../services/vadPulse';
 import * as comfortCareService from '../services/comfortCare';
+import * as codeNavigatorService from '../services/codeNavigator';
 
 const router = Router();
 
@@ -6534,6 +6535,185 @@ router.get('/palliative/patients/:patientId/history', async (req: AuthenticatedR
   } catch (err: any) {
     console.error('Get Palliative History error:', err);
     res.status(500).json({ error: 'Failed to retrieve palliative history.' });
+  }
+});
+
+// Phase 80: CODE-NAVIGATOR - Evaluate ACLS 2025 Code Cycle
+router.post('/code/evaluate-cycle', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      current_rhythm,
+      cycle_number,
+      time_in_code_seconds,
+      etco2_mmhg,
+      compression_fraction_percent,
+      epinephrine_doses_given,
+      last_epinephrine_cycle,
+      amiodarone_mg_given,
+      lidocaine_mg_given,
+      h_and_t_findings
+    } = req.body;
+
+    if (!current_rhythm || cycle_number === undefined || etco2_mmhg === undefined || compression_fraction_percent === undefined) {
+      return res.status(400).json({ error: 'current_rhythm, cycle_number, etco2_mmhg, and compression_fraction_percent are required.' });
+    }
+
+    const result = codeNavigatorService.CodeNavigatorService.evaluateCodeCycle({
+      current_rhythm,
+      cycle_number: Number(cycle_number),
+      time_in_code_seconds: Number(time_in_code_seconds || 0),
+      etco2_mmhg: Number(etco2_mmhg),
+      compression_fraction_percent: Number(compression_fraction_percent),
+      epinephrine_doses_given: Number(epinephrine_doses_given || 0),
+      last_epinephrine_cycle: last_epinephrine_cycle !== undefined ? Number(last_epinephrine_cycle) : undefined,
+      amiodarone_mg_given: Number(amiodarone_mg_given || 0),
+      lidocaine_mg_given: Number(lidocaine_mg_given || 0),
+      h_and_t_findings: h_and_t_findings || {}
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Code Cycle error:', err);
+    res.status(500).json({ error: 'Failed to evaluate code cycle.' });
+  }
+});
+
+// Phase 80: CODE-NAVIGATOR - Evaluate Post-Cardiac Arrest Care Bundle
+router.post('/code/evaluate-post-arrest', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      map_mmhg,
+      sbp_mmhg,
+      spo2_percent,
+      paco2_mmhg,
+      core_temperature_celsius,
+      stemi_on_12lead,
+      comatose_unresponsive
+    } = req.body;
+
+    if (map_mmhg === undefined || sbp_mmhg === undefined || spo2_percent === undefined || core_temperature_celsius === undefined) {
+      return res.status(400).json({ error: 'map_mmhg, sbp_mmhg, spo2_percent, and core_temperature_celsius are required.' });
+    }
+
+    const result = codeNavigatorService.CodeNavigatorService.evaluatePostArrestCare({
+      map_mmhg: Number(map_mmhg),
+      sbp_mmhg: Number(sbp_mmhg),
+      spo2_percent: Number(spo2_percent),
+      paco2_mmhg: paco2_mmhg !== undefined ? Number(paco2_mmhg) : undefined,
+      core_temperature_celsius: Number(core_temperature_celsius),
+      stemi_on_12lead: Boolean(stemi_on_12lead),
+      comatose_unresponsive: Boolean(comatose_unresponsive)
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Post-Arrest Care error:', err);
+    res.status(500).json({ error: 'Failed to evaluate post-arrest bundle.' });
+  }
+});
+
+// Phase 80: CODE-NAVIGATOR - Start Code Event
+router.post('/code/events', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patient_id,
+      initial_rhythm,
+      current_etco2_mmhg,
+      compression_fraction_percent,
+      h_and_t_checklist
+    } = req.body;
+
+    if (!patient_id || !initial_rhythm) {
+      return res.status(400).json({ error: 'patient_id and initial_rhythm are required.' });
+    }
+
+    const saved = await codeNavigatorService.CodeNavigatorService.startCodeEvent({
+      patient_id: Number(patient_id),
+      initial_rhythm,
+      current_etco2_mmhg: current_etco2_mmhg !== undefined ? Number(current_etco2_mmhg) : undefined,
+      compression_fraction_percent: compression_fraction_percent !== undefined ? Number(compression_fraction_percent) : undefined,
+      h_and_t_checklist
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Start Code Event error:', err);
+    res.status(500).json({ error: 'Failed to record code arrest event.' });
+  }
+});
+
+// Phase 80: CODE-NAVIGATOR - Log Code Cycle
+router.post('/code/cycles', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      code_id,
+      cycle_number,
+      rhythm_assessed,
+      shock_delivered,
+      shock_energy_joules,
+      drug_administered,
+      cycle_etco2_mmhg,
+      cycle_ccf_percent,
+      reversible_causes_addressed,
+      notes
+    } = req.body;
+
+    if (!code_id || cycle_number === undefined || !rhythm_assessed) {
+      return res.status(400).json({ error: 'code_id, cycle_number, and rhythm_assessed are required.' });
+    }
+
+    const saved = await codeNavigatorService.CodeNavigatorService.logCodeCycle({
+      code_id: Number(code_id),
+      cycle_number: Number(cycle_number),
+      rhythm_assessed,
+      shock_delivered: Boolean(shock_delivered),
+      shock_energy_joules: shock_energy_joules !== undefined ? Number(shock_energy_joules) : undefined,
+      drug_administered,
+      cycle_etco2_mmhg: cycle_etco2_mmhg !== undefined ? Number(cycle_etco2_mmhg) : undefined,
+      cycle_ccf_percent: cycle_ccf_percent !== undefined ? Number(cycle_ccf_percent) : undefined,
+      reversible_causes_addressed,
+      notes
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Log Code Cycle error:', err);
+    res.status(500).json({ error: 'Failed to record code cycle log.' });
+  }
+});
+
+// Phase 80: CODE-NAVIGATOR - Update Code Status (ROSC or Terminated)
+router.patch('/code/events/:codeId/status', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const codeId = Number(req.params.codeId);
+    const { status, rosc_timestamp } = req.body;
+
+    if (!status || (status !== 'ROSC_ACHIEVED' && status !== 'TERMINATED')) {
+      return res.status(400).json({ error: 'status must be ROSC_ACHIEVED or TERMINATED.' });
+    }
+
+    const updated = await codeNavigatorService.CodeNavigatorService.updateCodeStatus(
+      codeId,
+      status,
+      rosc_timestamp ? new Date(rosc_timestamp) : undefined
+    );
+
+    res.json(updated);
+  } catch (err: any) {
+    console.error('Update Code Status error:', err);
+    res.status(500).json({ error: 'Failed to update code status.' });
+  }
+});
+
+// Phase 80: CODE-NAVIGATOR - Get Patient Code History
+router.get('/code/patients/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await codeNavigatorService.CodeNavigatorService.getPatientCodeHistory(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get Code History error:', err);
+    res.status(500).json({ error: 'Failed to retrieve code history.' });
   }
 });
 
