@@ -73,6 +73,7 @@ import * as codeNavigatorService from '../services/codeNavigator';
 import * as pneumoDrainService from '../services/pneumoDrain';
 import * as statusPulmoService from '../services/statusPulmo';
 import * as aortaCodeService from '../services/aortaCode';
+import * as graftPulseService from '../services/graftPulse';
 
 const router = Router();
 
@@ -7367,6 +7368,177 @@ router.get('/aorta/encounter/:encounterId/telemetry', async (req: AuthenticatedR
   } catch (err: any) {
     console.error('Get Telemetry Logs error:', err);
     res.status(500).json({ error: 'Failed to retrieve telemetry logs.' });
+  }
+});
+
+// ==========================================
+// Phase 84: GRAFT-PULSE Endpoints
+// ==========================================
+
+// Record New Allograft Transplant
+router.post('/transplant/record', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId, organType, donorAge, ischemicTimeMinutes, surgicalNotes } = req.body;
+    if (!patientId || !organType || ischemicTimeMinutes === undefined) {
+      return res.status(400).json({ error: 'patientId, organType, and ischemicTimeMinutes are required.' });
+    }
+
+    const saved = await graftPulseService.GraftPulseService.recordTransplant({
+      patientId: Number(patientId),
+      organType,
+      donorAge: donorAge ? Number(donorAge) : undefined,
+      ischemicTimeMinutes: Number(ischemicTimeMinutes),
+      surgicalNotes
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Record Transplant error:', err);
+    res.status(500).json({ error: 'Failed to record allograft transplant.' });
+  }
+});
+
+// Assess ISHLT Lung Primary Graft Dysfunction (PGD)
+router.post('/transplant/pgd/lung', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { pao2Mmhg, fio2, radiographicInfiltrates, ecmoActive, ecmoType, invasiveMechanicalVentilation } = req.body;
+    if (pao2Mmhg === undefined || fio2 === undefined) {
+      return res.status(400).json({ error: 'pao2Mmhg and fio2 are required.' });
+    }
+
+    const result = graftPulseService.GraftPulseService.assessLungPGD({
+      pao2Mmhg: Number(pao2Mmhg),
+      fio2: Number(fio2),
+      radiographicInfiltrates: Boolean(radiographicInfiltrates),
+      ecmoActive: Boolean(ecmoActive),
+      ecmoType,
+      invasiveMechanicalVentilation: Boolean(invasiveMechanicalVentilation)
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Assess Lung PGD error:', err);
+    res.status(500).json({ error: 'Failed to assess lung PGD.' });
+  }
+});
+
+// Assess ISHLT Heart Primary Graft Dysfunction (PGD)
+router.post('/transplant/pgd/heart', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      lvefPercent,
+      cvpMmhg,
+      pcwpMmhg,
+      cardiacIndexLMinM2,
+      pulmonaryArterySystolicMmhg,
+      pulmonaryArteryDiastolicMmhg,
+      rvDysfunctionPresent,
+      vasoactives,
+      newIabpPlaced,
+      mechanicalCirculatorySupportActive,
+      mcsType
+    } = req.body;
+
+    if (lvefPercent === undefined || cvpMmhg === undefined || pcwpMmhg === undefined) {
+      return res.status(400).json({ error: 'lvefPercent, cvpMmhg, and pcwpMmhg are required.' });
+    }
+
+    const result = graftPulseService.GraftPulseService.assessHeartPGD({
+      lvefPercent: Number(lvefPercent),
+      cvpMmhg: Number(cvpMmhg),
+      pcwpMmhg: Number(pcwpMmhg),
+      cardiacIndexLMinM2: cardiacIndexLMinM2 ? Number(cardiacIndexLMinM2) : undefined,
+      pulmonaryArterySystolicMmhg: pulmonaryArterySystolicMmhg !== undefined ? Number(pulmonaryArterySystolicMmhg) : undefined,
+      pulmonaryArteryDiastolicMmhg: pulmonaryArteryDiastolicMmhg !== undefined ? Number(pulmonaryArteryDiastolicMmhg) : undefined,
+      rvDysfunctionPresent: Boolean(rvDysfunctionPresent),
+      vasoactives,
+      newIabpPlaced: Boolean(newIabpPlaced),
+      mechanicalCirculatorySupportActive: Boolean(mechanicalCirculatorySupportActive),
+      mcsType
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Assess Heart PGD error:', err);
+    res.status(500).json({ error: 'Failed to assess heart PGD.' });
+  }
+});
+
+// Log PGD Surveillance Assessment
+router.post('/transplant/pgd/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      transplantId,
+      patientId,
+      timepoint,
+      pao2Fio2Ratio,
+      radiographicInfiltrates,
+      lvefPercent,
+      cvpMmhg,
+      pcwpMmhg,
+      cardiacIndex,
+      papi,
+      visScore,
+      ecmoActive,
+      ecmoType,
+      pgdGrade,
+      inhaledVasodilator,
+      inhaledVasodilatorDose,
+      recommendations
+    } = req.body;
+
+    if (!transplantId || !patientId || !timepoint || !pgdGrade) {
+      return res.status(400).json({ error: 'transplantId, patientId, timepoint, and pgdGrade are required.' });
+    }
+
+    const saved = await graftPulseService.GraftPulseService.logPgdSurveillance({
+      transplantId: Number(transplantId),
+      patientId: Number(patientId),
+      timepoint,
+      pao2Fio2Ratio: pao2Fio2Ratio !== undefined ? Number(pao2Fio2Ratio) : undefined,
+      radiographicInfiltrates: Boolean(radiographicInfiltrates),
+      lvefPercent: lvefPercent !== undefined ? Number(lvefPercent) : undefined,
+      cvpMmhg: cvpMmhg !== undefined ? Number(cvpMmhg) : undefined,
+      pcwpMmhg: pcwpMmhg !== undefined ? Number(pcwpMmhg) : undefined,
+      cardiacIndex: cardiacIndex !== undefined ? Number(cardiacIndex) : undefined,
+      papi: papi !== undefined ? Number(papi) : undefined,
+      visScore: visScore !== undefined ? Number(visScore) : undefined,
+      ecmoActive: Boolean(ecmoActive),
+      ecmoType,
+      pgdGrade,
+      inhaledVasodilator,
+      inhaledVasodilatorDose,
+      recommendations
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Log PGD Surveillance error:', err);
+    res.status(500).json({ error: 'Failed to log PGD surveillance.' });
+  }
+});
+
+// Get Patient Transplants History
+router.get('/transplant/patient/:patientId/history', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const history = await graftPulseService.GraftPulseService.getPatientTransplants(patientId);
+    res.json(history);
+  } catch (err: any) {
+    console.error('Get Transplants History error:', err);
+    res.status(500).json({ error: 'Failed to retrieve transplants history.' });
+  }
+});
+
+// Get PGD Logs for Transplant
+router.get('/transplant/:transplantId/pgd-logs', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const transplantId = Number(req.params.transplantId);
+    const logs = await graftPulseService.GraftPulseService.getTransplantPgdLogs(transplantId);
+    res.json(logs);
+  } catch (err: any) {
+    console.error('Get PGD Logs error:', err);
+    res.status(500).json({ error: 'Failed to retrieve PGD logs.' });
   }
 });
 

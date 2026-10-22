@@ -2724,6 +2724,50 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_telemetry_patient ON anti_impulse_telemetry_logs(patient_id);
     `);
 
+    // Create allograft_transplant_records table (Phase 84: GRAFT-PULSE)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS allograft_transplant_records (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        organ_type VARCHAR(32) NOT NULL,
+        donor_age INTEGER,
+        ischemic_time_minutes INTEGER NOT NULL,
+        transplant_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        surgical_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_transplant_patient ON allograft_transplant_records(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_transplant_organ ON allograft_transplant_records(organ_type);
+    `);
+
+    // Create pgd_surveillance_logs table (Phase 84: GRAFT-PULSE)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS pgd_surveillance_logs (
+        id SERIAL PRIMARY KEY,
+        transplant_id INTEGER REFERENCES allograft_transplant_records(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        timepoint VARCHAR(16) NOT NULL,
+        pao2_fio2_ratio NUMERIC(6,1),
+        radiographic_infiltrates BOOLEAN DEFAULT FALSE,
+        lvef_percent NUMERIC(4,1),
+        cvp_mmhg NUMERIC(4,1),
+        pcwp_mmhg NUMERIC(4,1),
+        cardiac_index NUMERIC(4,2),
+        papi NUMERIC(4,2),
+        vis_score NUMERIC(6,2),
+        ecmo_active BOOLEAN DEFAULT FALSE,
+        ecmo_type VARCHAR(16) DEFAULT 'NONE',
+        pgd_grade VARCHAR(32) NOT NULL,
+        inhaled_vasodilator VARCHAR(32) DEFAULT 'NONE',
+        inhaled_vasodilator_dose VARCHAR(32),
+        recommendations JSONB,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pgd_transplant ON pgd_surveillance_logs(transplant_id);
+      CREATE INDEX IF NOT EXISTS idx_pgd_patient ON pgd_surveillance_logs(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_pgd_timepoint ON pgd_surveillance_logs(timepoint);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
