@@ -80,6 +80,7 @@ import * as prophylaxRxService from '../services/prophylaxRx';
 import * as neoVentService from '../services/neoVent';
 import * as congenitalHeartService from '../services/congenitalHeart';
 import * as pphnResidualService from '../services/pphnResidual';
+import * as surgNeoService from '../services/surgNeo';
 
 const router = Router();
 
@@ -8386,6 +8387,147 @@ router.get('/pphn/ino-logs/:patientId', async (req: AuthenticatedRequest, res: R
   } catch (error) {
     console.error('Error in /pphn/ino-logs/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve iNO monitoring logs.' });
+  }
+});
+
+// ==========================================
+// Phase 91: SURG-NEO Endpoints
+// ==========================================
+
+// Evaluate Neonatal Surgical Emergency (CDH, Gastroschisis, Omphalocele, TEF/EA, NEC)
+router.post('/surgneo/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      gestationalAgeWeeks,
+      currentWeightGrams,
+      emergencyType,
+      clinicalPresentation,
+      radiographicFindings,
+      plateletCount,
+      serumLactateMmolL,
+      bloodPh,
+      saveEvaluation
+    } = req.body;
+
+    if (
+      gestationalAgeWeeks === undefined ||
+      currentWeightGrams === undefined ||
+      !emergencyType ||
+      !clinicalPresentation ||
+      !radiographicFindings
+    ) {
+      return res.status(400).json({
+        error: 'Missing required parameters: gestationalAgeWeeks, currentWeightGrams, emergencyType, clinicalPresentation, radiographicFindings.'
+      });
+    }
+
+    const input: surgNeoService.SurgicalEvaluationInput = {
+      patientId: Number(patientId || 1),
+      gestationalAgeWeeks: Number(gestationalAgeWeeks),
+      currentWeightGrams: Number(currentWeightGrams),
+      emergencyType,
+      clinicalPresentation,
+      radiographicFindings,
+      plateletCount: plateletCount !== undefined ? Number(plateletCount) : undefined,
+      serumLactateMmolL: serumLactateMmolL !== undefined ? Number(serumLactateMmolL) : undefined,
+      bloodPh: bloodPh !== undefined ? Number(bloodPh) : undefined
+    };
+
+    const evaluation = surgNeoService.evaluateNeonatalSurgicalEmergency(input);
+
+    let savedRecord = null;
+    if (saveEvaluation && patientId) {
+      savedRecord = await surgNeoService.saveSurgicalEvaluation({
+        ...input,
+        ...evaluation
+      });
+    }
+
+    res.json({ evaluation, savedRecord });
+  } catch (error) {
+    console.error('Error in /surgneo/evaluate:', error);
+    res.status(500).json({ error: 'Failed to evaluate neonatal surgical emergency.' });
+  }
+});
+
+// Evaluate & Log Surgical Decompression (Replogle sump & enteric drainage)
+router.post('/surgneo/decompression/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      emergencyType,
+      replogleSizeFr,
+      suctionPressureMmhg,
+      aspirateVolumeMl,
+      aspirateCharacter,
+      abdominalExam,
+      abdominalGirthCm,
+      saveLog
+    } = req.body;
+
+    if (
+      !emergencyType ||
+      replogleSizeFr === undefined ||
+      suctionPressureMmhg === undefined ||
+      aspirateVolumeMl === undefined ||
+      !aspirateCharacter ||
+      !abdominalExam
+    ) {
+      return res.status(400).json({
+        error: 'Missing required parameters: emergencyType, replogleSizeFr, suctionPressureMmhg, aspirateVolumeMl, aspirateCharacter, abdominalExam.'
+      });
+    }
+
+    const input: surgNeoService.DecompressionMonitoringInput = {
+      patientId: Number(patientId || 1),
+      emergencyType,
+      replogleSizeFr: Number(replogleSizeFr),
+      suctionPressureMmhg: Number(suctionPressureMmhg),
+      aspirateVolumeMl: Number(aspirateVolumeMl),
+      aspirateCharacter,
+      abdominalExam,
+      abdominalGirthCm: abdominalGirthCm !== undefined ? Number(abdominalGirthCm) : undefined
+    };
+
+    const monitoring = surgNeoService.evaluateSurgicalDecompression(input);
+
+    let savedLog = null;
+    if (saveLog && patientId) {
+      savedLog = await surgNeoService.saveDecompressionLog({
+        ...input,
+        ...monitoring
+      });
+    }
+
+    res.json({ monitoring, savedLog });
+  } catch (error) {
+    console.error('Error in /surgneo/decompression/log:', error);
+    res.status(500).json({ error: 'Failed to evaluate surgical decompression.' });
+  }
+});
+
+// Get Patient Surgical Evaluations
+router.get('/surgneo/evaluations/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await surgNeoService.getPatientSurgicalEvaluations(patientId);
+    res.json(records);
+  } catch (error) {
+    console.error('Error in /surgneo/evaluations/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve surgical evaluations.' });
+  }
+});
+
+// Get Patient Decompression Logs
+router.get('/surgneo/decompression-logs/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await surgNeoService.getPatientDecompressionLogs(patientId);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error in /surgneo/decompression-logs/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve surgical decompression logs.' });
   }
 });
 

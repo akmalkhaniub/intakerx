@@ -3017,6 +3017,46 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_ino_patient ON ino_monitoring_logs(patient_id);
     `);
 
+    // Create neonatal_surgical_evaluations table (Phase 91: SURG-NEO)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS neonatal_surgical_evaluations (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        surgical_emergency_type VARCHAR(64) NOT NULL,
+        gestational_age_weeks NUMERIC(4,1) NOT NULL,
+        current_weight_grams NUMERIC(6,1) NOT NULL,
+        clinical_presentation JSONB NOT NULL,
+        radiographic_findings JSONB NOT NULL,
+        bell_stage VARCHAR(32),
+        airway_vent_strategy TEXT NOT NULL,
+        decompression_regimen TEXT NOT NULL,
+        surgical_urgency VARCHAR(64) NOT NULL,
+        contraindicated_interventions JSONB NOT NULL,
+        clinical_action_plan JSONB NOT NULL,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_surg_patient ON neonatal_surgical_evaluations(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_surg_type ON neonatal_surgical_evaluations(surgical_emergency_type);
+    `);
+
+    // Create surgical_decompression_logs table (Phase 91: SURG-NEO)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS surgical_decompression_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        emergency_type VARCHAR(64) NOT NULL,
+        replogle_size_fr INTEGER NOT NULL,
+        suction_pressure_mmhg INTEGER NOT NULL,
+        aspirate_volume_ml NUMERIC(5,1) NOT NULL,
+        aspirate_character VARCHAR(64) NOT NULL,
+        abdominal_exam TEXT NOT NULL,
+        decompression_effective BOOLEAN NOT NULL,
+        directives TEXT NOT NULL,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_decomp_patient ON surgical_decompression_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
