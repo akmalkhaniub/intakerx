@@ -76,6 +76,7 @@ import * as aortaCodeService from '../services/aortaCode';
 import * as graftPulseService from '../services/graftPulse';
 import * as rejectGuardService from '../services/rejectGuard';
 import * as immunoTdmService from '../services/immunoTdm';
+import * as prophylaxRxService from '../services/prophylaxRx';
 
 const router = Router();
 
@@ -7853,6 +7854,126 @@ router.get('/tdm/nephrotoxicity/:patientId', async (req: AuthenticatedRequest, r
   } catch (error) {
     console.error('Error in /tdm/nephrotoxicity/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve nephrotoxicity logs.' });
+  }
+});
+
+// ==========================================
+// Phase 87: PROPHYLAX-RX Endpoints
+// ==========================================
+
+// Generate Opportunistic Infection Prophylaxis Plan
+router.post('/prophylaxis/plan', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      transplantId,
+      patientId,
+      organType,
+      cmvDonorStatus,
+      cmvRecipientStatus,
+      ebvDonorStatus,
+      ebvRecipientStatus,
+      crClMlMin,
+      ancCellsPerUl,
+      plateletsPerUl,
+      sulfaAllergy,
+      g6pdDeficiency,
+      antithymocyteGlobulinUsed,
+      savePlan
+    } = req.body;
+
+    if (!organType || !cmvDonorStatus || !cmvRecipientStatus || crClMlMin === undefined) {
+      return res.status(400).json({ error: 'organType, cmvDonorStatus, cmvRecipientStatus, and crClMlMin are required.' });
+    }
+
+    const plan = prophylaxRxService.generateOpportunisticProphylaxisPlan({
+      transplantId: Number(transplantId || 1),
+      patientId: Number(patientId || 1),
+      organType,
+      cmvDonorStatus,
+      cmvRecipientStatus,
+      ebvDonorStatus: ebvDonorStatus || 'POSITIVE',
+      ebvRecipientStatus: ebvRecipientStatus || 'POSITIVE',
+      crClMlMin: Number(crClMlMin),
+      ancCellsPerUl: ancCellsPerUl !== undefined ? Number(ancCellsPerUl) : undefined,
+      plateletsPerUl: plateletsPerUl !== undefined ? Number(plateletsPerUl) : undefined,
+      sulfaAllergy: Boolean(sulfaAllergy),
+      g6pdDeficiency: Boolean(g6pdDeficiency),
+      antithymocyteGlobulinUsed: Boolean(antithymocyteGlobulinUsed)
+    });
+
+    let savedRecord = null;
+    if (savePlan && transplantId && patientId) {
+      savedRecord = await prophylaxRxService.saveProphylaxisPlan({
+        ...plan,
+        transplantId: Number(transplantId),
+        patientId: Number(patientId)
+      });
+    }
+
+    res.json({ plan, savedRecord });
+  } catch (error) {
+    console.error('Error in /prophylaxis/plan:', error);
+    res.status(500).json({ error: 'Failed to generate prophylaxis plan.' });
+  }
+});
+
+// Interpret Viral Load Surveillance (CMV / EBV / BKV)
+router.post('/prophylaxis/viral-load', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { transplantId, patientId, virusType, copiesPerMl, previousCopiesPerMl, onProphylaxis, saveRecord } = req.body;
+    if (!virusType || copiesPerMl === undefined) {
+      return res.status(400).json({ error: 'virusType and copiesPerMl are required.' });
+    }
+
+    const input = {
+      transplantId: Number(transplantId || 1),
+      patientId: Number(patientId || 1),
+      virusType,
+      copiesPerMl: Number(copiesPerMl),
+      previousCopiesPerMl: previousCopiesPerMl !== undefined ? Number(previousCopiesPerMl) : undefined,
+      onProphylaxis: Boolean(onProphylaxis)
+    };
+
+    const evaluation = prophylaxRxService.interpretViralLoadSurveillance(input);
+
+    let savedRecord = null;
+    if (saveRecord && transplantId && patientId) {
+      savedRecord = await prophylaxRxService.saveViralLoadRecord({
+        ...input,
+        ...evaluation
+      });
+    }
+
+    res.json({ evaluation, savedRecord });
+  } catch (error) {
+    console.error('Error in /prophylaxis/viral-load:', error);
+    res.status(500).json({ error: 'Failed to evaluate viral load.' });
+  }
+});
+
+// Get Patient Prophylaxis Plans
+router.get('/prophylaxis/plans/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const transplantId = req.query.transplantId ? Number(req.query.transplantId) : undefined;
+    const plans = await prophylaxRxService.getPatientProphylaxisPlans(patientId, transplantId);
+    res.json(plans);
+  } catch (error) {
+    console.error('Error in /prophylaxis/plans/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve prophylaxis plans.' });
+  }
+});
+
+// Get Patient Viral Load History
+router.get('/prophylaxis/viral-load/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const virusType = req.query.virusType as string | undefined;
+    const history = await prophylaxRxService.getPatientViralLoadHistory(patientId, virusType);
+    res.json(history);
+  } catch (error) {
+    console.error('Error in /prophylaxis/viral-load/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve viral load history.' });
   }
 });
 

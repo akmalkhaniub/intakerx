@@ -2854,6 +2854,47 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_cni_patient ON cni_nephrotoxicity_logs(patient_id);
     `);
 
+    // Create opportunistic_prophylaxis_plans table (Phase 87: PROPHYLAX-RX)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS opportunistic_prophylaxis_plans (
+        id SERIAL PRIMARY KEY,
+        transplant_id INTEGER REFERENCES allograft_transplant_records(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        cmv_d_r_status VARCHAR(16) NOT NULL,
+        cmv_risk_level VARCHAR(16) NOT NULL,
+        valganciclovir_dosing TEXT NOT NULL,
+        pcp_regimen TEXT NOT NULL,
+        fungal_regimen TEXT,
+        ebv_ptld_risk VARCHAR(16) NOT NULL,
+        surveillance_schedule JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      ALTER TABLE opportunistic_prophylaxis_plans ALTER COLUMN valganciclovir_dosing TYPE TEXT;
+      ALTER TABLE opportunistic_prophylaxis_plans ALTER COLUMN pcp_regimen TYPE TEXT;
+      ALTER TABLE opportunistic_prophylaxis_plans ALTER COLUMN fungal_regimen TYPE TEXT;
+      CREATE INDEX IF NOT EXISTS idx_prophylaxis_transplant ON opportunistic_prophylaxis_plans(transplant_id);
+      CREATE INDEX IF NOT EXISTS idx_prophylaxis_patient ON opportunistic_prophylaxis_plans(patient_id);
+    `);
+
+    // Create viral_load_surveillance_logs table (Phase 87: PROPHYLAX-RX)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS viral_load_surveillance_logs (
+        id SERIAL PRIMARY KEY,
+        transplant_id INTEGER REFERENCES allograft_transplant_records(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        virus_type VARCHAR(16) NOT NULL,
+        assay_type VARCHAR(32) NOT NULL,
+        copies_per_ml NUMERIC(12,2) NOT NULL,
+        log10_value NUMERIC(4,2),
+        interpretation VARCHAR(32) NOT NULL,
+        clinical_action TEXT,
+        tested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_viral_transplant ON viral_load_surveillance_logs(transplant_id);
+      CREATE INDEX IF NOT EXISTS idx_viral_patient ON viral_load_surveillance_logs(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_viral_virus ON viral_load_surveillance_logs(virus_type);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
