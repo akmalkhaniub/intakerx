@@ -75,6 +75,7 @@ import * as statusPulmoService from '../services/statusPulmo';
 import * as aortaCodeService from '../services/aortaCode';
 import * as graftPulseService from '../services/graftPulse';
 import * as rejectGuardService from '../services/rejectGuard';
+import * as immunoTdmService from '../services/immunoTdm';
 
 const router = Router();
 
@@ -7713,6 +7714,145 @@ router.get('/rejection/patient/:patientId/dsa', async (req: AuthenticatedRequest
   } catch (err: any) {
     console.error('Get Patient DSA History error:', err);
     res.status(500).json({ error: 'Failed to retrieve patient DSA history.' });
+  }
+});
+
+// ==========================================
+// Phase 86: IMMUNO-TDM Endpoints
+// ==========================================
+
+// Evaluate CNI TDM Level (Tacrolimus C0 or Cyclosporine C0/C2)
+router.post('/tdm/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { transplantId, patientId, drugName, levelType, measuredLevel, postOpMonths, currentDoseMgPerDay, saveRecord } = req.body;
+    if (!drugName || measuredLevel === undefined || postOpMonths === undefined) {
+      return res.status(400).json({ error: 'drugName, measuredLevel, and postOpMonths are required.' });
+    }
+
+    const evaluation = immunoTdmService.evaluateCniTdm({
+      transplantId: Number(transplantId || 1),
+      patientId: Number(patientId || 1),
+      drugName,
+      levelType: levelType || 'C0_TROUGH',
+      measuredLevel: Number(measuredLevel),
+      postOpMonths: Number(postOpMonths),
+      currentDoseMgPerDay: currentDoseMgPerDay ? Number(currentDoseMgPerDay) : undefined
+    });
+
+    let savedRecord = null;
+    if (saveRecord && transplantId && patientId) {
+      savedRecord = await immunoTdmService.saveTdmRecord({
+        ...evaluation,
+        transplantId: Number(transplantId),
+        patientId: Number(patientId)
+      });
+    }
+
+    res.json({ evaluation, savedRecord });
+  } catch (error) {
+    console.error('Error in /tdm/evaluate:', error);
+    res.status(500).json({ error: 'Failed to evaluate CNI TDM level.' });
+  }
+});
+
+// Screen for CYP3A4 & P-gp Drug-Drug Interactions
+router.post('/tdm/cyp3a-screen', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { cniDrug, concurrentDrugs } = req.body;
+    if (!cniDrug || !Array.isArray(concurrentDrugs)) {
+      return res.status(400).json({ error: 'cniDrug and concurrentDrugs array are required.' });
+    }
+
+    const report = immunoTdmService.evaluateCyp3aInteractions(cniDrug, concurrentDrugs);
+    res.json(report);
+  } catch (error) {
+    console.error('Error in /tdm/cyp3a-screen:', error);
+    res.status(500).json({ error: 'Failed to screen CYP3A4 drug interactions.' });
+  }
+});
+
+// Differentiate CNI Nephrotoxicity vs. Acute Allograft Rejection
+router.post('/tdm/nephrotoxicity/differentiate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      transplantId,
+      patientId,
+      baselineCreatinine,
+      currentCreatinine,
+      tacrolimusTrough,
+      postOpMonths,
+      fenaPercent,
+      dsaPositive,
+      highestMfi,
+      hasNeurologicalSymptoms,
+      hasHypertensionOrHyperkalemia,
+      hasFeverOrGraftTenderness,
+      graftDysfunctionSigns,
+      interactingDrugs,
+      logEvaluation
+    } = req.body;
+
+    if (baselineCreatinine === undefined || currentCreatinine === undefined || tacrolimusTrough === undefined) {
+      return res.status(400).json({ error: 'baselineCreatinine, currentCreatinine, and tacrolimusTrough are required.' });
+    }
+
+    const input = {
+      transplantId: Number(transplantId || 1),
+      patientId: Number(patientId || 1),
+      baselineCreatinine: Number(baselineCreatinine),
+      currentCreatinine: Number(currentCreatinine),
+      tacrolimusTrough: Number(tacrolimusTrough),
+      postOpMonths: Number(postOpMonths || 1),
+      fenaPercent: fenaPercent !== undefined ? Number(fenaPercent) : undefined,
+      dsaPositive: Boolean(dsaPositive),
+      highestMfi: highestMfi !== undefined ? Number(highestMfi) : undefined,
+      hasNeurologicalSymptoms: Boolean(hasNeurologicalSymptoms),
+      hasHypertensionOrHyperkalemia: Boolean(hasHypertensionOrHyperkalemia),
+      hasFeverOrGraftTenderness: Boolean(hasFeverOrGraftTenderness),
+      graftDysfunctionSigns: Boolean(graftDysfunctionSigns),
+      interactingDrugs: Array.isArray(interactingDrugs) ? interactingDrugs : []
+    };
+
+    const differential = immunoTdmService.differentiateCniToxicityVsRejection(input);
+
+    let loggedRecord = null;
+    if (logEvaluation && transplantId && patientId) {
+      loggedRecord = await immunoTdmService.logNephrotoxicityEvaluation({
+        ...input,
+        ...differential
+      });
+    }
+
+    res.json({ differential, loggedRecord });
+  } catch (error) {
+    console.error('Error in /tdm/nephrotoxicity/differentiate:', error);
+    res.status(500).json({ error: 'Failed to evaluate CNI toxicity differential.' });
+  }
+});
+
+// Get Patient TDM History
+router.get('/tdm/records/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const transplantId = req.query.transplantId ? Number(req.query.transplantId) : undefined;
+    const records = await immunoTdmService.getPatientTdmHistory(patientId, transplantId);
+    res.json(records);
+  } catch (error) {
+    console.error('Error in /tdm/records/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve TDM history.' });
+  }
+});
+
+// Get Patient Nephrotoxicity Logs
+router.get('/tdm/nephrotoxicity/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const transplantId = req.query.transplantId ? Number(req.query.transplantId) : undefined;
+    const logs = await immunoTdmService.getPatientNephrotoxicityLogs(patientId, transplantId);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error in /tdm/nephrotoxicity/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve nephrotoxicity logs.' });
   }
 });
 

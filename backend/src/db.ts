@@ -2812,6 +2812,48 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_dsa_status ON dsa_luminex_surveillance(dsa_status);
     `);
 
+    // Create immuno_tdm_records table (Phase 86: IMMUNO-TDM)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS immuno_tdm_records (
+        id SERIAL PRIMARY KEY,
+        transplant_id INTEGER REFERENCES allograft_transplant_records(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        drug_name VARCHAR(32) NOT NULL,
+        level_type VARCHAR(16) NOT NULL,
+        measured_level NUMERIC(8,2) NOT NULL,
+        target_range_low NUMERIC(8,2) NOT NULL,
+        target_range_high NUMERIC(8,2) NOT NULL,
+        post_op_months NUMERIC(4,1) NOT NULL,
+        status VARCHAR(32) NOT NULL,
+        dose_adjustment_pct INTEGER DEFAULT 0,
+        dose_recommendation TEXT,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_tdm_transplant ON immuno_tdm_records(transplant_id);
+      CREATE INDEX IF NOT EXISTS idx_tdm_patient ON immuno_tdm_records(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_tdm_drug ON immuno_tdm_records(drug_name);
+    `);
+
+    // Create cni_nephrotoxicity_logs table (Phase 86: IMMUNO-TDM)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS cni_nephrotoxicity_logs (
+        id SERIAL PRIMARY KEY,
+        transplant_id INTEGER REFERENCES allograft_transplant_records(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        baseline_creatinine NUMERIC(5,2) NOT NULL,
+        current_creatinine NUMERIC(5,2) NOT NULL,
+        tacrolimus_trough NUMERIC(5,2) NOT NULL,
+        interacting_drugs JSONB,
+        cni_toxicity_probability VARCHAR(16) NOT NULL,
+        rejection_probability VARCHAR(16) NOT NULL,
+        diagnostic_differentiation TEXT,
+        action_plan JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cni_transplant ON cni_nephrotoxicity_logs(transplant_id);
+      CREATE INDEX IF NOT EXISTS idx_cni_patient ON cni_nephrotoxicity_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
