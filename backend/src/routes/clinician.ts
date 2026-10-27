@@ -79,6 +79,7 @@ import * as immunoTdmService from '../services/immunoTdm';
 import * as prophylaxRxService from '../services/prophylaxRx';
 import * as neoVentService from '../services/neoVent';
 import * as congenitalHeartService from '../services/congenitalHeart';
+import * as pphnResidualService from '../services/pphnResidual';
 
 const router = Router();
 
@@ -8230,6 +8231,161 @@ router.get('/congenital-heart/pge1-logs/:patientId', async (req: AuthenticatedRe
   } catch (error) {
     console.error('Error in /congenital-heart/pge1-logs/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve PGE1 logs.' });
+  }
+});
+
+// ==========================================
+// Phase 90: PPHN-RESIDUAL Endpoints
+// ==========================================
+
+// Evaluate Persistent Pulmonary Hypertension of the Newborn (PPHN)
+router.post('/pphn/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      gestationalAgeWeeks,
+      birthWeightGrams,
+      etiology,
+      paspMmhg,
+      systemicSbpMmhg,
+      ductalShunt,
+      foramenOvaleShunt,
+      hasIvsFlatteningOrDShapedLv,
+      meanAirwayPressureMmh2o,
+      fio2,
+      pao2Mmhg,
+      lactateMmolL,
+      ph,
+      saveEvaluation
+    } = req.body;
+
+    if (
+      gestationalAgeWeeks === undefined ||
+      birthWeightGrams === undefined ||
+      !etiology ||
+      paspMmhg === undefined ||
+      systemicSbpMmhg === undefined ||
+      !ductalShunt ||
+      !foramenOvaleShunt ||
+      meanAirwayPressureMmh2o === undefined ||
+      fio2 === undefined ||
+      pao2Mmhg === undefined
+    ) {
+      return res.status(400).json({
+        error: 'Missing required parameters: gestationalAgeWeeks, birthWeightGrams, etiology, paspMmhg, systemicSbpMmhg, ductalShunt, foramenOvaleShunt, meanAirwayPressureMmh2o, fio2, pao2Mmhg.'
+      });
+    }
+
+    const input: pphnResidualService.PphnEvaluationInput = {
+      patientId: Number(patientId || 1),
+      gestationalAgeWeeks: Number(gestationalAgeWeeks),
+      birthWeightGrams: Number(birthWeightGrams),
+      etiology,
+      paspMmhg: Number(paspMmhg),
+      systemicSbpMmhg: Number(systemicSbpMmhg),
+      ductalShunt,
+      foramenOvaleShunt,
+      hasIvsFlatteningOrDShapedLv: Boolean(hasIvsFlatteningOrDShapedLv),
+      meanAirwayPressureMmh2o: Number(meanAirwayPressureMmh2o),
+      fio2: Number(fio2),
+      pao2Mmhg: Number(pao2Mmhg),
+      lactateMmolL: lactateMmolL !== undefined ? Number(lactateMmolL) : undefined,
+      ph: ph !== undefined ? Number(ph) : undefined
+    };
+
+    const evaluation = pphnResidualService.evaluatePphn(input);
+
+    let savedRecord = null;
+    if (saveEvaluation && patientId) {
+      savedRecord = await pphnResidualService.savePphnEvaluation({
+        ...input,
+        ...evaluation
+      });
+    }
+
+    res.json({ evaluation, savedRecord });
+  } catch (error) {
+    console.error('Error in /pphn/evaluate:', error);
+    res.status(500).json({ error: 'Failed to evaluate PPHN status.' });
+  }
+});
+
+// Monitor iNO Titration, Methemoglobin, and Weaning
+router.post('/pphn/ino/monitor', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      inoDosePpm,
+      fio2,
+      pao2Mmhg,
+      meanAirwayPressureMmh2o,
+      preInoPao2,
+      methemoglobinPercent,
+      nitrogenDioxidePpm,
+      saveLog
+    } = req.body;
+
+    if (
+      inoDosePpm === undefined ||
+      fio2 === undefined ||
+      pao2Mmhg === undefined ||
+      meanAirwayPressureMmh2o === undefined ||
+      methemoglobinPercent === undefined
+    ) {
+      return res.status(400).json({
+        error: 'Missing required parameters: inoDosePpm, fio2, pao2Mmhg, meanAirwayPressureMmh2o, methemoglobinPercent.'
+      });
+    }
+
+    const input: pphnResidualService.InoMonitoringInput = {
+      patientId: Number(patientId || 1),
+      inoDosePpm: Number(inoDosePpm),
+      fio2: Number(fio2),
+      pao2Mmhg: Number(pao2Mmhg),
+      meanAirwayPressureMmh2o: Number(meanAirwayPressureMmh2o),
+      preInoPao2: preInoPao2 !== undefined ? Number(preInoPao2) : undefined,
+      methemoglobinPercent: Number(methemoglobinPercent),
+      nitrogenDioxidePpm: nitrogenDioxidePpm !== undefined ? Number(nitrogenDioxidePpm) : undefined
+    };
+
+    const monitoring = pphnResidualService.evaluateInoMonitoring(input);
+
+    let savedLog = null;
+    if (saveLog && patientId) {
+      savedLog = await pphnResidualService.saveInoLog({
+        ...input,
+        ...monitoring
+      });
+    }
+
+    res.json({ monitoring, savedLog });
+  } catch (error) {
+    console.error('Error in /pphn/ino/monitor:', error);
+    res.status(500).json({ error: 'Failed to monitor iNO therapy.' });
+  }
+});
+
+// Get Patient PPHN Evaluations
+router.get('/pphn/evaluations/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await pphnResidualService.getPatientPphnEvaluations(patientId);
+    res.json(records);
+  } catch (error) {
+    console.error('Error in /pphn/evaluations/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve PPHN evaluations.' });
+  }
+});
+
+// Get Patient iNO Monitoring Logs
+router.get('/pphn/ino-logs/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await pphnResidualService.getPatientInoLogs(patientId);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error in /pphn/ino-logs/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve iNO monitoring logs.' });
   }
 });
 

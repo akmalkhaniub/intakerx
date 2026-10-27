@@ -2973,6 +2973,50 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_pge1_patient ON pge1_infusion_monitoring_logs(patient_id);
     `);
 
+    // Create pphn_evaluations table (Phase 90: PPHN-RESIDUAL)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS pphn_evaluations (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        gestational_age_weeks NUMERIC(4,1) NOT NULL,
+        birth_weight_grams NUMERIC(6,1) NOT NULL,
+        etiology VARCHAR(64) NOT NULL,
+        pasp_mmhg NUMERIC(5,1) NOT NULL,
+        systemic_sbp_mmhg INTEGER NOT NULL,
+        pasp_sbp_ratio NUMERIC(4,2) NOT NULL,
+        pphn_severity VARCHAR(32) NOT NULL,
+        shunting_pattern TEXT NOT NULL,
+        oxygenation_index NUMERIC(5,2) NOT NULL,
+        ino_indicated BOOLEAN NOT NULL,
+        ino_dose_ppm INTEGER,
+        adjunctive_therapies JSONB NOT NULL,
+        ecmo_criteria_met BOOLEAN NOT NULL,
+        clinical_management_plan JSONB NOT NULL,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      ALTER TABLE pphn_evaluations ALTER COLUMN shunting_pattern TYPE TEXT;
+      CREATE INDEX IF NOT EXISTS idx_pphn_patient ON pphn_evaluations(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_pphn_severity ON pphn_evaluations(pphn_severity);
+    `);
+
+    // Create ino_monitoring_logs table (Phase 90: PPHN-RESIDUAL)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS ino_monitoring_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        ino_dose_ppm INTEGER NOT NULL,
+        fio2 NUMERIC(5,2) NOT NULL,
+        pao2_mmhg NUMERIC(5,1) NOT NULL,
+        oxygenation_index NUMERIC(5,2) NOT NULL,
+        methemoglobin_percent NUMERIC(4,2) NOT NULL,
+        nitrogen_dioxide_ppm NUMERIC(4,2),
+        responder_status VARCHAR(32) NOT NULL,
+        weaning_action TEXT,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ino_patient ON ino_monitoring_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
