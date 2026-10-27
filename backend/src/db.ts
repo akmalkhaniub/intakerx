@@ -2935,6 +2935,44 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_surfactant_patient ON surfactant_administration_logs(patient_id);
     `);
 
+    // Create congenital_heart_evaluations table (Phase 89: CONGENITAL-HEART)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS congenital_heart_evaluations (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        lesion_category VARCHAR(32) NOT NULL,
+        suspected_lesions JSONB NOT NULL,
+        hyperoxia_test JSONB NOT NULL,
+        pge1_indicated BOOLEAN NOT NULL,
+        pge1_dosing TEXT,
+        oxygenation_target_strategy TEXT,
+        rashkind_indicated BOOLEAN DEFAULT FALSE,
+        clinical_actions JSONB NOT NULL,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cchd_patient ON congenital_heart_evaluations(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_cchd_category ON congenital_heart_evaluations(lesion_category);
+    `);
+
+    // Create pge1_infusion_monitoring_logs table (Phase 89: CONGENITAL-HEART)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS pge1_infusion_monitoring_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        infusion_rate_mcg_kg_min NUMERIC(5,3) NOT NULL,
+        apnea_observed BOOLEAN NOT NULL,
+        temperature_celsius NUMERIC(4,1),
+        blood_pressure_systolic INTEGER,
+        blood_pressure_diastolic INTEGER,
+        pre_ductal_spo2 INTEGER,
+        post_ductal_spo2 INTEGER,
+        airway_status TEXT,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      ALTER TABLE pge1_infusion_monitoring_logs ALTER COLUMN airway_status TYPE TEXT;
+      CREATE INDEX IF NOT EXISTS idx_pge1_patient ON pge1_infusion_monitoring_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

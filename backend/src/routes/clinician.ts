@@ -78,6 +78,7 @@ import * as rejectGuardService from '../services/rejectGuard';
 import * as immunoTdmService from '../services/immunoTdm';
 import * as prophylaxRxService from '../services/prophylaxRx';
 import * as neoVentService from '../services/neoVent';
+import * as congenitalHeartService from '../services/congenitalHeart';
 
 const router = Router();
 
@@ -8099,6 +8100,136 @@ router.get('/neovent/surfactant/:patientId', async (req: AuthenticatedRequest, r
   } catch (error) {
     console.error('Error in /neovent/surfactant/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve surfactant logs.' });
+  }
+});
+
+// ==========================================
+// Phase 89: CONGENITAL-HEART Endpoints
+// ==========================================
+
+// Evaluate Critical Congenital Heart Disease (CCHD) & Ductal Dependency
+router.post('/congenital-heart/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      postnatalAgeHours,
+      preDuctalSpo2,
+      postDuctalSpo2,
+      roomAirPao2,
+      hyperoxiaPao2,
+      femoralPulses,
+      fourExtremityBpGradientMmhg,
+      echocardiogramFindings,
+      hasMetabolicAcidosis,
+      lactateMmolL,
+      saveEvaluation
+    } = req.body;
+
+    if (preDuctalSpo2 === undefined || postDuctalSpo2 === undefined || hyperoxiaPao2 === undefined || !femoralPulses) {
+      return res.status(400).json({ error: 'preDuctalSpo2, postDuctalSpo2, hyperoxiaPao2, and femoralPulses are required.' });
+    }
+
+    const input = {
+      patientId: Number(patientId || 1),
+      postnatalAgeHours: Number(postnatalAgeHours || 12),
+      preDuctalSpo2: Number(preDuctalSpo2),
+      postDuctalSpo2: Number(postDuctalSpo2),
+      roomAirPao2: roomAirPao2 !== undefined ? Number(roomAirPao2) : undefined,
+      hyperoxiaPao2: Number(hyperoxiaPao2),
+      femoralPulses,
+      fourExtremityBpGradientMmhg: fourExtremityBpGradientMmhg !== undefined ? Number(fourExtremityBpGradientMmhg) : undefined,
+      echocardiogramFindings: Array.isArray(echocardiogramFindings) ? echocardiogramFindings : [],
+      hasMetabolicAcidosis: Boolean(hasMetabolicAcidosis),
+      lactateMmolL: lactateMmolL !== undefined ? Number(lactateMmolL) : undefined
+    };
+
+    const evaluation = congenitalHeartService.evaluateCongenitalHeart(input);
+
+    let savedRecord = null;
+    if (saveEvaluation && patientId) {
+      savedRecord = await congenitalHeartService.saveCongenitalHeartEvaluation({
+        ...input,
+        ...evaluation
+      });
+    }
+
+    res.json({ evaluation, savedRecord });
+  } catch (error) {
+    console.error('Error in /congenital-heart/evaluate:', error);
+    res.status(500).json({ error: 'Failed to evaluate congenital heart disease.' });
+  }
+});
+
+// Monitor PGE1 Infusion Dynamics & Adverse Effects
+router.post('/congenital-heart/pge1/monitor', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      infusionRateMcgKgMin,
+      apneaObserved,
+      temperatureCelsius,
+      bloodPressureSystolic,
+      bloodPressureDiastolic,
+      preDuctalSpo2,
+      postDuctalSpo2,
+      patientWeightKg,
+      saveLog
+    } = req.body;
+
+    if (infusionRateMcgKgMin === undefined || apneaObserved === undefined || preDuctalSpo2 === undefined || postDuctalSpo2 === undefined || !patientWeightKg) {
+      return res.status(400).json({ error: 'infusionRateMcgKgMin, apneaObserved, preDuctalSpo2, postDuctalSpo2, and patientWeightKg are required.' });
+    }
+
+    const input = {
+      patientId: Number(patientId || 1),
+      infusionRateMcgKgMin: Number(infusionRateMcgKgMin),
+      apneaObserved: Boolean(apneaObserved),
+      temperatureCelsius: temperatureCelsius !== undefined ? Number(temperatureCelsius) : undefined,
+      bloodPressureSystolic: bloodPressureSystolic !== undefined ? Number(bloodPressureSystolic) : undefined,
+      bloodPressureDiastolic: bloodPressureDiastolic !== undefined ? Number(bloodPressureDiastolic) : undefined,
+      preDuctalSpo2: Number(preDuctalSpo2),
+      postDuctalSpo2: Number(postDuctalSpo2),
+      patientWeightKg: Number(patientWeightKg)
+    };
+
+    const monitoring = congenitalHeartService.evaluatePge1Infusion(input);
+
+    let savedLog = null;
+    if (saveLog && patientId) {
+      savedLog = await congenitalHeartService.savePge1Log({
+        ...input,
+        ...monitoring
+      });
+    }
+
+    res.json({ monitoring, savedLog });
+  } catch (error) {
+    console.error('Error in /congenital-heart/pge1/monitor:', error);
+    res.status(500).json({ error: 'Failed to monitor PGE1 infusion.' });
+  }
+});
+
+// Get Patient CCHD Evaluations
+router.get('/congenital-heart/evaluations/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await congenitalHeartService.getPatientCchdEvaluations(patientId);
+    res.json(records);
+  } catch (error) {
+    console.error('Error in /congenital-heart/evaluations/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve CCHD evaluations.' });
+  }
+});
+
+// Get Patient PGE1 Infusion Logs
+router.get('/congenital-heart/pge1-logs/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await congenitalHeartService.getPatientPge1Logs(patientId);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error in /congenital-heart/pge1-logs/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve PGE1 logs.' });
   }
 });
 
