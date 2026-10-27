@@ -2895,6 +2895,46 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_viral_virus ON viral_load_surveillance_logs(virus_type);
     `);
 
+    // Create neonatal_vent_records table (Phase 88: NEO-VENT)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS neonatal_vent_records (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        gestational_age_weeks NUMERIC(4,1) NOT NULL,
+        birth_weight_grams NUMERIC(6,1) NOT NULL,
+        current_weight_grams NUMERIC(6,1) NOT NULL,
+        postnatal_age_days INTEGER NOT NULL,
+        diagnosis VARCHAR(64) NOT NULL,
+        vent_mode VARCHAR(32) NOT NULL,
+        current_settings JSONB NOT NULL,
+        blood_gas JSONB NOT NULL,
+        oxygenation_index NUMERIC(5,2),
+        ventilatory_adjustments JSONB NOT NULL,
+        clinical_recommendations TEXT,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_neovent_patient ON neonatal_vent_records(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_neovent_mode ON neonatal_vent_records(vent_mode);
+    `);
+
+    // Create surfactant_administration_logs table (Phase 88: NEO-VENT)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS surfactant_administration_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        dose_number INTEGER NOT NULL,
+        surfactant_type VARCHAR(32) NOT NULL,
+        dose_mg_per_kg NUMERIC(6,1) NOT NULL,
+        total_dose_ml NUMERIC(5,2) NOT NULL,
+        delivery_technique VARCHAR(32) NOT NULL,
+        pre_fio2 NUMERIC(5,2) NOT NULL,
+        post_fio2 NUMERIC(5,2),
+        complications JSONB DEFAULT '[]'::jsonb,
+        administered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_surfactant_patient ON surfactant_administration_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

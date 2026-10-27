@@ -77,6 +77,7 @@ import * as graftPulseService from '../services/graftPulse';
 import * as rejectGuardService from '../services/rejectGuard';
 import * as immunoTdmService from '../services/immunoTdm';
 import * as prophylaxRxService from '../services/prophylaxRx';
+import * as neoVentService from '../services/neoVent';
 
 const router = Router();
 
@@ -7974,6 +7975,130 @@ router.get('/prophylaxis/viral-load/:patientId', async (req: AuthenticatedReques
   } catch (error) {
     console.error('Error in /prophylaxis/viral-load/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve viral load history.' });
+  }
+});
+
+// ==========================================
+// Phase 88: NEO-VENT Endpoints
+// ==========================================
+
+// Evaluate Neonatal Ventilation Settings & Blood Gas
+router.post('/neovent/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      gestationalAgeWeeks,
+      birthWeightGrams,
+      currentWeightGrams,
+      postnatalAgeDays,
+      diagnosis,
+      settings,
+      bloodGas,
+      saveRecord
+    } = req.body;
+
+    if (!gestationalAgeWeeks || !birthWeightGrams || !settings || !bloodGas) {
+      return res.status(400).json({ error: 'gestationalAgeWeeks, birthWeightGrams, settings, and bloodGas are required.' });
+    }
+
+    const input = {
+      patientId: Number(patientId || 1),
+      gestationalAgeWeeks: Number(gestationalAgeWeeks),
+      birthWeightGrams: Number(birthWeightGrams),
+      currentWeightGrams: Number(currentWeightGrams || birthWeightGrams),
+      postnatalAgeDays: Number(postnatalAgeDays || 1),
+      diagnosis: diagnosis || 'RDS',
+      settings,
+      bloodGas
+    };
+
+    const evaluation = neoVentService.evaluateNeonatalVentilation(input);
+
+    let savedRecord = null;
+    if (saveRecord && patientId) {
+      savedRecord = await neoVentService.saveNeonatalVentRecord({
+        ...input,
+        ...evaluation
+      });
+    }
+
+    res.json({ evaluation, savedRecord });
+  } catch (error) {
+    console.error('Error in /neovent/evaluate:', error);
+    res.status(500).json({ error: 'Failed to evaluate neonatal ventilation.' });
+  }
+});
+
+// Calculate Surfactant Dose & Administration Protocol
+router.post('/neovent/surfactant/calculate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      currentWeightKg,
+      surfactantType,
+      doseNumber,
+      deliveryTechnique,
+      preFio2,
+      onCpap,
+      postFio2,
+      complications,
+      saveLog
+    } = req.body;
+
+    if (!currentWeightKg || !surfactantType) {
+      return res.status(400).json({ error: 'currentWeightKg and surfactantType are required.' });
+    }
+
+    const input = {
+      patientId: Number(patientId || 1),
+      currentWeightKg: Number(currentWeightKg),
+      surfactantType,
+      doseNumber: Number(doseNumber || 1) as 1 | 2 | 3,
+      deliveryTechnique: deliveryTechnique || 'LISA',
+      preFio2: Number(preFio2 || 0.35),
+      onCpap: Boolean(onCpap)
+    };
+
+    const calculation = neoVentService.calculateSurfactantDose(input);
+
+    let savedLog = null;
+    if (saveLog && patientId) {
+      savedLog = await neoVentService.saveSurfactantLog({
+        ...input,
+        ...calculation,
+        postFio2: postFio2 !== undefined ? Number(postFio2) : undefined,
+        complications: Array.isArray(complications) ? complications : []
+      });
+    }
+
+    res.json({ calculation, savedLog });
+  } catch (error) {
+    console.error('Error in /neovent/surfactant/calculate:', error);
+    res.status(500).json({ error: 'Failed to calculate surfactant replacement.' });
+  }
+});
+
+// Get Patient Neonatal Vent Records
+router.get('/neovent/records/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await neoVentService.getPatientVentRecords(patientId);
+    res.json(records);
+  } catch (error) {
+    console.error('Error in /neovent/records/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve vent records.' });
+  }
+});
+
+// Get Patient Surfactant Logs
+router.get('/neovent/surfactant/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await neoVentService.getPatientSurfactantLogs(patientId);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error in /neovent/surfactant/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve surfactant logs.' });
   }
 });
 
