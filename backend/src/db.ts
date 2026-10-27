@@ -2768,6 +2768,50 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_pgd_timepoint ON pgd_surveillance_logs(timepoint);
     `);
 
+    // Create allograft_rejection_biopsies table (Phase 85: REJECT-GUARD)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS allograft_rejection_biopsies (
+        id SERIAL PRIMARY KEY,
+        transplant_id INTEGER REFERENCES allograft_transplant_records(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        biopsy_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        organ_type VARCHAR(32) NOT NULL,
+        acr_grade VARCHAR(16) NOT NULL,
+        pamr_grade VARCHAR(16) NOT NULL,
+        c4d_staining VARCHAR(16) NOT NULL,
+        cd68_macrophages VARCHAR(16) NOT NULL,
+        myocyte_damage_present BOOLEAN DEFAULT FALSE,
+        allograft_dysfunction_present BOOLEAN DEFAULT FALSE,
+        treatment_indicated BOOLEAN DEFAULT FALSE,
+        pathology_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_biopsy_transplant ON allograft_rejection_biopsies(transplant_id);
+      CREATE INDEX IF NOT EXISTS idx_biopsy_patient ON allograft_rejection_biopsies(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_biopsy_acr ON allograft_rejection_biopsies(acr_grade);
+    `);
+
+    // Create dsa_luminex_surveillance table (Phase 85: REJECT-GUARD)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS dsa_luminex_surveillance (
+        id SERIAL PRIMARY KEY,
+        transplant_id INTEGER REFERENCES allograft_transplant_records(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        sample_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        hla_class VARCHAR(16) NOT NULL,
+        specific_hla_loci JSONB NOT NULL,
+        max_mfi INTEGER NOT NULL,
+        c1q_complement_fixing BOOLEAN DEFAULT FALSE,
+        dsa_status VARCHAR(32) NOT NULL,
+        risk_stratification VARCHAR(32) NOT NULL,
+        recommended_interventions JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_dsa_transplant ON dsa_luminex_surveillance(transplant_id);
+      CREATE INDEX IF NOT EXISTS idx_dsa_patient ON dsa_luminex_surveillance(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_dsa_status ON dsa_luminex_surveillance(dsa_status);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

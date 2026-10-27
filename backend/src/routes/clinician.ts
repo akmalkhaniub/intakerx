@@ -74,6 +74,7 @@ import * as pneumoDrainService from '../services/pneumoDrain';
 import * as statusPulmoService from '../services/statusPulmo';
 import * as aortaCodeService from '../services/aortaCode';
 import * as graftPulseService from '../services/graftPulse';
+import * as rejectGuardService from '../services/rejectGuard';
 
 const router = Router();
 
@@ -7539,6 +7540,179 @@ router.get('/transplant/:transplantId/pgd-logs', async (req: AuthenticatedReques
   } catch (err: any) {
     console.error('Get PGD Logs error:', err);
     res.status(500).json({ error: 'Failed to retrieve PGD logs.' });
+  }
+});
+
+// ==========================================
+// Phase 85: REJECT-GUARD Endpoints
+// ==========================================
+
+// Evaluate Biopsy Histopathology (ACR & pAMR)
+router.post('/rejection/biopsy/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      transplantId,
+      patientId,
+      organType,
+      heartAcrGrade,
+      lungAcrGrade,
+      pamrGrade,
+      c4dStaining,
+      cd68MacrophagesPositive,
+      myocyteDamagePresent,
+      allograftDysfunctionPresent,
+      pathologyNotes
+    } = req.body;
+
+    if (!transplantId || !patientId || !organType) {
+      return res.status(400).json({ error: 'transplantId, patientId, and organType are required.' });
+    }
+
+    const result = rejectGuardService.RejectGuardService.evaluateBiopsy({
+      transplantId: Number(transplantId),
+      patientId: Number(patientId),
+      organType,
+      heartAcrGrade,
+      lungAcrGrade,
+      pamrGrade,
+      c4dStaining: c4dStaining || 'NEGATIVE',
+      cd68MacrophagesPositive: Boolean(cd68MacrophagesPositive),
+      myocyteDamagePresent: Boolean(myocyteDamagePresent),
+      allograftDysfunctionPresent: Boolean(allograftDysfunctionPresent),
+      pathologyNotes
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate Biopsy error:', err);
+    res.status(500).json({ error: 'Failed to evaluate allograft biopsy.' });
+  }
+});
+
+// Evaluate Luminex SAB & C1q DSA Surveillance
+router.post('/rejection/dsa/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { transplantId, patientId, hlaClass, specificHlaLoci, c1qComplementFixing } = req.body;
+    if (!transplantId || !patientId || !hlaClass) {
+      return res.status(400).json({ error: 'transplantId, patientId, and hlaClass are required.' });
+    }
+
+    const result = rejectGuardService.RejectGuardService.evaluateDsaSurveillance({
+      transplantId: Number(transplantId),
+      patientId: Number(patientId),
+      hlaClass,
+      specificHlaLoci: specificHlaLoci || [],
+      c1qComplementFixing: Boolean(c1qComplementFixing)
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Evaluate DSA error:', err);
+    res.status(500).json({ error: 'Failed to evaluate DSA surveillance.' });
+  }
+});
+
+// Save Biopsy Record
+router.post('/rejection/biopsy/save', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      transplantId,
+      patientId,
+      organType,
+      acrGrade,
+      pamrGrade,
+      c4dStaining,
+      cd68Macrophages,
+      myocyteDamagePresent,
+      allograftDysfunctionPresent,
+      treatmentIndicated,
+      pathologyNotes
+    } = req.body;
+
+    if (!transplantId || !patientId || !organType || !acrGrade || !pamrGrade) {
+      return res.status(400).json({ error: 'Missing required biopsy parameters.' });
+    }
+
+    const saved = await rejectGuardService.RejectGuardService.saveBiopsy({
+      transplantId: Number(transplantId),
+      patientId: Number(patientId),
+      organType,
+      acrGrade,
+      pamrGrade,
+      c4dStaining: c4dStaining || 'NEGATIVE',
+      cd68Macrophages: cd68Macrophages || 'NEGATIVE',
+      myocyteDamagePresent: Boolean(myocyteDamagePresent),
+      allograftDysfunctionPresent: Boolean(allograftDysfunctionPresent),
+      treatmentIndicated: Boolean(treatmentIndicated),
+      pathologyNotes
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save Biopsy error:', err);
+    res.status(500).json({ error: 'Failed to save allograft biopsy.' });
+  }
+});
+
+// Save DSA Surveillance Record
+router.post('/rejection/dsa/save', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      transplantId,
+      patientId,
+      hlaClass,
+      specificHlaLoci,
+      maxMfi,
+      c1qComplementFixing,
+      dsaStatus,
+      riskStratification,
+      recommendedInterventions
+    } = req.body;
+
+    if (!transplantId || !patientId || !hlaClass || maxMfi === undefined || !dsaStatus || !riskStratification) {
+      return res.status(400).json({ error: 'Missing required DSA parameters.' });
+    }
+
+    const saved = await rejectGuardService.RejectGuardService.saveDsaSurveillance({
+      transplantId: Number(transplantId),
+      patientId: Number(patientId),
+      hlaClass,
+      specificHlaLoci: specificHlaLoci || [],
+      maxMfi: Number(maxMfi),
+      c1qComplementFixing: Boolean(c1qComplementFixing),
+      dsaStatus,
+      riskStratification,
+      recommendedInterventions: recommendedInterventions || []
+    });
+
+    res.status(201).json(saved);
+  } catch (err: any) {
+    console.error('Save DSA error:', err);
+    res.status(500).json({ error: 'Failed to save DSA surveillance.' });
+  }
+});
+
+// Get Patient Biopsies
+router.get('/rejection/patient/:patientId/biopsies', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const biopsies = await rejectGuardService.RejectGuardService.getPatientBiopsies(patientId);
+    res.json(biopsies);
+  } catch (err: any) {
+    console.error('Get Patient Biopsies error:', err);
+    res.status(500).json({ error: 'Failed to retrieve patient biopsies.' });
+  }
+});
+
+// Get Patient DSA History
+router.get('/rejection/patient/:patientId/dsa', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const dsaHistory = await rejectGuardService.RejectGuardService.getPatientDsaHistory(patientId);
+    res.json(dsaHistory);
+  } catch (err: any) {
+    console.error('Get Patient DSA History error:', err);
+    res.status(500).json({ error: 'Failed to retrieve patient DSA history.' });
   }
 });
 
