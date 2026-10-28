@@ -84,6 +84,7 @@ import * as surgNeoService from '../services/surgNeo';
 import * as icpCrisisService from '../services/icpCrisis';
 import * as subarachNavService from '../services/subarachNav';
 import { StatusEpilepticusService } from '../services/statusEpilepticus';
+import { SpinalCordService } from '../services/spinalCord';
 
 const router = Router();
 
@@ -8979,6 +8980,147 @@ router.get('/epilepsy/ceeg-logs/:patientId', async (req: AuthenticatedRequest, r
   } catch (error: any) {
     console.error('Error in /epilepsy/ceeg-logs/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve cEEG logs.' });
+  }
+});
+
+// ============================================================================
+// PHASE 95: SPINAL-CORD (Acute Spinal Cord Injury, ASIA Scale & MAP Augmentation)
+// ============================================================================
+
+// Evaluate Acute Spinal Cord Injury
+router.post('/spinalcord/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      neurologicalLevelOfInjury,
+      hoursSinceInjury,
+      motorScoreTotal,
+      sensoryScoreTotal,
+      sacralSparingSensory,
+      sacralSparingMotor,
+      keyMusclesBelowNliGrade3Percent,
+      bulbocavernosusReflexPresent,
+      currentSbp,
+      currentDbp,
+      currentMap,
+      currentHeartRate,
+      cordCompressionOnMri,
+      spinalInstabilityPresent,
+      baselineSbp,
+      persist
+    } = req.body;
+
+    if (!patientId || !neurologicalLevelOfInjury || hoursSinceInjury === undefined || motorScoreTotal === undefined || sensoryScoreTotal === undefined) {
+      return res.status(400).json({ error: 'patientId, neurologicalLevelOfInjury, hoursSinceInjury, motorScoreTotal, and sensoryScoreTotal are required.' });
+    }
+
+    const evaluation = SpinalCordService.evaluateInjury({
+      patientId: Number(patientId),
+      neurologicalLevelOfInjury,
+      hoursSinceInjury: Number(hoursSinceInjury),
+      motorScoreTotal: Number(motorScoreTotal),
+      sensoryScoreTotal: Number(sensoryScoreTotal),
+      sacralSparingSensory: Boolean(sacralSparingSensory),
+      sacralSparingMotor: Boolean(sacralSparingMotor),
+      keyMusclesBelowNliGrade3Percent: Number(keyMusclesBelowNliGrade3Percent || 0),
+      bulbocavernosusReflexPresent: Boolean(bulbocavernosusReflexPresent),
+      currentSbp: Number(currentSbp || 120),
+      currentDbp: Number(currentDbp || 80),
+      currentMap: Number(currentMap || 90),
+      currentHeartRate: Number(currentHeartRate || 75),
+      cordCompressionOnMri: cordCompressionOnMri !== undefined ? Boolean(cordCompressionOnMri) : true,
+      spinalInstabilityPresent: spinalInstabilityPresent !== undefined ? Boolean(spinalInstabilityPresent) : false,
+      baselineSbp: baselineSbp !== undefined ? Number(baselineSbp) : undefined
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await SpinalCordService.persistEvaluation(evaluation);
+    }
+
+    if (evaluation.neurogenicShockActive || (evaluation.decompressionWindowStatus === 'ULTRA_EARLY_OPTIMAL' && evaluation.surgicalCandidate)) {
+      notificationBus.emit('notification', {
+        id: `sci-${patientId}-${Date.now()}`,
+        type: 'emergency_triage',
+        title: evaluation.neurogenicShockActive ? 'NEUROGENIC SHOCK ALERT' : 'STAT SPINAL SURGERY DECOMPRESSION',
+        message: evaluation.recommendedAction,
+        severity: 'critical',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({ evaluation, savedId });
+  } catch (error: any) {
+    console.error('Error in /spinalcord/evaluate:', error);
+    res.status(500).json({ error: error.message || 'Failed to evaluate spinal cord injury.' });
+  }
+});
+
+// Log Hourly MAP Augmentation Titration
+router.post('/spinalcord/map/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounterId,
+      patientId,
+      postInjuryHour,
+      systolicBp,
+      diastolicBp,
+      mapMmhg,
+      heartRate,
+      activeVasopressor,
+      vasopressorDoseMcgMin,
+      persist
+    } = req.body;
+
+    if (!patientId || postInjuryHour === undefined || systolicBp === undefined || diastolicBp === undefined || mapMmhg === undefined || heartRate === undefined) {
+      return res.status(400).json({ error: 'patientId, postInjuryHour, systolicBp, diastolicBp, mapMmhg, and heartRate are required.' });
+    }
+
+    const titration = SpinalCordService.titrateMap({
+      encounterId: encounterId ? Number(encounterId) : undefined,
+      patientId: Number(patientId),
+      postInjuryHour: Number(postInjuryHour),
+      systolicBp: Number(systolicBp),
+      diastolicBp: Number(diastolicBp),
+      mapMmhg: Number(mapMmhg),
+      heartRate: Number(heartRate),
+      activeVasopressor,
+      vasopressorDoseMcgMin: vasopressorDoseMcgMin !== undefined ? Number(vasopressorDoseMcgMin) : undefined
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await SpinalCordService.persistMapLog(titration);
+    }
+
+    res.json({ titration, savedId });
+  } catch (error: any) {
+    console.error('Error in /spinalcord/map/log:', error);
+    res.status(500).json({ error: error.message || 'Failed to log MAP augmentation.' });
+  }
+});
+
+// Get Spinal Cord Evaluations for a Patient
+router.get('/spinalcord/evaluations/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await SpinalCordService.getEvaluations(patientId);
+    res.json(records);
+  } catch (error: any) {
+    console.error('Error in /spinalcord/evaluations/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve evaluations.' });
+  }
+});
+
+// Get MAP Augmentation Logs for a Patient
+router.get('/spinalcord/map-logs/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await SpinalCordService.getMapLogs(patientId);
+    res.json(logs);
+  } catch (error: any) {
+    console.error('Error in /spinalcord/map-logs/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve MAP logs.' });
   }
 });
 

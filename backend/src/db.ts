@@ -3188,6 +3188,54 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_ceeg_encounter ON continuous_eeg_titration_logs(encounter_id);
     `);
 
+    // Create spinal_cord_injury_encounters table (Phase 95: SPINAL-CORD)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS spinal_cord_injury_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        neurological_level_of_injury VARCHAR(32) NOT NULL,
+        injury_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        hours_since_injury NUMERIC(6,1) NOT NULL,
+        asia_grade VARCHAR(8) NOT NULL,
+        motor_score_total INTEGER NOT NULL,
+        sensory_score_total INTEGER NOT NULL,
+        sacral_sparing_sensory BOOLEAN DEFAULT FALSE,
+        sacral_sparing_motor BOOLEAN DEFAULT FALSE,
+        bulbocavernosus_reflex_present BOOLEAN DEFAULT FALSE,
+        spinal_shock_active BOOLEAN DEFAULT TRUE,
+        neurogenic_shock_active BOOLEAN DEFAULT FALSE,
+        lesion_above_t6 BOOLEAN DEFAULT FALSE,
+        surgical_candidate BOOLEAN DEFAULT TRUE,
+        decompression_window_status VARCHAR(64) NOT NULL,
+        recommended_vasopressor VARCHAR(64) NOT NULL,
+        target_map_min INTEGER DEFAULT 85,
+        target_map_max INTEGER DEFAULT 90,
+        directives JSONB DEFAULT '[]'::jsonb,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_sci_enc_patient ON spinal_cord_injury_encounters(patient_id);
+
+      CREATE TABLE IF NOT EXISTS map_augmentation_logs (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES spinal_cord_injury_encounters(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        post_injury_hour NUMERIC(5,1) NOT NULL,
+        systolic_bp NUMERIC(5,1) NOT NULL,
+        diastolic_bp NUMERIC(5,1) NOT NULL,
+        map_mmhg NUMERIC(5,1) NOT NULL,
+        heart_rate INTEGER NOT NULL,
+        target_met BOOLEAN DEFAULT FALSE,
+        active_vasopressor VARCHAR(64),
+        vasopressor_dose_mcg_min NUMERIC(6,2),
+        vasopressor_action VARCHAR(32) NOT NULL,
+        ischemia_risk_alert BOOLEAN DEFAULT FALSE,
+        action_plan TEXT NOT NULL,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_map_log_patient ON map_augmentation_logs(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_map_log_encounter ON map_augmentation_logs(encounter_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
