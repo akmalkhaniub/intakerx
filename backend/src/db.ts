@@ -3102,6 +3102,45 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_osmo_patient ON osmotherapy_administration_logs(patient_id);
     `);
 
+    // Create subarachnoid_encounters table (Phase 93: SUBARACH-NAV)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS subarachnoid_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        hunt_hess_grade INTEGER NOT NULL,
+        modified_fisher_grade INTEGER NOT NULL,
+        wfns_grade INTEGER NOT NULL,
+        aneurysm_secured BOOLEAN NOT NULL,
+        aneurysm_treatment_type VARCHAR(64),
+        post_bleed_day INTEGER NOT NULL,
+        blood_pressure_target TEXT NOT NULL,
+        nimodipine_regimen TEXT NOT NULL,
+        dci_risk_category VARCHAR(32) NOT NULL,
+        clinical_action_plan JSONB NOT NULL,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_sah_patient ON subarachnoid_encounters(patient_id);
+    `);
+
+    // Create tcd_vasospasm_surveillance_logs table (Phase 93: SUBARACH-NAV)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS tcd_vasospasm_surveillance_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        post_bleed_day INTEGER NOT NULL,
+        mca_mfv_left NUMERIC(5,1) NOT NULL,
+        mca_mfv_right NUMERIC(5,1) NOT NULL,
+        ica_extracranial_mfv NUMERIC(5,1) NOT NULL,
+        lindegaard_ratio NUMERIC(4,2) NOT NULL,
+        vasospasm_severity VARCHAR(64) NOT NULL,
+        endovascular_rescue_indicated BOOLEAN NOT NULL,
+        induced_hypertension_target TEXT NOT NULL,
+        directives TEXT NOT NULL,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_tcd_patient ON tcd_vasospasm_surveillance_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

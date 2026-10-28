@@ -82,6 +82,7 @@ import * as congenitalHeartService from '../services/congenitalHeart';
 import * as pphnResidualService from '../services/pphnResidual';
 import * as surgNeoService from '../services/surgNeo';
 import * as icpCrisisService from '../services/icpCrisis';
+import * as subarachNavService from '../services/subarachNav';
 
 const router = Router();
 
@@ -8679,6 +8680,154 @@ router.get('/icp/osmotherapy-logs/:patientId', async (req: AuthenticatedRequest,
   } catch (error) {
     console.error('Error in /icp/osmotherapy-logs/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve osmotherapy logs.' });
+  }
+});
+
+// ==========================================
+// Phase 93: SUBARACH-NAV Endpoints
+// ==========================================
+
+// Evaluate Aneurysmal SAH (Hunt-Hess, Modified Fisher, WFNS, DCI risk)
+router.post('/subarach/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      huntHessGrade,
+      modifiedFisherGrade,
+      gcsScore,
+      hasFocalDeficit,
+      aneurysmSecured,
+      aneurysmTreatmentType,
+      postBleedDay,
+      hasHydrocephalus,
+      currentSbpMmhg,
+      currentMapMmhg,
+      serumSodiumMeqL,
+      urineOutputMlHr,
+      saveEvaluation
+    } = req.body;
+
+    if (
+      huntHessGrade === undefined ||
+      modifiedFisherGrade === undefined ||
+      gcsScore === undefined ||
+      aneurysmSecured === undefined ||
+      postBleedDay === undefined
+    ) {
+      return res.status(400).json({
+        error: 'Missing required parameters: huntHessGrade, modifiedFisherGrade, gcsScore, aneurysmSecured, postBleedDay.'
+      });
+    }
+
+    const input: subarachNavService.SubarachnoidEvaluationInput = {
+      patientId: Number(patientId || 1),
+      huntHessGrade: Number(huntHessGrade),
+      modifiedFisherGrade: Number(modifiedFisherGrade),
+      gcsScore: Number(gcsScore),
+      hasFocalDeficit: Boolean(hasFocalDeficit),
+      aneurysmSecured: Boolean(aneurysmSecured),
+      aneurysmTreatmentType,
+      postBleedDay: Number(postBleedDay),
+      hasHydrocephalus: Boolean(hasHydrocephalus),
+      currentSbpMmhg: currentSbpMmhg !== undefined ? Number(currentSbpMmhg) : undefined,
+      currentMapMmhg: currentMapMmhg !== undefined ? Number(currentMapMmhg) : undefined,
+      serumSodiumMeqL: serumSodiumMeqL !== undefined ? Number(serumSodiumMeqL) : undefined,
+      urineOutputMlHr: urineOutputMlHr !== undefined ? Number(urineOutputMlHr) : undefined
+    };
+
+    const evaluation = subarachNavService.evaluateSubarachnoidHemorrhage(input);
+
+    let savedRecord = null;
+    if (saveEvaluation && patientId) {
+      savedRecord = await subarachNavService.saveSubarachnoidEvaluation({
+        ...input,
+        ...evaluation
+      });
+    }
+
+    res.json({ evaluation, savedRecord });
+  } catch (error) {
+    console.error('Error in /subarach/evaluate:', error);
+    res.status(500).json({ error: 'Failed to evaluate subarachnoid hemorrhage.' });
+  }
+});
+
+// Evaluate & Log TCD Vasospasm Surveillance & Induced Hypertension
+router.post('/subarach/tcd/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      postBleedDay,
+      mcaMfvLeft,
+      mcaMfvRight,
+      icaExtracranialMfv,
+      currentMapMmhg,
+      newFocalDeficitOrDropInGcs,
+      onNorepinephrine,
+      saveLog
+    } = req.body;
+
+    if (
+      postBleedDay === undefined ||
+      mcaMfvLeft === undefined ||
+      mcaMfvRight === undefined ||
+      icaExtracranialMfv === undefined ||
+      currentMapMmhg === undefined
+    ) {
+      return res.status(400).json({
+        error: 'Missing required parameters: postBleedDay, mcaMfvLeft, mcaMfvRight, icaExtracranialMfv, currentMapMmhg.'
+      });
+    }
+
+    const input: subarachNavService.TcdVasospasmInput = {
+      patientId: Number(patientId || 1),
+      postBleedDay: Number(postBleedDay),
+      mcaMfvLeft: Number(mcaMfvLeft),
+      mcaMfvRight: Number(mcaMfvRight),
+      icaExtracranialMfv: Number(icaExtracranialMfv),
+      currentMapMmhg: Number(currentMapMmhg),
+      newFocalDeficitOrDropInGcs: Boolean(newFocalDeficitOrDropInGcs),
+      onNorepinephrine: Boolean(onNorepinephrine)
+    };
+
+    const monitoring = subarachNavService.evaluateTcdVasospasm(input);
+
+    let savedLog = null;
+    if (saveLog && patientId) {
+      savedLog = await subarachNavService.saveTcdLog({
+        ...input,
+        ...monitoring
+      });
+    }
+
+    res.json({ monitoring, savedLog });
+  } catch (error) {
+    console.error('Error in /subarach/tcd/log:', error);
+    res.status(500).json({ error: 'Failed to evaluate TCD vasospasm.' });
+  }
+});
+
+// Get Patient Subarachnoid Evaluations
+router.get('/subarach/evaluations/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await subarachNavService.getPatientSubarachnoidEvaluations(patientId);
+    res.json(records);
+  } catch (error) {
+    console.error('Error in /subarach/evaluations/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve subarachnoid evaluations.' });
+  }
+});
+
+// Get Patient TCD Surveillance Logs
+router.get('/subarach/tcd-logs/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await subarachNavService.getPatientTcdLogs(patientId);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error in /subarach/tcd-logs/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve TCD surveillance logs.' });
   }
 });
 
