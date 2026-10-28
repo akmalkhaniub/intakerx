@@ -81,6 +81,7 @@ import * as neoVentService from '../services/neoVent';
 import * as congenitalHeartService from '../services/congenitalHeart';
 import * as pphnResidualService from '../services/pphnResidual';
 import * as surgNeoService from '../services/surgNeo';
+import * as icpCrisisService from '../services/icpCrisis';
 
 const router = Router();
 
@@ -8528,6 +8529,156 @@ router.get('/surgneo/decompression-logs/:patientId', async (req: AuthenticatedRe
   } catch (error) {
     console.error('Error in /surgneo/decompression-logs/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve surgical decompression logs.' });
+  }
+});
+
+// ==========================================
+// Phase 92: ICP-CRISIS Endpoints
+// ==========================================
+
+// Evaluate Intracranial Hypertension, CPP & Herniation Risk
+router.post('/icp/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      gcsScore,
+      icpMmhg,
+      mapMmhg,
+      pbto2Mmhg,
+      sjvo2Percent,
+      npiLeft,
+      npiRight,
+      pupilAsymmetryMm,
+      cushingTriadPresent,
+      unilateralPupilDilation,
+      bilateralFixedDilated,
+      decerebratePosturing,
+      evdInPlace,
+      currentSodiumMeqL,
+      currentOsmolalityMosmKg,
+      hasArterialLine,
+      saveEvaluation
+    } = req.body;
+
+    if (gcsScore === undefined || icpMmhg === undefined || mapMmhg === undefined) {
+      return res.status(400).json({
+        error: 'Missing required parameters: gcsScore, icpMmhg, mapMmhg.'
+      });
+    }
+
+    const input: icpCrisisService.IcpCrisisInput = {
+      patientId: Number(patientId || 1),
+      gcsScore: Number(gcsScore),
+      icpMmhg: Number(icpMmhg),
+      mapMmhg: Number(mapMmhg),
+      pbto2Mmhg: pbto2Mmhg !== undefined ? Number(pbto2Mmhg) : undefined,
+      sjvo2Percent: sjvo2Percent !== undefined ? Number(sjvo2Percent) : undefined,
+      npiLeft: npiLeft !== undefined ? Number(npiLeft) : undefined,
+      npiRight: npiRight !== undefined ? Number(npiRight) : undefined,
+      pupilAsymmetryMm: pupilAsymmetryMm !== undefined ? Number(pupilAsymmetryMm) : undefined,
+      cushingTriadPresent: Boolean(cushingTriadPresent),
+      unilateralPupilDilation: Boolean(unilateralPupilDilation),
+      bilateralFixedDilated: Boolean(bilateralFixedDilated),
+      decerebratePosturing: Boolean(decerebratePosturing),
+      evdInPlace: Boolean(evdInPlace),
+      currentSodiumMeqL: currentSodiumMeqL !== undefined ? Number(currentSodiumMeqL) : undefined,
+      currentOsmolalityMosmKg: currentOsmolalityMosmKg !== undefined ? Number(currentOsmolalityMosmKg) : undefined,
+      hasArterialLine: Boolean(hasArterialLine)
+    };
+
+    const evaluation = icpCrisisService.evaluateIcpCrisis(input);
+
+    let savedRecord = null;
+    if (saveEvaluation && patientId) {
+      savedRecord = await icpCrisisService.saveIcpEvaluation({
+        ...input,
+        ...evaluation
+      });
+    }
+
+    res.json({ evaluation, savedRecord });
+  } catch (error) {
+    console.error('Error in /icp/evaluate:', error);
+    res.status(500).json({ error: 'Failed to evaluate ICP crisis status.' });
+  }
+});
+
+// Monitor & Log Osmotherapy Administration
+router.post('/icp/osmotherapy/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      agent,
+      doseVolumeMl,
+      serumSodiumMeqL,
+      serumOsmolalityMosmKg,
+      osmolarGap,
+      preIcp,
+      postIcp,
+      saveLog
+    } = req.body;
+
+    if (
+      !agent ||
+      doseVolumeMl === undefined ||
+      serumSodiumMeqL === undefined ||
+      serumOsmolalityMosmKg === undefined ||
+      preIcp === undefined
+    ) {
+      return res.status(400).json({
+        error: 'Missing required parameters: agent, doseVolumeMl, serumSodiumMeqL, serumOsmolalityMosmKg, preIcp.'
+      });
+    }
+
+    const input: icpCrisisService.OsmotherapyInput = {
+      patientId: Number(patientId || 1),
+      agent,
+      doseVolumeMl: Number(doseVolumeMl),
+      serumSodiumMeqL: Number(serumSodiumMeqL),
+      serumOsmolalityMosmKg: Number(serumOsmolalityMosmKg),
+      osmolarGap: osmolarGap !== undefined ? Number(osmolarGap) : undefined,
+      preIcp: Number(preIcp),
+      postIcp: postIcp !== undefined ? Number(postIcp) : undefined
+    };
+
+    const monitoring = icpCrisisService.evaluateOsmotherapy(input);
+
+    let savedLog = null;
+    if (saveLog && patientId) {
+      savedLog = await icpCrisisService.saveOsmotherapyLog({
+        ...input,
+        ...monitoring
+      });
+    }
+
+    res.json({ monitoring, savedLog });
+  } catch (error) {
+    console.error('Error in /icp/osmotherapy/log:', error);
+    res.status(500).json({ error: 'Failed to evaluate osmotherapy.' });
+  }
+});
+
+// Get Patient ICP Crisis Evaluations
+router.get('/icp/evaluations/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await icpCrisisService.getPatientIcpEvaluations(patientId);
+    res.json(records);
+  } catch (error) {
+    console.error('Error in /icp/evaluations/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve ICP crisis evaluations.' });
+  }
+});
+
+// Get Patient Osmotherapy Logs
+router.get('/icp/osmotherapy-logs/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await icpCrisisService.getPatientOsmotherapyLogs(patientId);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error in /icp/osmotherapy-logs/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve osmotherapy logs.' });
   }
 });
 

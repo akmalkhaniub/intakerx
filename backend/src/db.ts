@@ -3057,6 +3057,51 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_decomp_patient ON surgical_decompression_logs(patient_id);
     `);
 
+    // Create icp_crisis_encounters table (Phase 92: ICP-CRISIS)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS icp_crisis_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        gcs_score INTEGER NOT NULL,
+        icp_mmhg NUMERIC(4,1) NOT NULL,
+        map_mmhg NUMERIC(4,1) NOT NULL,
+        cpp_mmhg NUMERIC(4,1) NOT NULL,
+        pbto2_mmhg NUMERIC(4,1),
+        sjvo2_percent NUMERIC(4,1),
+        npi_left NUMERIC(3,1),
+        npi_right NUMERIC(3,1),
+        pupil_reactivity TEXT NOT NULL,
+        herniation_syndrome TEXT NOT NULL,
+        tier_level VARCHAR(32) NOT NULL,
+        osmotherapy_regimen TEXT NOT NULL,
+        target_parameters JSONB NOT NULL,
+        clinical_actions JSONB NOT NULL,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      ALTER TABLE icp_crisis_encounters ALTER COLUMN pupil_reactivity TYPE TEXT;
+      ALTER TABLE icp_crisis_encounters ALTER COLUMN herniation_syndrome TYPE TEXT;
+      CREATE INDEX IF NOT EXISTS idx_icp_patient ON icp_crisis_encounters(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_icp_tier ON icp_crisis_encounters(tier_level);
+    `);
+
+    // Create osmotherapy_administration_logs table (Phase 92: ICP-CRISIS)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS osmotherapy_administration_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        agent VARCHAR(64) NOT NULL,
+        dose_volume_ml NUMERIC(5,1) NOT NULL,
+        serum_sodium_meq_l NUMERIC(4,1) NOT NULL,
+        serum_osmolality_mosm_kg NUMERIC(5,1) NOT NULL,
+        osmolar_gap NUMERIC(4,1),
+        pre_icp NUMERIC(4,1) NOT NULL,
+        post_icp NUMERIC(4,1),
+        directives TEXT NOT NULL,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_osmo_patient ON osmotherapy_administration_logs(patient_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
