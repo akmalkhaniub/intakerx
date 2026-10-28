@@ -83,6 +83,7 @@ import * as pphnResidualService from '../services/pphnResidual';
 import * as surgNeoService from '../services/surgNeo';
 import * as icpCrisisService from '../services/icpCrisis';
 import * as subarachNavService from '../services/subarachNav';
+import { StatusEpilepticusService } from '../services/statusEpilepticus';
 
 const router = Router();
 
@@ -8828,6 +8829,156 @@ router.get('/subarach/tcd-logs/:patientId', async (req: AuthenticatedRequest, re
   } catch (error) {
     console.error('Error in /subarach/tcd-logs/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve TCD surveillance logs.' });
+  }
+});
+
+// ============================================================================
+// PHASE 94: STATUS-EPILEPTICUS (Refractory & Super-Refractory Protocol)
+// ============================================================================
+
+// Evaluate Status Epilepticus encounter & generate protocol directives
+router.post('/epilepsy/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      seizureDurationMins,
+      seizureType,
+      weightKg,
+      ivAccess,
+      firstLineBenzoGiven,
+      firstLineResponse,
+      secondLineAsmGiven,
+      secondLineResponse,
+      intubated,
+      activeCivaInfusion,
+      civaDurationHours,
+      eegDischargesHz,
+      evolutionOrImprovementWithAsm,
+      feverOrProdromePreceding,
+      noPriorEpilepsyHistory,
+      propofolDoseMgKgH,
+      propofolInfusionHours,
+      triglyceridesMgDl,
+      ckLevelUL,
+      persist
+    } = req.body;
+
+    if (!patientId || seizureDurationMins === undefined || !seizureType || weightKg === undefined) {
+      return res.status(400).json({ error: 'patientId, seizureDurationMins, seizureType, and weightKg are required.' });
+    }
+
+    const evaluation = StatusEpilepticusService.evaluateStatus({
+      patientId: Number(patientId),
+      seizureDurationMins: Number(seizureDurationMins),
+      seizureType,
+      weightKg: Number(weightKg),
+      ivAccess: ivAccess !== undefined ? Boolean(ivAccess) : true,
+      firstLineBenzoGiven,
+      firstLineResponse,
+      secondLineAsmGiven,
+      secondLineResponse,
+      intubated: Boolean(intubated),
+      activeCivaInfusion,
+      civaDurationHours: civaDurationHours !== undefined ? Number(civaDurationHours) : undefined,
+      eegDischargesHz: eegDischargesHz !== undefined ? Number(eegDischargesHz) : undefined,
+      evolutionOrImprovementWithAsm: evolutionOrImprovementWithAsm !== undefined ? Boolean(evolutionOrImprovementWithAsm) : undefined,
+      feverOrProdromePreceding: Boolean(feverOrProdromePreceding),
+      noPriorEpilepsyHistory: Boolean(noPriorEpilepsyHistory),
+      propofolDoseMgKgH: propofolDoseMgKgH !== undefined ? Number(propofolDoseMgKgH) : undefined,
+      propofolInfusionHours: propofolInfusionHours !== undefined ? Number(propofolInfusionHours) : undefined,
+      triglyceridesMgDl: triglyceridesMgDl !== undefined ? Number(triglyceridesMgDl) : undefined,
+      ckLevelUL: ckLevelUL !== undefined ? Number(ckLevelUL) : undefined
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await StatusEpilepticusService.persistEvaluation(evaluation);
+    }
+
+    // Publish critical alerts to SSE bus if Refractory or PRIS or Super-Refractory
+    if (evaluation.stage === 'STAGE_3_REFRACTORY' || evaluation.stage === 'STAGE_4_SUPER_REFRACTORY' || evaluation.prisRiskFlag) {
+      notificationBus.emit('notification', {
+        id: `epilepsy-${patientId}-${Date.now()}`,
+        type: 'emergency_triage',
+        title: evaluation.prisRiskFlag ? 'PRIS CRITICAL WARNING' : `STATUS EPILEPTICUS: ${evaluation.stage}`,
+        message: evaluation.recommendedAction,
+        severity: 'critical',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({ evaluation, savedId });
+  } catch (error: any) {
+    console.error('Error in /epilepsy/evaluate:', error);
+    res.status(500).json({ error: error.message || 'Failed to evaluate status epilepticus.' });
+  }
+});
+
+// Titrate cEEG Anesthetic Infusions
+router.post('/epilepsy/ceeg/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounterId,
+      patientId,
+      eegPattern,
+      burstSuppressionRatioPct,
+      burstsPerMinute,
+      interburstIntervalSec,
+      civaDrug,
+      civaRateUnit,
+      civaRate,
+      persist
+    } = req.body;
+
+    if (!patientId || !eegPattern || !civaDrug || !civaRateUnit || civaRate === undefined) {
+      return res.status(400).json({ error: 'patientId, eegPattern, civaDrug, civaRateUnit, and civaRate are required.' });
+    }
+
+    const titration = StatusEpilepticusService.titrateCeeg({
+      encounterId: encounterId ? Number(encounterId) : undefined,
+      patientId: Number(patientId),
+      eegPattern,
+      burstSuppressionRatioPct: burstSuppressionRatioPct !== undefined ? Number(burstSuppressionRatioPct) : undefined,
+      burstsPerMinute: burstsPerMinute !== undefined ? Number(burstsPerMinute) : undefined,
+      interburstIntervalSec: interburstIntervalSec !== undefined ? Number(interburstIntervalSec) : undefined,
+      civaDrug,
+      civaRateUnit,
+      civaRate: Number(civaRate)
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await StatusEpilepticusService.persistCeegLog(titration);
+    }
+
+    res.json({ titration, savedId });
+  } catch (error: any) {
+    console.error('Error in /epilepsy/ceeg/log:', error);
+    res.status(500).json({ error: error.message || 'Failed to titrate cEEG infusion.' });
+  }
+});
+
+// Get Status Epilepticus Evaluations for a Patient
+router.get('/epilepsy/evaluations/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await StatusEpilepticusService.getEvaluations(patientId);
+    res.json(records);
+  } catch (error: any) {
+    console.error('Error in /epilepsy/evaluations/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve evaluations.' });
+  }
+});
+
+// Get cEEG Titration Logs for a Patient
+router.get('/epilepsy/ceeg-logs/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await StatusEpilepticusService.getCeegLogs(patientId);
+    res.json(logs);
+  } catch (error: any) {
+    console.error('Error in /epilepsy/ceeg-logs/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve cEEG logs.' });
   }
 });
 

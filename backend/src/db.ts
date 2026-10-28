@@ -3141,6 +3141,53 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_tcd_patient ON tcd_vasospasm_surveillance_logs(patient_id);
     `);
 
+    // Create status_epilepticus_encounters table (Phase 94: STATUS-EPILEPTICUS)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS status_epilepticus_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        seizure_duration_mins NUMERIC(6,1) NOT NULL,
+        seizure_type VARCHAR(64) NOT NULL,
+        stage VARCHAR(32) NOT NULL,
+        iv_access BOOLEAN NOT NULL DEFAULT true,
+        weight_kg NUMERIC(5,1) NOT NULL,
+        first_line_benzo_given VARCHAR(64),
+        first_line_response VARCHAR(32),
+        second_line_asm_given VARCHAR(64),
+        second_line_response VARCHAR(32),
+        intubated BOOLEAN NOT NULL DEFAULT false,
+        active_civa_infusion VARCHAR(64),
+        salzburg_ncse_met BOOLEAN NOT NULL DEFAULT false,
+        autoimmune_norse_suspected BOOLEAN NOT NULL DEFAULT false,
+        pris_risk_flag BOOLEAN NOT NULL DEFAULT false,
+        protocol_directives JSONB NOT NULL DEFAULT '[]'::jsonb,
+        recommended_action TEXT NOT NULL,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_se_patient ON status_epilepticus_encounters(patient_id);
+    `);
+
+    // Create continuous_eeg_titration_logs table (Phase 94: STATUS-EPILEPTICUS)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS continuous_eeg_titration_logs (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES status_epilepticus_encounters(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        eeg_pattern VARCHAR(64) NOT NULL,
+        burst_suppression_ratio_pct NUMERIC(5,1),
+        bursts_per_minute NUMERIC(4,1),
+        interburst_interval_sec NUMERIC(5,1),
+        target_achieved BOOLEAN NOT NULL DEFAULT false,
+        civa_drug VARCHAR(64) NOT NULL,
+        civa_rate_unit VARCHAR(32) NOT NULL,
+        civa_rate NUMERIC(8,2) NOT NULL,
+        titration_directive TEXT NOT NULL,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ceeg_patient ON continuous_eeg_titration_logs(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_ceeg_encounter ON continuous_eeg_titration_logs(encounter_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
