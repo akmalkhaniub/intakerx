@@ -298,9 +298,10 @@ export const CenturyOrchestratorHub: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', color: '#38bdf8', fontWeight: 600, marginBottom: '4px' }}>🧠 NEUROLOGIC</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <input type="number" placeholder="GCS (3-15)" value={gcsScore} onChange={(e) => setGcsScore(parseInt(e.target.value) || 0)} style={{ padding: '6px 8px', backgroundColor: '#0f172a', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '12px' }} />
-                  <input type="number" placeholder="ICP (mmHg)" value={icpMmhg} onChange={(e) => setIcpMmhg(parseFloat(e.target.value) || 0)} style={{ padding: '6px 8px', backgroundColor: '#0f172a', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '12px' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                  <input type="number" placeholder="GCS" value={gcsScore} onChange={(e) => setGcsScore(parseInt(e.target.value) || 0)} style={{ padding: '6px 6px', backgroundColor: '#0f172a', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '12px' }} />
+                  <input type="number" placeholder="ICP" value={icpMmhg} onChange={(e) => setIcpMmhg(parseFloat(e.target.value) || 0)} style={{ padding: '6px 6px', backgroundColor: '#0f172a', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '12px' }} />
+                  <input type="number" placeholder="CPP" value={cppMmhg} onChange={(e) => setCppMmhg(parseFloat(e.target.value) || 0)} style={{ padding: '6px 6px', backgroundColor: '#0f172a', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '12px' }} />
                 </div>
                 <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
                   <label><input type="checkbox" checked={statusEpilepticus} onChange={(e) => setStatusEpilepticus(e.target.checked)} /> Status Epilepticus</label>
@@ -317,7 +318,10 @@ export const CenturyOrchestratorHub: React.FC = () => {
                 </div>
                 <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
                   <label style={{ color: '#f87171' }}><input type="checkbox" checked={typeADissection} onChange={(e) => setTypeADissection(e.target.checked)} /> Type A Aortic Dissection</label>
-                  <input type="text" placeholder="Active MCS (ECMO, Impella)" value={activeMcsDevice} onChange={(e) => setActiveMcsDevice(e.target.value)} style={{ padding: '4px 6px', backgroundColor: '#0f172a', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '11px' }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                    <input type="text" placeholder="MCS (ECMO, Impella)" value={activeMcsDevice} onChange={(e) => setActiveMcsDevice(e.target.value)} style={{ padding: '4px 6px', backgroundColor: '#0f172a', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '11px' }} />
+                    <input type="number" placeholder="VIS Score" value={vasoactiveInotropicScore} onChange={(e) => setVasoactiveInotropicScore(parseFloat(e.target.value) || 0)} style={{ padding: '4px 6px', backgroundColor: '#0f172a', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '11px' }} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -385,7 +389,10 @@ export const CenturyOrchestratorHub: React.FC = () => {
                   <label style={{ color: '#ef4444' }}><input type="checkbox" checked={maternalArrest} onChange={(e) => setMaternalArrest(e.target.checked)} /> Maternal Cardiac Arrest (4-Min PMCS)</label>
                   <label><input type="checkbox" checked={preeclampsiaEclampsia} onChange={(e) => setPreeclampsiaEclampsia(e.target.checked)} /> Severe Preeclampsia / Eclampsia</label>
                   <label style={{ color: '#f43f5e' }}><input type="checkbox" checked={postpartumHemorrhage} onChange={(e) => setPostpartumHemorrhage(e.target.checked)} /> Active PPH Hemorrhage</label>
-                  <input type="number" placeholder="QBL (mL)" value={qblMl} onChange={(e) => setQblMl(parseFloat(e.target.value) || 0)} style={{ padding: '2px 6px', backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '11px' }} />
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <input type="number" placeholder="GA Wks" value={gestationalAgeWeeks} onChange={(e) => setGestationalAgeWeeks(parseFloat(e.target.value) || 0)} style={{ width: '50%', padding: '2px 4px', backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '11px' }} />
+                    <input type="number" placeholder="QBL mL" value={qblMl} onChange={(e) => setQblMl(parseFloat(e.target.value) || 0)} style={{ width: '50%', padding: '2px 4px', backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '4px', color: '#fff', fontSize: '11px' }} />
+                  </div>
                 </div>
               )}
             </div>
