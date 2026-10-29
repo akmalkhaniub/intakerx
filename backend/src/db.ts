@@ -3277,6 +3277,55 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_mat_interv_enc ON maternal_resuscitation_interventions_logs(encounter_id);
     `);
 
+    // Create preeclampsia_encounters table (Phase 97: PREECLAMPSIA-SHIELD)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS preeclampsia_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        gestational_age_weeks NUMERIC(4,1) NOT NULL,
+        systolic_bp NUMERIC(5,1) NOT NULL,
+        diastolic_bp NUMERIC(5,1) NOT NULL,
+        severe_hypertension BOOLEAN NOT NULL DEFAULT FALSE,
+        neurological_symptoms JSONB DEFAULT '[]'::jsonb,
+        pulmonary_edema BOOLEAN DEFAULT FALSE,
+        platelet_count INTEGER NOT NULL,
+        serum_creatinine NUMERIC(4,2) NOT NULL,
+        ast_u_l NUMERIC(6,1) NOT NULL,
+        alt_u_l NUMERIC(6,1) NOT NULL,
+        ldh_u_l NUMERIC(6,1) NOT NULL,
+        total_bilirubin_mg_dl NUMERIC(4,2) NOT NULL,
+        preeclampsia_severity VARCHAR(64) NOT NULL,
+        hellp_class VARCHAR(32) NOT NULL,
+        swansea_aflp_score INTEGER NOT NULL DEFAULT 0,
+        aflp_suspected BOOLEAN NOT NULL DEFAULT FALSE,
+        emergency_antihypertensive_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        recommended_antihypertensive VARCHAR(64) NOT NULL,
+        mgso4_regimen TEXT NOT NULL,
+        delivery_timing_guidance TEXT NOT NULL,
+        protocol_directives JSONB DEFAULT '[]'::jsonb,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_preecl_patient ON preeclampsia_encounters(patient_id);
+
+      CREATE TABLE IF NOT EXISTS magnesium_surveillance_logs (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES preeclampsia_encounters(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        hours_on_mgso4 NUMERIC(5,1) NOT NULL,
+        current_infusion_rate_g_h NUMERIC(4,1) NOT NULL,
+        serum_magnesium_mg_dl NUMERIC(4,2),
+        patellar_reflex_intact BOOLEAN NOT NULL DEFAULT TRUE,
+        respiratory_rate INTEGER NOT NULL,
+        hourly_urine_output_ml NUMERIC(6,1) NOT NULL,
+        toxicity_flag VARCHAR(32) NOT NULL,
+        titration_action VARCHAR(32) NOT NULL,
+        clinical_directive TEXT NOT NULL,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_mg_log_patient ON magnesium_surveillance_logs(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_mg_log_encounter ON magnesium_surveillance_logs(encounter_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);

@@ -86,6 +86,7 @@ import * as subarachNavService from '../services/subarachNav';
 import { StatusEpilepticusService } from '../services/statusEpilepticus';
 import { SpinalCordService } from '../services/spinalCord';
 import { MaternalCodeService } from '../services/maternalCode';
+import { PreeclampsiaShieldService } from '../services/preeclampsiaShield';
 
 const router = Router();
 
@@ -9258,6 +9259,154 @@ router.get('/maternal/interventions/:patientId', async (req: AuthenticatedReques
   } catch (error: any) {
     console.error('Error in /maternal/interventions/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve maternal interventions.' });
+  }
+});
+
+// ============================================================================
+// PHASE 97: PREECLAMPSIA-SHIELD (Severe Preeclampsia, Eclampsia & HELLP)
+// ============================================================================
+
+// Evaluate Preeclampsia, Severe Features & Antihypertensive Roadmap
+router.post('/preeclampsia/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      gestationalAgeWeeks,
+      systolicBp,
+      diastolicBp,
+      priorConfirmedSevereBp,
+      neurologicalSymptoms,
+      pulmonaryEdema,
+      activeEclampticSeizure,
+      plateletCount,
+      serumCreatinine,
+      astUL,
+      altUL,
+      ldhUL,
+      totalBilirubinMgDl,
+      hypoglycemiaMgDl,
+      elevatedUricAcidMgDl,
+      coagulopathyPtSec,
+      vomitingOrAbdominalPain,
+      encephalopathy,
+      hasAsthmaOrBradycardia,
+      persist
+    } = req.body;
+
+    if (!patientId || gestationalAgeWeeks === undefined || systolicBp === undefined || diastolicBp === undefined || plateletCount === undefined) {
+      return res.status(400).json({ error: 'patientId, gestationalAgeWeeks, systolicBp, diastolicBp, and plateletCount are required.' });
+    }
+
+    const evaluation = PreeclampsiaShieldService.evaluatePreeclampsia({
+      patientId: Number(patientId),
+      gestationalAgeWeeks: Number(gestationalAgeWeeks),
+      systolicBp: Number(systolicBp),
+      diastolicBp: Number(diastolicBp),
+      priorConfirmedSevereBp: Boolean(priorConfirmedSevereBp),
+      neurologicalSymptoms: Array.isArray(neurologicalSymptoms) ? neurologicalSymptoms : [],
+      pulmonaryEdema: Boolean(pulmonaryEdema),
+      activeEclampticSeizure: Boolean(activeEclampticSeizure),
+      plateletCount: Number(plateletCount),
+      serumCreatinine: Number(serumCreatinine || 0.8),
+      astUL: Number(astUL || 25),
+      altUL: Number(altUL || 25),
+      ldhUL: Number(ldhUL || 200),
+      totalBilirubinMgDl: Number(totalBilirubinMgDl || 0.5),
+      hypoglycemiaMgDl: hypoglycemiaMgDl !== undefined ? Number(hypoglycemiaMgDl) : undefined,
+      elevatedUricAcidMgDl: elevatedUricAcidMgDl !== undefined ? Number(elevatedUricAcidMgDl) : undefined,
+      coagulopathyPtSec: coagulopathyPtSec !== undefined ? Number(coagulopathyPtSec) : undefined,
+      vomitingOrAbdominalPain: Boolean(vomitingOrAbdominalPain),
+      encephalopathy: Boolean(encephalopathy),
+      hasAsthmaOrBradycardia: Boolean(hasAsthmaOrBradycardia)
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await PreeclampsiaShieldService.persistEvaluation(evaluation);
+    }
+
+    // Emit critical alert if Eclampsia, Class 1 HELLP, or Severe Hypertension
+    if (evaluation.preeclampsiaSeverity === 'ECLAMPSIA_ACTIVE_SEIZURE' || evaluation.hellpClass === 'CLASS_1_SEVERE' || evaluation.severeHypertension) {
+      notificationBus.emit('notification', {
+        id: `preecl-${patientId}-${Date.now()}`,
+        type: 'emergency_triage',
+        title: evaluation.preeclampsiaSeverity === 'ECLAMPSIA_ACTIVE_SEIZURE' ? 'ECLAMPSIA SEIZURE ALERT' : evaluation.hellpClass === 'CLASS_1_SEVERE' ? 'CLASS 1 HELLP SYNDROME' : 'SEVERE MATERNAL HYPERTENSION',
+        message: evaluation.clinicalSummary,
+        severity: 'critical',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({ evaluation, savedId });
+  } catch (error: any) {
+    console.error('Error in /preeclampsia/evaluate:', error);
+    res.status(500).json({ error: error.message || 'Failed to evaluate preeclampsia.' });
+  }
+});
+
+// Log Hourly Magnesium Surveillance
+router.post('/preeclampsia/magnesium/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounterId,
+      patientId,
+      hoursOnMgso4,
+      currentInfusionRateGH,
+      serumMagnesiumMgDl,
+      patellarReflexIntact,
+      respiratoryRate,
+      hourlyUrineOutputMl,
+      persist
+    } = req.body;
+
+    if (!patientId || hoursOnMgso4 === undefined || currentInfusionRateGH === undefined || respiratoryRate === undefined || hourlyUrineOutputMl === undefined) {
+      return res.status(400).json({ error: 'patientId, hoursOnMgso4, currentInfusionRateGH, respiratoryRate, and hourlyUrineOutputMl are required.' });
+    }
+
+    const logResult = PreeclampsiaShieldService.evaluateMagnesiumSurveillance({
+      encounterId: encounterId ? Number(encounterId) : undefined,
+      patientId: Number(patientId),
+      hoursOnMgso4: Number(hoursOnMgso4),
+      currentInfusionRateGH: Number(currentInfusionRateGH),
+      serumMagnesiumMgDl: serumMagnesiumMgDl !== undefined ? Number(serumMagnesiumMgDl) : undefined,
+      patellarReflexIntact: patellarReflexIntact !== undefined ? Boolean(patellarReflexIntact) : true,
+      respiratoryRate: Number(respiratoryRate),
+      hourlyUrineOutputMl: Number(hourlyUrineOutputMl)
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await PreeclampsiaShieldService.persistMagnesiumLog(logResult);
+    }
+
+    res.json({ surveillance: logResult, savedId });
+  } catch (error: any) {
+    console.error('Error in /preeclampsia/magnesium/log:', error);
+    res.status(500).json({ error: error.message || 'Failed to log magnesium surveillance.' });
+  }
+});
+
+// Get Preeclampsia Evaluations for a Patient
+router.get('/preeclampsia/evaluations/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await PreeclampsiaShieldService.getEvaluations(patientId);
+    res.json(records);
+  } catch (error: any) {
+    console.error('Error in /preeclampsia/evaluations/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve preeclampsia evaluations.' });
+  }
+});
+
+// Get Magnesium Surveillance Logs for a Patient
+router.get('/preeclampsia/magnesium-logs/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await PreeclampsiaShieldService.getMagnesiumLogs(patientId);
+    res.json(logs);
+  } catch (error: any) {
+    console.error('Error in /preeclampsia/magnesium-logs/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve magnesium surveillance logs.' });
   }
 });
 
