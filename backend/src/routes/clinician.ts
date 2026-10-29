@@ -85,6 +85,7 @@ import * as icpCrisisService from '../services/icpCrisis';
 import * as subarachNavService from '../services/subarachNav';
 import { StatusEpilepticusService } from '../services/statusEpilepticus';
 import { SpinalCordService } from '../services/spinalCord';
+import { MaternalCodeService } from '../services/maternalCode';
 
 const router = Router();
 
@@ -9121,6 +9122,142 @@ router.get('/spinalcord/map-logs/:patientId', async (req: AuthenticatedRequest, 
   } catch (error: any) {
     console.error('Error in /spinalcord/map-logs/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve MAP logs.' });
+  }
+});
+
+// ============================================================================
+// PHASE 96: MATERNAL-CODE (Obstetric Critical Care & AFE Resuscitation)
+// ============================================================================
+
+// Evaluate Maternal Cardiopulmonary Arrest & AFE Protocol
+router.post('/maternal/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      gestationalAgeWeeks,
+      fundalHeightCm,
+      arrestRhythm,
+      etiologySuspected,
+      minutesSinceArrest,
+      ludActive,
+      chestCompressionsQuality,
+      hysterotomyInitiated,
+      hysterotomyDeliveryMinute,
+      aokProtocolAdministered,
+      fibrinogenLevelMgDl,
+      plateletCount,
+      activeBleedingFromLinesOrSites,
+      roscAchieved,
+      persist
+    } = req.body;
+
+    if (!patientId || gestationalAgeWeeks === undefined || !arrestRhythm || !etiologySuspected || minutesSinceArrest === undefined) {
+      return res.status(400).json({ error: 'patientId, gestationalAgeWeeks, arrestRhythm, etiologySuspected, and minutesSinceArrest are required.' });
+    }
+
+    const evaluation = MaternalCodeService.evaluateMaternalCode({
+      patientId: Number(patientId),
+      gestationalAgeWeeks: Number(gestationalAgeWeeks),
+      fundalHeightCm: fundalHeightCm !== undefined ? Number(fundalHeightCm) : undefined,
+      arrestRhythm,
+      etiologySuspected,
+      minutesSinceArrest: Number(minutesSinceArrest),
+      ludActive: ludActive !== undefined ? Boolean(ludActive) : true,
+      chestCompressionsQuality: chestCompressionsQuality || 'OPTIMAL',
+      hysterotomyInitiated: Boolean(hysterotomyInitiated),
+      hysterotomyDeliveryMinute: hysterotomyDeliveryMinute !== undefined ? Number(hysterotomyDeliveryMinute) : undefined,
+      aokProtocolAdministered: Boolean(aokProtocolAdministered),
+      fibrinogenLevelMgDl: fibrinogenLevelMgDl !== undefined ? Number(fibrinogenLevelMgDl) : undefined,
+      plateletCount: plateletCount !== undefined ? Number(plateletCount) : undefined,
+      activeBleedingFromLinesOrSites: Boolean(activeBleedingFromLinesOrSites),
+      roscAchieved: Boolean(roscAchieved)
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await MaternalCodeService.persistEvaluation(evaluation);
+    }
+
+    // Emit critical alert if PMCS incision is mandatory or AFE active
+    if (evaluation.pmcsGuidance.actionRequired === 'STAT_PMCS_INCISION_NOW' || evaluation.etiologySuspected === 'AMNIOTIC_FLUID_EMBOLISM') {
+      notificationBus.emit('notification', {
+        id: `maternal-${patientId}-${Date.now()}`,
+        type: 'emergency_triage',
+        title: evaluation.pmcsGuidance.actionRequired === 'STAT_PMCS_INCISION_NOW' ? 'STAT PMCS INCISION (4-MIN RULE)' : 'AMNIOTIC FLUID EMBOLISM (AFE)',
+        message: evaluation.actionSummary,
+        severity: 'critical',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({ evaluation, savedId });
+  } catch (error: any) {
+    console.error('Error in /maternal/evaluate:', error);
+    res.status(500).json({ error: error.message || 'Failed to evaluate maternal code.' });
+  }
+});
+
+// Log Maternal Resuscitation Intervention
+router.post('/maternal/intervention/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounterId,
+      patientId,
+      elapsedMinutes,
+      interventionType,
+      agentOrAction,
+      dosageOrDetails,
+      hemodynamicResponse,
+      persist
+    } = req.body;
+
+    if (!patientId || elapsedMinutes === undefined || !interventionType || !agentOrAction) {
+      return res.status(400).json({ error: 'patientId, elapsedMinutes, interventionType, and agentOrAction are required.' });
+    }
+
+    const logResult = MaternalCodeService.logIntervention({
+      encounterId: encounterId ? Number(encounterId) : undefined,
+      patientId: Number(patientId),
+      elapsedMinutes: Number(elapsedMinutes),
+      interventionType,
+      agentOrAction,
+      dosageOrDetails: dosageOrDetails || '',
+      hemodynamicResponse: hemodynamicResponse || 'PENDING'
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await MaternalCodeService.persistIntervention(logResult);
+    }
+
+    res.json({ intervention: logResult, savedId });
+  } catch (error: any) {
+    console.error('Error in /maternal/intervention/log:', error);
+    res.status(500).json({ error: error.message || 'Failed to log maternal intervention.' });
+  }
+});
+
+// Get Maternal Code Evaluations for a Patient
+router.get('/maternal/evaluations/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await MaternalCodeService.getEvaluations(patientId);
+    res.json(records);
+  } catch (error: any) {
+    console.error('Error in /maternal/evaluations/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve maternal code evaluations.' });
+  }
+});
+
+// Get Maternal Interventions for a Patient
+router.get('/maternal/interventions/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await MaternalCodeService.getInterventions(patientId);
+    res.json(logs);
+  } catch (error: any) {
+    console.error('Error in /maternal/interventions/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve maternal interventions.' });
   }
 });
 

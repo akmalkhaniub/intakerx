@@ -3236,6 +3236,47 @@ export async function bootstrap() {
       CREATE INDEX IF NOT EXISTS idx_map_log_encounter ON map_augmentation_logs(encounter_id);
     `);
 
+    // Create maternal_code_encounters table (Phase 96: MATERNAL-CODE)
+    await migrationPool.query(`
+      CREATE TABLE IF NOT EXISTS maternal_code_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        gestational_age_weeks NUMERIC(4,1) NOT NULL,
+        fundal_height_cm INTEGER,
+        arrest_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        arrest_rhythm VARCHAR(32) NOT NULL,
+        etiology_suspected VARCHAR(64) NOT NULL,
+        lud_active BOOLEAN NOT NULL DEFAULT TRUE,
+        chest_compressions_quality VARCHAR(32) DEFAULT 'OPTIMAL',
+        pmcs_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        minutes_since_arrest NUMERIC(4,1) NOT NULL,
+        hysterotomy_initiated BOOLEAN NOT NULL DEFAULT FALSE,
+        hysterotomy_delivery_minute NUMERIC(4,1),
+        aok_protocol_administered BOOLEAN NOT NULL DEFAULT FALSE,
+        dic_coagulopathy_present BOOLEAN NOT NULL DEFAULT FALSE,
+        fibrinogen_level_mg_dl NUMERIC(5,1),
+        rosc_achieved BOOLEAN NOT NULL DEFAULT FALSE,
+        protocol_directives JSONB DEFAULT '[]'::jsonb,
+        action_summary TEXT NOT NULL,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_maternal_patient ON maternal_code_encounters(patient_id);
+
+      CREATE TABLE IF NOT EXISTS maternal_resuscitation_interventions_logs (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES maternal_code_encounters(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        elapsed_minutes NUMERIC(4,1) NOT NULL,
+        intervention_type VARCHAR(64) NOT NULL,
+        agent_or_action VARCHAR(64) NOT NULL,
+        dosage_or_details TEXT NOT NULL,
+        hemodynamic_response VARCHAR(64) NOT NULL,
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_mat_interv_patient ON maternal_resuscitation_interventions_logs(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_mat_interv_enc ON maternal_resuscitation_interventions_logs(encounter_id);
+    `);
+
     console.log('Database tables and indexes verified/created.');
   } catch (error) {
     console.error('Error running migrations:', error);
