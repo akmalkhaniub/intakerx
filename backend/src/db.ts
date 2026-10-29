@@ -3364,6 +3364,47 @@ export async function bootstrap() {
       );
       CREATE INDEX IF NOT EXISTS idx_ut_log_patient ON uterotonic_administration_logs(patient_id);
       CREATE INDEX IF NOT EXISTS idx_ut_log_encounter ON uterotonic_administration_logs(encounter_id);
+
+      -- Create burn_resuscitation_encounters table (Phase 99: BURN-RESUS)
+      CREATE TABLE IF NOT EXISTS burn_resuscitation_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        weight_kg NUMERIC(5,2) NOT NULL,
+        tbsa_percentage NUMERIC(4,1) NOT NULL,
+        burn_depth_classification VARCHAR(64) NOT NULL,
+        mechanism_type VARCHAR(64) NOT NULL,
+        hours_since_injury NUMERIC(4,1) NOT NULL,
+        parkland_total_24h_ml NUMERIC(8,1) NOT NULL,
+        first_8h_rate_ml_h NUMERIC(7,1) NOT NULL,
+        next_16h_rate_ml_h NUMERIC(7,1) NOT NULL,
+        target_urine_output_ml_kg_h NUMERIC(4,2) NOT NULL,
+        inhalation_injury_suspected BOOLEAN NOT NULL DEFAULT FALSE,
+        carboxyhemoglobin_pct NUMERIC(4,1),
+        cyanide_suspected BOOLEAN NOT NULL DEFAULT FALSE,
+        escharotomy_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        protocol_directives JSONB DEFAULT '[]'::jsonb,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_burn_patient ON burn_resuscitation_encounters(patient_id);
+
+      CREATE TABLE IF NOT EXISTS hourly_parkland_titration_logs (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES burn_resuscitation_encounters(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        hour_post_burn NUMERIC(4,1) NOT NULL,
+        current_lr_rate_ml_h NUMERIC(6,1) NOT NULL,
+        urine_output_ml NUMERIC(6,1) NOT NULL,
+        urine_output_ml_kg_h NUMERIC(4,2) NOT NULL,
+        bladder_pressure_mmhg NUMERIC(4,1),
+        cumulative_fluid_ml NUMERIC(8,1) NOT NULL,
+        fluid_creep_flag VARCHAR(32) NOT NULL,
+        titration_action VARCHAR(32) NOT NULL,
+        new_lr_rate_ml_h NUMERIC(6,1) NOT NULL,
+        clinical_directive TEXT NOT NULL,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_burn_log_patient ON hourly_parkland_titration_logs(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_burn_log_encounter ON hourly_parkland_titration_logs(encounter_id);
     `);
 
     console.log('Database tables and indexes verified/created.');

@@ -88,6 +88,7 @@ import { SpinalCordService } from '../services/spinalCord';
 import { MaternalCodeService } from '../services/maternalCode';
 import { PreeclampsiaShieldService } from '../services/preeclampsiaShield';
 import { ObHemorrhageService } from '../services/obHemorrhage';
+import { BurnResusService } from '../services/burnResus';
 
 const router = Router();
 
@@ -9554,6 +9555,148 @@ router.get('/obhemorrhage/uterotonic-logs/:patientId', async (req: Authenticated
   } catch (error: any) {
     console.error('Error in /obhemorrhage/uterotonic-logs/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve uterotonic logs.' });
+  }
+});
+
+// ============================================================================
+// PHASE 99: BURN-RESUS (Critical Burn Shock, Inhalation & Parkland Titration)
+// ============================================================================
+
+// Evaluate Burn Shock, Parkland-Baxter Fluid Plan & Inhalation Protocol
+router.post('/burns/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      weightKg,
+      isPediatric,
+      mechanism,
+      hoursSinceInjury,
+      prehospitalFluidReceivedMl,
+      tbsaBreakdown,
+      totalTbsaPercentage,
+      circumferentialBurnLimbsOrTorso,
+      inhalationInjurySigns,
+      carboxyhemoglobinPct,
+      serumLactateMmolL,
+      pigmenturiaOrRhabdo,
+      persist
+    } = req.body;
+
+    if (!patientId || !weightKg || !mechanism || hoursSinceInjury === undefined) {
+      res.status(400).json({ error: 'patientId, weightKg, mechanism, and hoursSinceInjury are required.' });
+      return;
+    }
+
+    const evaluation = BurnResusService.evaluateBurnShock({
+      patientId: Number(patientId),
+      weightKg: Number(weightKg),
+      isPediatric: Boolean(isPediatric),
+      mechanism,
+      hoursSinceInjury: Number(hoursSinceInjury),
+      prehospitalFluidReceivedMl: prehospitalFluidReceivedMl !== undefined ? Number(prehospitalFluidReceivedMl) : 0,
+      tbsaBreakdown,
+      totalTbsaPercentage: totalTbsaPercentage !== undefined ? Number(totalTbsaPercentage) : undefined,
+      circumferentialBurnLimbsOrTorso: Boolean(circumferentialBurnLimbsOrTorso),
+      inhalationInjurySigns: Array.isArray(inhalationInjurySigns) ? inhalationInjurySigns : [],
+      carboxyhemoglobinPct: carboxyhemoglobinPct !== undefined ? Number(carboxyhemoglobinPct) : undefined,
+      serumLactateMmolL: serumLactateMmolL !== undefined ? Number(serumLactateMmolL) : undefined,
+      pigmenturiaOrRhabdo: Boolean(pigmenturiaOrRhabdo)
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await BurnResusService.persistBurnEncounter(evaluation);
+    }
+
+    // Emit critical alert if TBSA >= 20% or Inhalation Injury or Cyanide suspected
+    if (evaluation.calculatedTbsa >= 20.0 || evaluation.inhalationInjuryPlan.cyanideAntidoteIndicated || evaluation.compartmentSyndromeAndEscharotomy.escharotomyIndicated) {
+      notificationBus.emit('notification', {
+        id: `burn-${patientId}-${Date.now()}`,
+        type: 'emergency_triage',
+        title: evaluation.inhalationInjuryPlan.cyanideAntidoteIndicated
+          ? 'SMOKE INHALATION CYANIDE TOXICITY'
+          : evaluation.calculatedTbsa >= 20.0
+          ? 'CRITICAL MAJOR BURN SHOCK (PARKLAND PROTOCOL)'
+          : 'CIRCUMFERENTIAL BURN ESCHAROTOMY ALERT',
+        message: evaluation.clinicalSummary,
+        severity: 'critical',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({ evaluation, savedId });
+  } catch (error: any) {
+    console.error('Error in /burns/evaluate:', error);
+    res.status(500).json({ error: error.message || 'Failed to evaluate burn shock resuscitation.' });
+  }
+});
+
+// Log Hourly Parkland Fluid & Urine Output Titration
+router.post('/burns/titration/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounterId,
+      patientId,
+      weightKg,
+      hourPostBurn,
+      currentLrRateMlH,
+      urineOutputMl,
+      bladderPressureMmhg,
+      cumulativeFluidMl,
+      pigmenturiaPresent,
+      persist
+    } = req.body;
+
+    if (!patientId || !weightKg || hourPostBurn === undefined || currentLrRateMlH === undefined || urineOutputMl === undefined || cumulativeFluidMl === undefined) {
+      res.status(400).json({ error: 'patientId, weightKg, hourPostBurn, currentLrRateMlH, urineOutputMl, and cumulativeFluidMl are required.' });
+      return;
+    }
+
+    const titrationResult = BurnResusService.evaluateHourlyTitration({
+      encounterId: encounterId ? Number(encounterId) : undefined,
+      patientId: Number(patientId),
+      weightKg: Number(weightKg),
+      hourPostBurn: Number(hourPostBurn),
+      currentLrRateMlH: Number(currentLrRateMlH),
+      urineOutputMl: Number(urineOutputMl),
+      bladderPressureMmhg: bladderPressureMmhg !== undefined ? Number(bladderPressureMmhg) : undefined,
+      cumulativeFluidMl: Number(cumulativeFluidMl),
+      pigmenturiaPresent: Boolean(pigmenturiaPresent)
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await BurnResusService.persistTitrationLog(titrationResult);
+    }
+
+    res.json({ titration: titrationResult, savedId });
+  } catch (error: any) {
+    console.error('Error in /burns/titration/log:', error);
+    res.status(500).json({ error: error.message || 'Failed to log burn fluid titration.' });
+  }
+});
+
+// Get Burn Encounters for a Patient
+router.get('/burns/encounters/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await BurnResusService.getBurnEncounters(patientId);
+    res.json(records);
+  } catch (error: any) {
+    console.error('Error in /burns/encounters/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve burn encounters.' });
+  }
+});
+
+// Get Titration Logs for a Patient
+router.get('/burns/titration-logs/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await BurnResusService.getTitrationLogs(patientId);
+    res.json(logs);
+  } catch (error: any) {
+    console.error('Error in /burns/titration-logs/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve burn titration logs.' });
   }
 });
 
