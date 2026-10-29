@@ -459,7 +459,7 @@ export const PreeclampsiaShieldHub: React.FC = () => {
                 <input type="checkbox" checked={hasAsthmaOrBradycardia} onChange={(e) => setHasAsthmaOrBradycardia(e.target.checked)} />
                 Asthma, Heart Block, or Severe Bradycardia (Contraindicates Labetalol)
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', marginBottom: '8px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <input type="checkbox" checked={vomitingOrAbdominalPain} onChange={(e) => setVomitingOrAbdominalPain(e.target.checked)} />
                   Nausea / Vomiting / RUQ Pain
@@ -468,6 +468,37 @@ export const PreeclampsiaShieldHub: React.FC = () => {
                   <input type="checkbox" checked={encephalopathy} onChange={(e) => setEncephalopathy(e.target.checked)} />
                   Hepatic Encephalopathy
                 </label>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', fontSize: '11px' }}>Glucose (mg/dL)</label>
+                  <input
+                    type="number"
+                    value={hypoglycemiaMgDl}
+                    onChange={(e) => setHypoglycemiaMgDl(parseFloat(e.target.value) || 0)}
+                    style={{ width: '100%', padding: '4px 6px', backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '4px', color: '#f8fafc', fontSize: '12px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', fontSize: '11px' }}>Uric Acid (mg/dL)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={elevatedUricAcidMgDl}
+                    onChange={(e) => setElevatedUricAcidMgDl(parseFloat(e.target.value) || 0)}
+                    style={{ width: '100%', padding: '4px 6px', backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '4px', color: '#f8fafc', fontSize: '12px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: '#94a3b8', fontSize: '11px' }}>PT / INR (sec)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={coagulopathyPtSec}
+                    onChange={(e) => setCoagulopathyPtSec(parseFloat(e.target.value) || 0)}
+                    style={{ width: '100%', padding: '4px 6px', backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '4px', color: '#f8fafc', fontSize: '12px' }}
+                  />
+                </div>
               </div>
             </div>
 

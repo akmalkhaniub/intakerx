@@ -3324,6 +3324,46 @@ export async function bootstrap() {
       );
       CREATE INDEX IF NOT EXISTS idx_mg_log_patient ON magnesium_surveillance_logs(patient_id);
       CREATE INDEX IF NOT EXISTS idx_mg_log_encounter ON magnesium_surveillance_logs(encounter_id);
+
+      -- Create obstetric_hemorrhage_encounters table (Phase 98: OB-HEMORRHAGE)
+      CREATE TABLE IF NOT EXISTS obstetric_hemorrhage_encounters (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        delivery_mode VARCHAR(32) NOT NULL,
+        qbl_ml NUMERIC(7,1) NOT NULL,
+        vital_shock_index NUMERIC(4,2) NOT NULL,
+        heart_rate INTEGER NOT NULL,
+        systolic_bp NUMERIC(5,1) NOT NULL,
+        diastolic_bp NUMERIC(5,1) NOT NULL,
+        pph_stage VARCHAR(32) NOT NULL,
+        etiology_category VARCHAR(64) NOT NULL,
+        uterine_atony_present BOOLEAN NOT NULL DEFAULT TRUE,
+        placenta_accreta_suspected BOOLEAN NOT NULL DEFAULT FALSE,
+        active_hemorrhage BOOLEAN NOT NULL DEFAULT TRUE,
+        txa_administered BOOLEAN NOT NULL DEFAULT FALSE,
+        bakri_balloon_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        mtp_activated BOOLEAN NOT NULL DEFAULT FALSE,
+        recommended_uterotonic VARCHAR(64) NOT NULL,
+        uterotonic_roadmap JSONB DEFAULT '[]'::jsonb,
+        surgical_escalation_plan TEXT NOT NULL,
+        protocol_directives JSONB DEFAULT '[]'::jsonb,
+        evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_obh_patient ON obstetric_hemorrhage_encounters(patient_id);
+
+      CREATE TABLE IF NOT EXISTS uterotonic_administration_logs (
+        id SERIAL PRIMARY KEY,
+        encounter_id INTEGER REFERENCES obstetric_hemorrhage_encounters(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        agent_administered VARCHAR(64) NOT NULL,
+        route_and_dosage VARCHAR(128) NOT NULL,
+        cumulative_dose VARCHAR(64) NOT NULL,
+        response_observed VARCHAR(64) NOT NULL,
+        next_step_action TEXT NOT NULL,
+        administered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ut_log_patient ON uterotonic_administration_logs(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_ut_log_encounter ON uterotonic_administration_logs(encounter_id);
     `);
 
     console.log('Database tables and indexes verified/created.');

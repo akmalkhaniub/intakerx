@@ -87,6 +87,7 @@ import { StatusEpilepticusService } from '../services/statusEpilepticus';
 import { SpinalCordService } from '../services/spinalCord';
 import { MaternalCodeService } from '../services/maternalCode';
 import { PreeclampsiaShieldService } from '../services/preeclampsiaShield';
+import { ObHemorrhageService } from '../services/obHemorrhage';
 
 const router = Router();
 
@@ -9407,6 +9408,152 @@ router.get('/preeclampsia/magnesium-logs/:patientId', async (req: AuthenticatedR
   } catch (error: any) {
     console.error('Error in /preeclampsia/magnesium-logs/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve magnesium surveillance logs.' });
+  }
+});
+
+// ============================================================================
+// PHASE 98: OB-HEMORRHAGE (Postpartum Hemorrhage, Accreta & Uterotonics)
+// ============================================================================
+
+// Evaluate Obstetric Hemorrhage Staging, Etiology & Uterotonic Cascade
+router.post('/obhemorrhage/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      deliveryMode,
+      qblMl,
+      heartRate,
+      systolicBp,
+      diastolicBp,
+      minutesPostpartum,
+      fundusBoggyOrAtonic,
+      suspectedPlacentaAccreta,
+      placentaAccretaType,
+      priorCesareansCount,
+      placentaPreviaPresent,
+      suspectedGenitalTrauma,
+      retainedTissueSuspected,
+      hasHypertensionOrPreeclampsia,
+      hasAsthmaOrBronchospasm,
+      activeTransfusionUnitsPrbc,
+      fibrinogenMgDl,
+      txaAdministered,
+      persist
+    } = req.body;
+
+    if (!patientId || !deliveryMode || qblMl === undefined || !heartRate || !systolicBp || !diastolicBp) {
+      res.status(400).json({ error: 'patientId, deliveryMode, qblMl, heartRate, systolicBp, and diastolicBp are required.' });
+      return;
+    }
+
+    const evaluation = ObHemorrhageService.evaluateHemorrhage({
+      patientId: Number(patientId),
+      deliveryMode,
+      qblMl: Number(qblMl),
+      heartRate: Number(heartRate),
+      systolicBp: Number(systolicBp),
+      diastolicBp: Number(diastolicBp),
+      minutesPostpartum: Number(minutesPostpartum || 0),
+      fundusBoggyOrAtonic: fundusBoggyOrAtonic !== undefined ? Boolean(fundusBoggyOrAtonic) : true,
+      suspectedPlacentaAccreta: Boolean(suspectedPlacentaAccreta),
+      placentaAccretaType,
+      priorCesareansCount: priorCesareansCount !== undefined ? Number(priorCesareansCount) : 0,
+      placentaPreviaPresent: Boolean(placentaPreviaPresent),
+      suspectedGenitalTrauma: Boolean(suspectedGenitalTrauma),
+      retainedTissueSuspected: Boolean(retainedTissueSuspected),
+      hasHypertensionOrPreeclampsia: Boolean(hasHypertensionOrPreeclampsia),
+      hasAsthmaOrBronchospasm: Boolean(hasAsthmaOrBronchospasm),
+      activeTransfusionUnitsPrbc: activeTransfusionUnitsPrbc !== undefined ? Number(activeTransfusionUnitsPrbc) : 0,
+      fibrinogenMgDl: fibrinogenMgDl !== undefined ? Number(fibrinogenMgDl) : undefined,
+      txaAdministered: Boolean(txaAdministered)
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await ObHemorrhageService.persistHemorrhageEncounter(evaluation);
+    }
+
+    // Emit critical alert if Stage 2 or Stage 3 PPH
+    if (evaluation.pphStage === 'STAGE_3_SEVERE_MTP' || evaluation.pphStage === 'STAGE_2_MODERATE') {
+      notificationBus.emit('notification', {
+        id: `obh-${patientId}-${Date.now()}`,
+        type: 'emergency_triage',
+        title: evaluation.pphStage === 'STAGE_3_SEVERE_MTP' ? 'STAGE 3 OB-HEMORRHAGE (MTP ACTIVATED)' : 'STAGE 2 POSTPARTUM HEMORRHAGE',
+        message: evaluation.clinicalSummary,
+        severity: 'critical',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({ evaluation, savedId });
+  } catch (error: any) {
+    console.error('Error in /obhemorrhage/evaluate:', error);
+    res.status(500).json({ error: error.message || 'Failed to evaluate postpartum hemorrhage.' });
+  }
+});
+
+// Log Uterotonic Administration
+router.post('/obhemorrhage/uterotonic/log', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      encounterId,
+      patientId,
+      agent,
+      dose,
+      route,
+      cumulativeDose,
+      responseObserved,
+      persist
+    } = req.body;
+
+    if (!patientId || !agent || !dose || !route || !responseObserved) {
+      res.status(400).json({ error: 'patientId, agent, dose, route, and responseObserved are required.' });
+      return;
+    }
+
+    const logResult = ObHemorrhageService.logUterotonicAdministration({
+      encounterId: encounterId ? Number(encounterId) : undefined,
+      patientId: Number(patientId),
+      agent,
+      dose,
+      route,
+      cumulativeDose: cumulativeDose || '1 dose',
+      responseObserved
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await ObHemorrhageService.persistUterotonicLog(logResult);
+    }
+
+    res.json({ uterotonicLog: logResult, savedId });
+  } catch (error: any) {
+    console.error('Error in /obhemorrhage/uterotonic/log:', error);
+    res.status(500).json({ error: error.message || 'Failed to log uterotonic administration.' });
+  }
+});
+
+// Get Hemorrhage Encounters for a Patient
+router.get('/obhemorrhage/encounters/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const records = await ObHemorrhageService.getHemorrhageEncounters(patientId);
+    res.json(records);
+  } catch (error: any) {
+    console.error('Error in /obhemorrhage/encounters/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve hemorrhage encounters.' });
+  }
+});
+
+// Get Uterotonic Administration Logs for a Patient
+router.get('/obhemorrhage/uterotonic-logs/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const logs = await ObHemorrhageService.getUterotonicLogs(patientId);
+    res.json(logs);
+  } catch (error: any) {
+    console.error('Error in /obhemorrhage/uterotonic-logs/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve uterotonic logs.' });
   }
 });
 
