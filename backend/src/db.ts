@@ -3405,6 +3405,35 @@ export async function bootstrap() {
       );
       CREATE INDEX IF NOT EXISTS idx_burn_log_patient ON hourly_parkland_titration_logs(patient_id);
       CREATE INDEX IF NOT EXISTS idx_burn_log_encounter ON hourly_parkland_titration_logs(encounter_id);
+
+      -- Create century_orchestrator_sessions table (Phase 100: CENTURY-ORCHESTRATOR)
+      CREATE TABLE IF NOT EXISTS century_orchestrator_sessions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        century_score INTEGER NOT NULL,
+        primary_instability_domain VARCHAR(64) NOT NULL,
+        organ_system_scores JSONB NOT NULL,
+        active_conflicts_detected JSONB DEFAULT '[]'::jsonb,
+        arbitrated_orders JSONB DEFAULT '[]'::jsonb,
+        dispatched_teams JSONB DEFAULT '[]'::jsonb,
+        executive_summary TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_century_patient ON century_orchestrator_sessions(patient_id);
+
+      CREATE TABLE IF NOT EXISTS cross_phase_clinical_alerts (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES century_orchestrator_sessions(id) ON DELETE CASCADE,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        alert_title VARCHAR(128) NOT NULL,
+        contradicting_phases VARCHAR(128) NOT NULL,
+        clinical_hazard TEXT NOT NULL,
+        arbitration_mandate TEXT NOT NULL,
+        resolution_status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+        generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cross_alert_patient ON cross_phase_clinical_alerts(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_cross_alert_session ON cross_phase_clinical_alerts(session_id);
     `);
 
     console.log('Database tables and indexes verified/created.');

@@ -89,6 +89,7 @@ import { MaternalCodeService } from '../services/maternalCode';
 import { PreeclampsiaShieldService } from '../services/preeclampsiaShield';
 import { ObHemorrhageService } from '../services/obHemorrhage';
 import { BurnResusService } from '../services/burnResus';
+import { CenturyOrchestratorService } from '../services/centuryOrchestrator';
 
 const router = Router();
 
@@ -9697,6 +9698,93 @@ router.get('/burns/titration-logs/:patientId', async (req: AuthenticatedRequest,
   } catch (error: any) {
     console.error('Error in /burns/titration-logs/:patientId:', error);
     res.status(500).json({ error: 'Failed to retrieve burn titration logs.' });
+  }
+});
+
+// ============================================================================
+// PHASE 100: CENTURY-ORCHESTRATOR (The Phase 100 Grand Meta-Executive)
+// ============================================================================
+
+// Synthesize Century Multi-Organ Resuscitation, Conflict Resolution & Global Command
+router.post('/century/synthesize', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      patientId,
+      neurologic,
+      cardiovascular,
+      respiratory,
+      renalFluids,
+      hepaticMetabolic,
+      hematologic,
+      obstetric,
+      traumaAndBurns,
+      persist
+    } = req.body;
+
+    if (!patientId || !cardiovascular) {
+      res.status(400).json({ error: 'patientId and cardiovascular state are required.' });
+      return;
+    }
+
+    const synthesis = CenturyOrchestratorService.synthesizeGrandOrchestration({
+      patientId: Number(patientId),
+      neurologic,
+      cardiovascular,
+      respiratory,
+      renalFluids,
+      hepaticMetabolic,
+      hematologic,
+      obstetric,
+      traumaAndBurns
+    });
+
+    let savedId: number | undefined;
+    if (persist !== false) {
+      savedId = await CenturyOrchestratorService.persistOrchestratorSession(synthesis);
+    }
+
+    // Emit critical alert if Extreme Surge or High Critical or Active Cross-Phase Conflicts
+    if (synthesis.centuryScore >= 50 || synthesis.crossPhaseConflicts.length > 0) {
+      notificationBus.emit('notification', {
+        id: `century-${patientId}-${Date.now()}`,
+        type: 'emergency_triage',
+        title: synthesis.crossPhaseConflicts.length > 0
+          ? `CROSS-PHASE CONFLICT: ${synthesis.crossPhaseConflicts[0].title}`
+          : `CENTURY META-EXECUTIVE ALERT (${synthesis.centuryTier})`,
+        message: synthesis.executiveSummary,
+        severity: 'critical',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({ synthesis, savedId });
+  } catch (error: any) {
+    console.error('Error in /century/synthesize:', error);
+    res.status(500).json({ error: error.message || 'Failed to synthesize grand orchestration.' });
+  }
+});
+
+// Get Century Orchestration Sessions for a Patient
+router.get('/century/sessions/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const sessions = await CenturyOrchestratorService.getOrchestratorSessions(patientId);
+    res.json(sessions);
+  } catch (error: any) {
+    console.error('Error in /century/sessions/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve century sessions.' });
+  }
+});
+
+// Get Cross-Phase Clinical Alerts for a Patient
+router.get('/century/alerts/:patientId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const patientId = Number(req.params.patientId);
+    const alerts = await CenturyOrchestratorService.getClinicalAlerts(patientId);
+    res.json(alerts);
+  } catch (error: any) {
+    console.error('Error in /century/alerts/:patientId:', error);
+    res.status(500).json({ error: 'Failed to retrieve cross-phase clinical alerts.' });
   }
 });
 
