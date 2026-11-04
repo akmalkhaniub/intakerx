@@ -9,6 +9,7 @@ import protocolRoutes from './routes/protocols';
 import clinicianRoutes from './routes/clinician';
 import telephonyRoutes from './routes/telephony';
 import portalRoutes from './routes/portal';
+import fhirRoutes from './routes/fhir';
 import { AIService } from './services/ai';
 import { GuardrailsService } from './services/guardrails';
 import { pool } from './db';
@@ -28,6 +29,8 @@ app.use('/api/protocols', protocolRoutes);
 app.use('/api/clinician', clinicianRoutes);
 app.use('/api/telephony', telephonyRoutes);
 app.use('/api/portal', portalRoutes);
+app.use('/api/fhir/r4', fhirRoutes);
+app.use('/', fhirRoutes);
 
 // Base health check
 app.get('/health', (req, res) => {
