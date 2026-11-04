@@ -90,6 +90,7 @@ import { PreeclampsiaShieldService } from '../services/preeclampsiaShield';
 import { ObHemorrhageService } from '../services/obHemorrhage';
 import { BurnResusService } from '../services/burnResus';
 import { CenturyOrchestratorService } from '../services/centuryOrchestrator';
+import { IcuSimulatorService } from '../services/icuSimulator';
 
 const router = Router();
 
@@ -9823,6 +9824,127 @@ router.get('/notifications/stream', (req: AuthenticatedRequest, res: Response) =
     notificationBus.removeListener('notification', handler);
     clearInterval(keepAlive);
     console.log('[SSE] Clinician notification stream closed.');
+  });
+});
+
+// ============================================================================
+// PILLAR 1: REAL-TIME MULTI-PATIENT ICU TELEMETRY SIMULATOR & STRESS ENGINE
+// ============================================================================
+
+// Get all 12 simulated ICU beds
+router.get('/simulator/beds', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const beds = await IcuSimulatorService.getWardBeds();
+    res.json({ beds, isRunning: IcuSimulatorService.isSimulationRunning() });
+  } catch (error: any) {
+    console.error('Error in /simulator/beds:', error);
+    res.status(500).json({ error: 'Failed to retrieve simulated beds.' });
+  }
+});
+
+// Start simulation tick loop
+router.post('/simulator/start', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const intervalMs = req.body.intervalMs ? Number(req.body.intervalMs) : 2000;
+    IcuSimulatorService.startSimulation(intervalMs);
+    res.json({ success: true, message: 'Simulation engine started.', isRunning: true });
+  } catch (error: any) {
+    console.error('Error in /simulator/start:', error);
+    res.status(500).json({ error: 'Failed to start simulation.' });
+  }
+});
+
+// Stop simulation tick loop
+router.post('/simulator/stop', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    IcuSimulatorService.stopSimulation();
+    res.json({ success: true, message: 'Simulation engine stopped.', isRunning: false });
+  } catch (error: any) {
+    console.error('Error in /simulator/stop:', error);
+    res.status(500).json({ error: 'Failed to stop simulation.' });
+  }
+});
+
+// Reset simulation ward to canonical baseline
+router.post('/simulator/reset', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const beds = await IcuSimulatorService.initializeWard();
+    res.json({ success: true, message: 'Ward reset to canonical baseline.', beds });
+  } catch (error: any) {
+    console.error('Error in /simulator/reset:', error);
+    res.status(500).json({ error: 'Failed to reset ward.' });
+  }
+});
+
+// Trigger an acute crisis on a specific bed
+router.post('/simulator/bed/:bedNumber/crisis', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const bedNumber = Number(req.params.bedNumber);
+    const { crisisType } = req.body;
+    if (!crisisType) {
+      res.status(400).json({ error: 'crisisType is required.' });
+      return;
+    }
+    const updatedBed = await IcuSimulatorService.triggerCrisis(bedNumber, crisisType);
+    res.json({ success: true, bed: updatedBed });
+  } catch (error: any) {
+    console.error(`Error in /simulator/bed/${req.params.bedNumber}/crisis:`, error);
+    res.status(500).json({ error: error.message || 'Failed to trigger crisis.' });
+  }
+});
+
+// Apply a protocol intervention to stabilize a bed
+router.post('/simulator/bed/:bedNumber/intervene', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const bedNumber = Number(req.params.bedNumber);
+    const { interventionType } = req.body;
+    if (!interventionType) {
+      res.status(400).json({ error: 'interventionType is required.' });
+      return;
+    }
+    const updatedBed = await IcuSimulatorService.applyIntervention(bedNumber, interventionType);
+    res.json({ success: true, bed: updatedBed });
+  } catch (error: any) {
+    console.error(`Error in /simulator/bed/${req.params.bedNumber}/intervene:`, error);
+    res.status(500).json({ error: error.message || 'Failed to apply intervention.' });
+  }
+});
+
+// SSE stream for real-time multi-patient telemetry updates
+router.get('/simulator/stream', async (_req: AuthenticatedRequest, res: Response) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+
+  // Send initial beds snapshot
+  const initialBeds = await IcuSimulatorService.getWardBeds();
+  res.write(`data: ${JSON.stringify({ type: 'snapshot', beds: initialBeds })}\n\n`);
+
+  const onTick = (beds: any[]) => {
+    try {
+      res.write(`data: ${JSON.stringify({ type: 'telemetry_tick', beds })}\n\n`);
+    } catch (err) {
+      // client closed
+    }
+  };
+
+  IcuSimulatorService.emitter.on('tick', onTick);
+
+  // Keep-alive ping every 15s
+  const ping = setInterval(() => {
+    try {
+      res.write(`: ping\n\n`);
+    } catch (err) {
+      clearInterval(ping);
+    }
+  }, 15000);
+
+  _req.on('close', () => {
+    IcuSimulatorService.emitter.removeListener('tick', onTick);
+    clearInterval(ping);
   });
 });
 

@@ -153,18 +153,22 @@ export class CenturyOrchestratorService {
 
     // 2. CARDIOVASCULAR DOMAIN
     const cv = input.cardiovascular;
-    if (cv.shockIndex >= 1.0) domainScores.CARDIOVASCULAR += 4;
-    else if (cv.shockIndex >= 0.8) domainScores.CARDIOVASCULAR += 2;
-    if (cv.meanArterialPressure < 65.0) domainScores.CARDIOVASCULAR += 3;
-    if (cv.vasoactiveInotropicScore !== undefined && cv.vasoactiveInotropicScore >= 15.0) domainScores.CARDIOVASCULAR += 4;
-    if (cv.activeMcsDevice) {
-      domainScores.CARDIOVASCULAR += 5;
-      dispatchedTeams.push(`Mechanical Circulatory Support Team (${cv.activeMcsDevice})`);
-    }
-    if (cv.acuteAorticDissectionTypeA) {
-      domainScores.CARDIOVASCULAR += 6;
-      dispatchedTeams.push('Cardiovascular Surgery (STAT Type A Aortic Dissection)');
-      directives.push('Type A Aortic Dissection: Anti-impulse dP/dt therapy mandatory (Target SBP < 120, HR < 60).');
+    if (cv.heartRate === 0 || (cv.systolicBp === 0 && cv.diastolicBp === 0) || cv.meanArterialPressure <= 20) {
+      domainScores.CARDIOVASCULAR = 10;
+    } else {
+      if (cv.shockIndex >= 1.0) domainScores.CARDIOVASCULAR += 4;
+      else if (cv.shockIndex >= 0.8) domainScores.CARDIOVASCULAR += 2;
+      if (cv.meanArterialPressure < 65.0) domainScores.CARDIOVASCULAR += 3;
+      if (cv.vasoactiveInotropicScore !== undefined && cv.vasoactiveInotropicScore >= 15.0) domainScores.CARDIOVASCULAR += 4;
+      if (cv.activeMcsDevice) {
+        domainScores.CARDIOVASCULAR += 5;
+        dispatchedTeams.push(`Mechanical Circulatory Support Team (${cv.activeMcsDevice})`);
+      }
+      if (cv.acuteAorticDissectionTypeA) {
+        domainScores.CARDIOVASCULAR += 6;
+        dispatchedTeams.push('Cardiovascular Surgery (STAT Type A Aortic Dissection)');
+        directives.push('Type A Aortic Dissection: Anti-impulse dP/dt therapy mandatory (Target SBP < 120, HR < 60).');
+      }
     }
     domainScores.CARDIOVASCULAR = Math.min(10, domainScores.CARDIOVASCULAR);
 
@@ -226,7 +230,8 @@ export class CenturyOrchestratorService {
     if (input.obstetric) {
       const ob = input.obstetric;
       if (ob.activeMaternalCardiacArrest) {
-        domainScores.OBSTETRIC_NEONATAL += 6;
+        domainScores.OBSTETRIC_NEONATAL = 10;
+        domainScores.CARDIOVASCULAR = 10;
         dispatchedTeams.push('Code Obstetric Resuscitation Team (4-Min PMCS Scalpel Alert)');
         directives.push('STAT MATERNAL ARREST: Manual LUD on flat backboard. PMCS scalpel bedside.');
       }
@@ -342,7 +347,12 @@ export class CenturyOrchestratorService {
 
     const baseScore = (rawSum / 50.0) * 65.0;
     const conflictPenalty = conflicts.length * 6;
-    const centuryScore = Math.min(100, Math.round(baseScore * mofMultiplier + conflictPenalty));
+    let centuryScore = Math.min(100, Math.round(baseScore * mofMultiplier + conflictPenalty));
+
+    // Maternal or cardiac arrest automatically mandates maximal surge orchestration
+    if (input.obstetric?.activeMaternalCardiacArrest || (input.cardiovascular.heartRate === 0 && input.cardiovascular.systolicBp === 0)) {
+      centuryScore = Math.max(centuryScore, 95);
+    }
 
     // Determine Century Tier
     let centuryTier: CenturyTier = 'STABLE_OBSERVATION';

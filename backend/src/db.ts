@@ -3434,6 +3434,58 @@ export async function bootstrap() {
       );
       CREATE INDEX IF NOT EXISTS idx_cross_alert_patient ON cross_phase_clinical_alerts(patient_id);
       CREATE INDEX IF NOT EXISTS idx_cross_alert_session ON cross_phase_clinical_alerts(session_id);
+
+      -- Create ICU Simulator Tables (Pillar 1: Multi-Patient Telemetry Engine)
+      CREATE TABLE IF NOT EXISTS icu_simulation_wards (
+        id SERIAL PRIMARY KEY,
+        ward_name VARCHAR(64) NOT NULL,
+        total_beds INTEGER NOT NULL DEFAULT 12,
+        is_running BOOLEAN NOT NULL DEFAULT FALSE,
+        speed_multiplier NUMERIC(3,1) NOT NULL DEFAULT 1.0,
+        active_preset VARCHAR(64) NOT NULL DEFAULT 'GRAND_CENTURY_SPECTRUM',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS icu_simulated_beds (
+        id SERIAL PRIMARY KEY,
+        ward_id INTEGER REFERENCES icu_simulation_wards(id) ON DELETE CASCADE,
+        bed_number INTEGER NOT NULL,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        patient_name VARCHAR(128) NOT NULL,
+        age INTEGER NOT NULL,
+        sex VARCHAR(16) NOT NULL,
+        clinical_profile_id VARCHAR(64) NOT NULL,
+        primary_diagnosis TEXT NOT NULL,
+        current_state JSONB NOT NULL,
+        century_score INTEGER NOT NULL DEFAULT 0,
+        century_tier VARCHAR(32) NOT NULL DEFAULT 'STABLE_OBSERVATION',
+        active_conflicts JSONB DEFAULT '[]'::jsonb,
+        dispatched_teams JSONB DEFAULT '[]'::jsonb,
+        is_crashing BOOLEAN NOT NULL DEFAULT FALSE,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_ward_bed UNIQUE(ward_id, bed_number)
+      );
+      CREATE INDEX IF NOT EXISTS idx_sim_bed_ward ON icu_simulated_beds(ward_id);
+      CREATE INDEX IF NOT EXISTS idx_sim_bed_num ON icu_simulated_beds(bed_number);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_sim_bed_ward_num ON icu_simulated_beds(ward_id, bed_number);
+      DO $$ BEGIN
+        ALTER TABLE icu_simulated_beds ADD CONSTRAINT uq_ward_bed UNIQUE(ward_id, bed_number);
+      EXCEPTION
+        WHEN others THEN NULL;
+      END $$;
+
+      CREATE TABLE IF NOT EXISTS icu_simulation_events_log (
+        id SERIAL PRIMARY KEY,
+        ward_id INTEGER REFERENCES icu_simulation_wards(id) ON DELETE CASCADE,
+        bed_number INTEGER NOT NULL,
+        event_type VARCHAR(64) NOT NULL,
+        description TEXT NOT NULL,
+        prior_state JSONB,
+        new_state JSONB,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_sim_event_ward ON icu_simulation_events_log(ward_id);
     `);
 
     console.log('Database tables and indexes verified/created.');
