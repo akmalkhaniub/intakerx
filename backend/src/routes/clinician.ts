@@ -91,6 +91,7 @@ import { ObHemorrhageService } from '../services/obHemorrhage';
 import { BurnResusService } from '../services/burnResus';
 import { CenturyOrchestratorService } from '../services/centuryOrchestrator';
 import { IcuSimulatorService } from '../services/icuSimulator';
+import { AmbientCodeScribeService } from '../services/ambientCodeScribe';
 
 const router = Router();
 
@@ -9944,6 +9945,132 @@ router.get('/simulator/stream', async (_req: AuthenticatedRequest, res: Response
 
   _req.on('close', () => {
     IcuSimulatorService.emitter.removeListener('tick', onTick);
+    clearInterval(ping);
+  });
+});
+
+// ============================================================================
+// PILLAR 3: AMBIENT CODE-RESUSCITATION AUDIO SCRIBE & BEDSIDE VOICE HUD
+// ============================================================================
+
+/**
+ * POST /api/clinician/ambient-code/session/start
+ */
+router.post('/ambient-code/session/start', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { patientId = 1, bedNumber = 1, codeLeader, codeRecorder, codeType } = req.body;
+    const session = await AmbientCodeScribeService.startSession(
+      patientId,
+      bedNumber,
+      codeLeader,
+      codeRecorder,
+      codeType
+    );
+    res.json({ session });
+  } catch (error: any) {
+    console.error('Error in /ambient-code/session/start:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/clinician/ambient-code/session/:id/utterance
+ */
+router.post('/ambient-code/session/:id/utterance', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const sessionId = parseInt(rawId as string, 10);
+    const { utteranceText, speakerRole = 'CODE_TEAM' } = req.body;
+    if (!utteranceText) {
+      return res.status(400).json({ error: 'utteranceText is required' });
+    }
+
+    const result = await AmbientCodeScribeService.processUtterance(
+      sessionId,
+      utteranceText,
+      speakerRole
+    );
+    res.json(result);
+  } catch (error: any) {
+    console.error(`Error in /ambient-code/session/${req.params.id}/utterance:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/clinician/ambient-code/session/:id/stop
+ */
+router.post('/ambient-code/session/:id/stop', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const sessionId = parseInt(rawId as string, 10);
+    const session = await AmbientCodeScribeService.stopSession(sessionId);
+    res.json({ session });
+  } catch (error: any) {
+    console.error(`Error in /ambient-code/session/${req.params.id}/stop:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/clinician/ambient-code/session/:id
+ */
+router.get('/ambient-code/session/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const sessionId = parseInt(rawId as string, 10);
+    const session = await AmbientCodeScribeService.getSession(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Resuscitation session not found' });
+    }
+    const events = await AmbientCodeScribeService.getSessionEvents(sessionId);
+    res.json({ session, events });
+  } catch (error: any) {
+    console.error(`Error in /ambient-code/session/${req.params.id}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/clinician/ambient-code/session/:id/debrief
+ */
+router.get('/ambient-code/session/:id/debrief', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const sessionId = parseInt(rawId as string, 10);
+    const debrief = await AmbientCodeScribeService.generateLegalDebrief(sessionId);
+    res.json({ debrief });
+  } catch (error: any) {
+    console.error(`Error in /ambient-code/session/${req.params.id}/debrief:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/clinician/ambient-code/stream
+ * SSE Event Stream for live ambient scribe timeline & Bedside Voice HUD.
+ */
+router.get('/ambient-code/stream', async (_req: AuthenticatedRequest, res: Response) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const onEvent = (data: any) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  AmbientCodeScribeService.emitter.on('event', onEvent);
+
+  const ping = setInterval(() => {
+    try {
+      res.write(`: ping\n\n`);
+    } catch {
+      clearInterval(ping);
+    }
+  }, 15000);
+
+  _req.on('close', () => {
+    AmbientCodeScribeService.emitter.removeListener('event', onEvent);
     clearInterval(ping);
   });
 });

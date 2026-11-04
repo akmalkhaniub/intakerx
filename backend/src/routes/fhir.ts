@@ -26,7 +26,8 @@ router.get('/metadata', (req: Request, res: Response) => {
  */
 router.get('/Patient/:id', async (req: Request, res: Response) => {
   try {
-    const patientId = parseInt(req.params.id, 10);
+    const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const patientId = parseInt(rawId as string, 10);
     if (isNaN(patientId)) {
       return res.status(400).json({ error: 'Invalid Patient ID format' });
     }
@@ -156,7 +157,8 @@ router.get('/cds-services', (_req: Request, res: Response) => {
  */
 router.post('/cds-services/:id', async (req: Request, res: Response) => {
   try {
-    const serviceId = req.params.id;
+    const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const serviceId = rawId as string;
     const hookRequest: CdsHookRequest = req.body;
 
     if (!hookRequest || !hookRequest.context) {

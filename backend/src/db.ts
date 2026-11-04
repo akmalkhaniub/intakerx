@@ -3486,6 +3486,41 @@ export async function bootstrap() {
         logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_sim_event_ward ON icu_simulation_events_log(ward_id);
+
+      CREATE TABLE IF NOT EXISTS ambient_code_resus_sessions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        bed_number INTEGER NOT NULL,
+        code_type VARCHAR(64) NOT NULL DEFAULT 'CARDIAC_ARREST_ACLS',
+        code_leader VARCHAR(128) NOT NULL,
+        code_recorder VARCHAR(128) NOT NULL,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ended_at TIMESTAMP,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        total_epinephrine_mg NUMERIC(6, 2) NOT NULL DEFAULT 0.0,
+        total_defibrillations INTEGER NOT NULL DEFAULT 0,
+        rosc_achieved BOOLEAN NOT NULL DEFAULT FALSE,
+        pmcs_performed BOOLEAN NOT NULL DEFAULT FALSE,
+        mtp_units_prbc INTEGER NOT NULL DEFAULT 0,
+        mtp_units_ffp INTEGER NOT NULL DEFAULT 0,
+        mtp_units_platelets INTEGER NOT NULL DEFAULT 0,
+        debrief_summary TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_ambient_resus_pat ON ambient_code_resus_sessions(patient_id);
+      CREATE INDEX IF NOT EXISTS idx_ambient_resus_act ON ambient_code_resus_sessions(is_active);
+
+      CREATE TABLE IF NOT EXISTS ambient_code_resus_events (
+        id SERIAL PRIMARY KEY,
+        session_id INTEGER REFERENCES ambient_code_resus_sessions(id) ON DELETE CASCADE,
+        elapsed_seconds INTEGER NOT NULL,
+        event_type VARCHAR(64) NOT NULL,
+        utterance_text TEXT NOT NULL,
+        structured_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+        speaker_role VARCHAR(64) NOT NULL DEFAULT 'CODE_TEAM',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ambient_event_sess ON ambient_code_resus_events(session_id);
+      CREATE INDEX IF NOT EXISTS idx_ambient_event_type ON ambient_code_resus_events(event_type);
     `);
 
     console.log('Database tables and indexes verified/created.');
