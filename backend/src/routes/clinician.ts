@@ -92,6 +92,11 @@ import { BurnResusService } from '../services/burnResus';
 import { CenturyOrchestratorService } from '../services/centuryOrchestrator';
 import { IcuSimulatorService } from '../services/icuSimulator';
 import { AmbientCodeScribeService } from '../services/ambientCodeScribe';
+import { MassCasualtyTriageService } from '../services/massCasualtyTriage';
+import { FlightCritService } from '../services/flightCrit';
+import { DivingHyperbaricService } from '../services/divingHyperbaric';
+import { ProlongedFieldCareService } from '../services/prolongedFieldCare';
+import { CyberGridBlackoutService } from '../services/cyberGridBlackout';
 
 const router = Router();
 
@@ -10073,6 +10078,76 @@ router.get('/ambient-code/stream', async (_req: AuthenticatedRequest, res: Respo
     AmbientCodeScribeService.emitter.removeListener('event', onEvent);
     clearInterval(ping);
   });
+});
+
+// ============================================================================
+// SUITE 6: DISASTER, FLIGHT & EXTREME-ENVIRONMENT MEDICINE (PHASES 101–105)
+// ============================================================================
+
+// --- Phase 101: MASS-CASUALTY-TRIAGE ---
+router.post('/mci/triage', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await MassCasualtyTriageService.triageAndPersist(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /mci/triage:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/mci/summary/:incidentId', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const rawId = Array.isArray(req.params.incidentId) ? req.params.incidentId[0] : req.params.incidentId;
+    const summary = await MassCasualtyTriageService.getIncidentSummary(rawId as string);
+    res.json(summary);
+  } catch (error: any) {
+    console.error(`Error in /mci/summary/${req.params.incidentId}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 102: FLIGHT-CRIT ---
+router.post('/flight-crit/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await FlightCritService.evaluateAndPersist(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /flight-crit/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 103: DIVING-HYPERBARIC ---
+router.post('/diving-hyperbaric/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await DivingHyperbaricService.evaluateAndPersist(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /diving-hyperbaric/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 104: TACTICAL-PROLONGED-FIELD-CARE ---
+router.post('/prolonged-field-care/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await ProlongedFieldCareService.evaluateAndPersist(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /prolonged-field-care/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 105: CYBER-GRID-BLACKOUT ---
+router.post('/cyber-blackout/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await CyberGridBlackoutService.evaluateAndPersist(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /cyber-blackout/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 export default router;

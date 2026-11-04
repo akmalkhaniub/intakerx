@@ -3521,6 +3521,101 @@ export async function bootstrap() {
       );
       CREATE INDEX IF NOT EXISTS idx_ambient_event_sess ON ambient_code_resus_events(session_id);
       CREATE INDEX IF NOT EXISTS idx_ambient_event_type ON ambient_code_resus_events(event_type);
+
+      -- Phase 101: MASS-CASUALTY-TRIAGE
+      CREATE TABLE IF NOT EXISTS mci_triage_events (
+        id SERIAL PRIMARY KEY,
+        incident_id VARCHAR(64) NOT NULL,
+        casualty_number INTEGER NOT NULL,
+        triage_category VARCHAR(16) NOT NULL,
+        triage_system VARCHAR(32) NOT NULL DEFAULT 'SALT',
+        age_group VARCHAR(16) NOT NULL DEFAULT 'ADULT',
+        can_walk BOOLEAN NOT NULL DEFAULT FALSE,
+        spontaneous_breathing BOOLEAN NOT NULL DEFAULT TRUE,
+        respiratory_rate INTEGER,
+        radial_pulse_present BOOLEAN NOT NULL DEFAULT TRUE,
+        obeys_commands BOOLEAN NOT NULL DEFAULT TRUE,
+        life_saving_interventions_applied JSONB DEFAULT '[]'::jsonb,
+        assigned_destination VARCHAR(128),
+        triaged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_mci_inc ON mci_triage_events(incident_id);
+      CREATE INDEX IF NOT EXISTS idx_mci_cat ON mci_triage_events(triage_category);
+
+      -- Phase 102: FLIGHT-CRIT
+      CREATE TABLE IF NOT EXISTS flight_crit_missions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        aircraft_type VARCHAR(32) NOT NULL DEFAULT 'ROTARY_WING',
+        cruising_altitude_ft INTEGER NOT NULL DEFAULT 4000,
+        cabin_altitude_ft INTEGER NOT NULL DEFAULT 4000,
+        pao2_sea_level_mmhg NUMERIC(6, 2) NOT NULL,
+        predicted_pao2_altitude_mmhg NUMERIC(6, 2) NOT NULL,
+        gas_expansion_ratio NUMERIC(5, 2) NOT NULL DEFAULT 1.0,
+        pneumothorax_present BOOLEAN NOT NULL DEFAULT FALSE,
+        chest_tube_open_to_air BOOLEAN NOT NULL DEFAULT FALSE,
+        ett_cuff_water_filled BOOLEAN NOT NULL DEFAULT FALSE,
+        acceleration_g_vector VARCHAR(16) NOT NULL DEFAULT '+Gz',
+        predicted_cpp_mmhg NUMERIC(6, 2) NOT NULL,
+        flight_recommendations JSONB DEFAULT '[]'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_flight_pat ON flight_crit_missions(patient_id);
+
+      -- Phase 103: DIVING-HYPERBARIC
+      CREATE TABLE IF NOT EXISTS hyperbaric_sessions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        diagnosis VARCHAR(64) NOT NULL,
+        dive_depth_msw NUMERIC(6, 2) NOT NULL,
+        bottom_time_min INTEGER NOT NULL,
+        time_to_symptom_onset_min INTEGER NOT NULL,
+        recommended_table VARCHAR(32) NOT NULL,
+        total_chamber_duration_min INTEGER NOT NULL,
+        maximum_chamber_ata NUMERIC(4, 2) NOT NULL DEFAULT 2.8,
+        oxygen_breathing_periods INTEGER NOT NULL DEFAULT 3,
+        surface_washout_o2_hours NUMERIC(4, 1) NOT NULL DEFAULT 0.0,
+        flying_ban_hours INTEGER NOT NULL DEFAULT 72,
+        treatment_protocol JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_hbot_pat ON hyperbaric_sessions(patient_id);
+
+      -- Phase 104: TACTICAL-PROLONGED-FIELD-CARE
+      CREATE TABLE IF NOT EXISTS prolonged_field_care_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        field_hour INTEGER NOT NULL DEFAULT 0,
+        total_pfc_hours_planned INTEGER NOT NULL DEFAULT 72,
+        wbb_donor_roster JSONB DEFAULT '[]'::jsonb,
+        whole_blood_units_transfused INTEGER NOT NULL DEFAULT 0,
+        urine_output_ml_kg_h NUMERIC(5, 2) NOT NULL,
+        fluid_resus_type VARCHAR(64) NOT NULL DEFAULT 'FRESH_WHOLE_BLOOD',
+        hypothermia_active_warming BOOLEAN NOT NULL DEFAULT TRUE,
+        core_temp_celsius NUMERIC(4, 1) NOT NULL DEFAULT 36.5,
+        antibiotic_prophylaxis VARCHAR(128) NOT NULL DEFAULT 'Ertapenem 1g IV q24h',
+        telemedicine_evac_status VARCHAR(64) NOT NULL DEFAULT 'DELAYED_INCLEMENT_WEATHER',
+        clinical_actions JSONB DEFAULT '[]'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pfc_pat ON prolonged_field_care_logs(patient_id);
+
+      -- Phase 105: CYBER-GRID-BLACKOUT
+      CREATE TABLE IF NOT EXISTS blackout_mesh_nodes (
+        id SERIAL PRIMARY KEY,
+        node_id VARCHAR(64) NOT NULL UNIQUE,
+        facility_zone VARCHAR(64) NOT NULL,
+        is_grid_power_available BOOLEAN NOT NULL DEFAULT FALSE,
+        generator_diesel_fuel_hours NUMERIC(6, 1) NOT NULL DEFAULT 48.0,
+        ups_battery_minutes_remaining INTEGER NOT NULL DEFAULT 120,
+        mechanical_ventilators_on_pneumatic INTEGER NOT NULL DEFAULT 0,
+        gravity_iv_titration_active BOOLEAN NOT NULL DEFAULT TRUE,
+        offline_peer_count INTEGER NOT NULL DEFAULT 4,
+        last_mesh_sync_hash VARCHAR(128) NOT NULL,
+        system_alert_level VARCHAR(32) NOT NULL DEFAULT 'RED_BLACKOUT_OPERATIONAL',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_mesh_node ON blackout_mesh_nodes(node_id);
     `);
 
     console.log('Database tables and indexes verified/created.');
