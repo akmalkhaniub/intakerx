@@ -102,6 +102,11 @@ import { SolarRadService } from '../services/solarRad';
 import { MicrogravResusService } from '../services/microgravResus';
 import { EclssHabitatService } from '../services/eclssHabitat';
 import { DeepSpaceTelemedService } from '../services/deepSpaceTelemed';
+import { ClosedLoopTitrationService } from '../services/closedLoopTitration';
+import { BayesianPkPdService } from '../services/bayesianPkPd';
+import { SepsisSubphenotypeService } from '../services/sepsisSubphenotype';
+import { PocusVexusService } from '../services/pocusVexus';
+import { HandoffHallucinationGuardService } from '../services/handoffHallucinationGuard';
 
 const router = Router();
 
@@ -10210,6 +10215,65 @@ router.post('/deep-space-telemed/evaluate', async (req: AuthenticatedRequest, re
     res.json(result);
   } catch (error: any) {
     console.error('Error in /deep-space-telemed/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// SUITE 8: AUTONOMOUS CLOSED-LOOP ICU & PRECISION THERAPEUTICS (PHASES 111–115)
+// ============================================================================
+
+// --- Phase 111: CLOSED-LOOP-TITRATION ---
+router.post('/closed-loop-titration/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await ClosedLoopTitrationService.recordTitration(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /closed-loop-titration/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 112: BAYESIAN-PK-PD ---
+router.post('/bayesian-pkpd/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await BayesianPkPdService.recordDosing(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /bayesian-pkpd/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 113: SEPSIS-SUBPHENOTYPE ---
+router.post('/sepsis-subphenotype/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await SepsisSubphenotypeService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /sepsis-subphenotype/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 114: POCUS-VEXUS-SHOCK ---
+router.post('/pocus-vexus/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await PocusVexusService.recordExam(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /pocus-vexus/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 115: HANDOFF-HALLUCINATION-GUARD ---
+router.post('/handoff-guard/verify', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await HandoffHallucinationGuardService.recordVerification(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /handoff-guard/verify:', error);
     res.status(500).json({ error: error.message });
   }
 });

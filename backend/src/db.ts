@@ -3703,6 +3703,84 @@ export async function bootstrap() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_telemed_pat ON deep_space_telemed_sessions(patient_id);
+
+      -- =========================================================================
+      -- SUITE 8: AUTONOMOUS CLOSED-LOOP ICU & PRECISION THERAPEUTICS (PHASES 111–115)
+      -- =========================================================================
+
+      -- Phase 111: CLOSED-LOOP-TITRATION
+      CREATE TABLE IF NOT EXISTS closed_loop_titration_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        current_map_mmhg NUMERIC(5, 1) NOT NULL,
+        target_map_mmhg NUMERIC(5, 1) NOT NULL DEFAULT 65.0,
+        norepi_rate_mcg_kg_min NUMERIC(6, 3) NOT NULL,
+        vasopressin_active BOOLEAN NOT NULL DEFAULT FALSE,
+        current_rass INTEGER NOT NULL DEFAULT -1,
+        propofol_rate_mcg_kg_min NUMERIC(6, 2) NOT NULL DEFAULT 25.0,
+        pris_risk_flagged BOOLEAN NOT NULL DEFAULT FALSE,
+        controller_status VARCHAR(64) NOT NULL DEFAULT 'CLOSED_LOOP_ACTIVE',
+        titration_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cl_titration_pat ON closed_loop_titration_logs(patient_id);
+
+      -- Phase 112: BAYESIAN-PK-PD
+      CREATE TABLE IF NOT EXISTS bayesian_pk_pd_dosing (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        drug_name VARCHAR(64) NOT NULL,
+        estimated_crcl_ml_min NUMERIC(6, 1) NOT NULL,
+        arc_detected BOOLEAN NOT NULL DEFAULT FALSE,
+        estimated_vd_l NUMERIC(6, 2) NOT NULL,
+        predicted_auc24 NUMERIC(7, 1) NOT NULL,
+        target_auc_mic_ratio NUMERIC(6, 1) NOT NULL,
+        recommended_regimen VARCHAR(255) NOT NULL,
+        nephrotoxicity_risk VARCHAR(32) NOT NULL DEFAULT 'LOW',
+        pk_profile JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_pkpd_pat ON bayesian_pk_pd_dosing(patient_id);
+
+      -- Phase 113: SEPSIS-SUBPHENOTYPE
+      CREATE TABLE IF NOT EXISTS sepsis_subphenotype_evals (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        sofa_score INTEGER NOT NULL,
+        qsofa_score INTEGER NOT NULL,
+        news2_score INTEGER NOT NULL,
+        subphenotype VARCHAR(32) NOT NULL,
+        bundle_1h_compliant BOOLEAN NOT NULL DEFAULT TRUE,
+        immunomodulation_plan JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_sepsis_sub_pat ON sepsis_subphenotype_evals(patient_id);
+
+      -- Phase 114: POCUS-VEXUS-SHOCK
+      CREATE TABLE IF NOT EXISTS pocus_vexus_exams (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        ivc_diameter_cm NUMERIC(4, 2) NOT NULL,
+        portal_pulsatility_pct NUMERIC(5, 1) NOT NULL,
+        vexus_grade INTEGER NOT NULL,
+        shock_phenotype VARCHAR(64) NOT NULL,
+        fluid_tolerance_status VARCHAR(64) NOT NULL,
+        exam_findings JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_vexus_pat ON pocus_vexus_exams(patient_id);
+
+      -- Phase 115: HANDOFF-HALLUCINATION-GUARD
+      CREATE TABLE IF NOT EXISTS handoff_verification_audits (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        safety_integrity_score INTEGER NOT NULL,
+        verification_status VARCHAR(64) NOT NULL,
+        discrepancy_count INTEGER NOT NULL DEFAULT 0,
+        audit_report JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_handoff_audit_pat ON handoff_verification_audits(patient_id);
     `);
 
     console.log('Database tables and indexes verified/created.');
