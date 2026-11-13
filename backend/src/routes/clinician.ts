@@ -97,6 +97,11 @@ import { FlightCritService } from '../services/flightCrit';
 import { DivingHyperbaricService } from '../services/divingHyperbaric';
 import { ProlongedFieldCareService } from '../services/prolongedFieldCare';
 import { CyberGridBlackoutService } from '../services/cyberGridBlackout';
+import { SpaceSansService } from '../services/spaceSans';
+import { SolarRadService } from '../services/solarRad';
+import { MicrogravResusService } from '../services/microgravResus';
+import { EclssHabitatService } from '../services/eclssHabitat';
+import { DeepSpaceTelemedService } from '../services/deepSpaceTelemed';
 
 const router = Router();
 
@@ -10146,6 +10151,65 @@ router.post('/cyber-blackout/evaluate', async (req: AuthenticatedRequest, res: R
     res.json(result);
   } catch (error: any) {
     console.error('Error in /cyber-blackout/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// SUITE 7: SPACEFLIGHT, PLANETARY & DEEP-SPACE MEDICINE (PHASES 106–110)
+// ============================================================================
+
+// --- Phase 106: SPACE-SANS ---
+router.post('/space-sans/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await SpaceSansService.recordSansEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /space-sans/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 107: SOLAR-RAD ---
+router.post('/solar-rad/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await SolarRadService.recordRadiationLog(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /solar-rad/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 108: MICROGRAV-RESUS ---
+router.post('/micrograv-resus/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await MicrogravResusService.recordResusEvent(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /micrograv-resus/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 109: ECLSS-HABITAT ---
+router.post('/eclss-habitat/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await EclssHabitatService.recordHabitatTelemetry(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /eclss-habitat/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 110: DELAYED-COMMS-TELEMED ---
+router.post('/deep-space-telemed/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await DeepSpaceTelemedService.recordTelemedSession(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /deep-space-telemed/evaluate:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -216,6 +216,10 @@ export const FlightCritHub: React.FC = () => {
               <span style={{ color: '#94a3b8' }}>FiO2: </span>
               <input type="number" step="0.05" value={fiO2} onChange={e => setFiO2(Number(e.target.value))} style={{ width: '60px', backgroundColor: '#0f172a', color: '#f8fafc', border: '1px solid #334155', padding: '4px', borderRadius: '4px' }} />
             </div>
+            <div>
+              <span style={{ color: '#94a3b8' }}>Baseline MAP: </span>
+              <input type="number" value={baselineMapMmhg} onChange={e => setBaselineMapMmhg(Number(e.target.value))} style={{ width: '60px', backgroundColor: '#0f172a', color: '#f8fafc', border: '1px solid #334155', padding: '4px', borderRadius: '4px' }} />
+            </div>
           </div>
 
           <button

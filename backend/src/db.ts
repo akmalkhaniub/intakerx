@@ -3616,6 +3616,93 @@ export async function bootstrap() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_mesh_node ON blackout_mesh_nodes(node_id);
+
+      -- =========================================================================
+      -- SUITE 7: SPACEFLIGHT, PLANETARY & DEEP-SPACE MEDICINE (PHASES 106–110)
+      -- =========================================================================
+
+      -- Phase 106: SPACE-SANS
+      CREATE TABLE IF NOT EXISTS space_sans_evaluations (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        mission_day INTEGER NOT NULL DEFAULT 90,
+        onsd_mm NUMERIC(4, 2) NOT NULL,
+        choroidal_folds BOOLEAN NOT NULL DEFAULT FALSE,
+        hyperopic_shift_diopters NUMERIC(4, 2) NOT NULL DEFAULT 0.0,
+        cotton_wool_spots BOOLEAN NOT NULL DEFAULT FALSE,
+        ijv_flow_pattern VARCHAR(64) NOT NULL DEFAULT 'NORMAL_ANTEROGRADE',
+        sans_grade VARCHAR(32) NOT NULL DEFAULT 'GRADE_0',
+        lbnp_target_mmhg NUMERIC(5, 1) NOT NULL DEFAULT -30.0,
+        lbnp_duration_minutes INTEGER NOT NULL DEFAULT 90,
+        countermeasure_plan JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_sans_pat ON space_sans_evaluations(patient_id);
+
+      -- Phase 107: SOLAR-RAD
+      CREATE TABLE IF NOT EXISTS solar_radiation_logs (
+        id SERIAL PRIMARY KEY,
+        mission_phase VARCHAR(64) NOT NULL DEFAULT 'TRANSIT_MARS',
+        spe_proton_flux_pfu NUMERIC(10, 2) NOT NULL DEFAULT 10.0,
+        gcr_dose_rate_msv_day NUMERIC(6, 3) NOT NULL DEFAULT 1.5,
+        cumulative_dose_msv NUMERIC(8, 2) NOT NULL DEFAULT 120.0,
+        eva_active BOOLEAN NOT NULL DEFAULT FALSE,
+        storm_tier VARCHAR(32) NOT NULL DEFAULT 'GREEN_NORMAL',
+        shelter_in_place_required BOOLEAN NOT NULL DEFAULT FALSE,
+        ars_syndrome_stage VARCHAR(64) NOT NULL DEFAULT 'NONE',
+        filgrastim_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        radioprotection_plan JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Phase 108: MICROGRAV-RESUS
+      CREATE TABLE IF NOT EXISTS microgravity_resus_events (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        cardiac_arrest_present BOOLEAN NOT NULL DEFAULT FALSE,
+        cpr_technique VARCHAR(64) NOT NULL DEFAULT 'HANDSTAND_CPR',
+        compression_rate_cpm INTEGER NOT NULL DEFAULT 110,
+        compression_depth_cm NUMERIC(4, 1) NOT NULL DEFAULT 5.5,
+        hermetic_canopy_deployed BOOLEAN NOT NULL DEFAULT FALSE,
+        laminar_suction_flow_lpm NUMERIC(6, 1) NOT NULL DEFAULT 60.0,
+        autotransfusion_volume_ml NUMERIC(6, 1) NOT NULL DEFAULT 0.0,
+        aerosol_containment_verified BOOLEAN NOT NULL DEFAULT TRUE,
+        resus_protocol JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_microresus_pat ON microgravity_resus_events(patient_id);
+
+      -- Phase 109: ECLSS-HABITAT
+      CREATE TABLE IF NOT EXISTS eclss_habitat_telemetry (
+        id SERIAL PRIMARY KEY,
+        habitat_module VARCHAR(64) NOT NULL DEFAULT 'HAB_CORE_ALPHA',
+        cabin_pressure_psia NUMERIC(5, 2) NOT NULL DEFAULT 14.7,
+        pco2_mmhg NUMERIC(5, 2) NOT NULL DEFAULT 1.8,
+        o2_percentage NUMERIC(5, 2) NOT NULL DEFAULT 20.9,
+        lioh_saturation_pct NUMERIC(5, 1) NOT NULL DEFAULT 35.0,
+        ammonia_coolant_ppm NUMERIC(6, 2) NOT NULL DEFAULT 0.0,
+        atmosphere_status VARCHAR(64) NOT NULL DEFAULT 'OPTIMAL_NOMINAL',
+        corrective_actions JSONB DEFAULT '[]'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_eclss_mod ON eclss_habitat_telemetry(habitat_module);
+
+      -- Phase 110: DELAYED-COMMS-TELEMED
+      CREATE TABLE IF NOT EXISTS deep_space_telemed_sessions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        mission_distance_au NUMERIC(5, 3) NOT NULL DEFAULT 1.524,
+        one_way_latency_minutes NUMERIC(6, 2) NOT NULL DEFAULT 12.68,
+        round_trip_delay_minutes NUMERIC(6, 2) NOT NULL DEFAULT 25.35,
+        symptoms JSONB DEFAULT '[]'::jsonb,
+        primary_differential VARCHAR(128) NOT NULL,
+        posterior_probability NUMERIC(4, 3) NOT NULL,
+        onboard_treatment_plan JSONB DEFAULT '{}'::jsonb,
+        earth_burst_payload JSONB DEFAULT '{}'::jsonb,
+        cryptographic_hash VARCHAR(128) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_telemed_pat ON deep_space_telemed_sessions(patient_id);
     `);
 
     console.log('Database tables and indexes verified/created.');
