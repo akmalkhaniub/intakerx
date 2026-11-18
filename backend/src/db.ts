@@ -3852,6 +3852,77 @@ export async function bootstrap() {
         logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_priv_model ON federated_privacy_audits(model_id);
+
+      -- =========================================================================
+      -- SUITE 10: HEMATOLOGY TMA, GERIATRIC DELIRIUM, TOX, TROPICAL & NEURO-PROGNOSIS (PHASES 121–125)
+      -- =========================================================================
+
+      -- Phase 121: TMA-HEMATOLOGY-GUARD
+      CREATE TABLE IF NOT EXISTS tma_hematology_evals (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        plasmic_score INTEGER NOT NULL,
+        isth_dic_score INTEGER NOT NULL,
+        primary_tma_syndrome VARCHAR(64) NOT NULL,
+        tpe_urgent_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        platelet_transfusion_prohibited BOOLEAN NOT NULL DEFAULT FALSE,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_tma_pat ON tma_hematology_evals(patient_id);
+
+      -- Phase 122: GERIATRIC-DELIRIUM-BEERS
+      CREATE TABLE IF NOT EXISTS geriatric_delirium_evals (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        cam_icu_positive BOOLEAN NOT NULL DEFAULT FALSE,
+        acb_total_score INTEGER NOT NULL DEFAULT 0,
+        beers_violation_count INTEGER NOT NULL DEFAULT 0,
+        delirium_risk_tier VARCHAR(32) NOT NULL,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_geri_pat ON geriatric_delirium_evals(patient_id);
+
+      -- Phase 123: ENVENOMATION-TOX-ANTIVENOM
+      CREATE TABLE IF NOT EXISTS envenomation_antivenom_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        venom_class VARCHAR(64) NOT NULL,
+        severity_grade VARCHAR(32) NOT NULL,
+        recommended_antivenom VARCHAR(128) NOT NULL,
+        initial_vials INTEGER NOT NULL DEFAULT 0,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_enven_pat ON envenomation_antivenom_logs(patient_id);
+
+      -- Phase 124: TROPICAL-MALARIA-DENGUE
+      CREATE TABLE IF NOT EXISTS tropical_critical_care_evals (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        pathogen_syndrome VARCHAR(64) NOT NULL,
+        severity_tier VARCHAR(64) NOT NULL,
+        iv_artesunate_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        plasma_leakage_shock BOOLEAN NOT NULL DEFAULT FALSE,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_trop_pat ON tropical_critical_care_evals(patient_id);
+
+      -- Phase 125: NEURO-PROGNOSIS-MULTIMODAL
+      CREATE TABLE IF NOT EXISTS neuro_prognostication_evals (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        hours_post_rosc INTEGER NOT NULL,
+        confounders_cleared BOOLEAN NOT NULL DEFAULT FALSE,
+        concordant_poor_predictors INTEGER NOT NULL DEFAULT 0,
+        prognosis_status VARCHAR(64) NOT NULL,
+        aan_bd_dnc_eligible BOOLEAN NOT NULL DEFAULT FALSE,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_neuroprog_pat ON neuro_prognostication_evals(patient_id);
     `);
 
     console.log('Database tables and indexes verified/created.');

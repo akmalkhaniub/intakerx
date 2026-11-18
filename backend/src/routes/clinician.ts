@@ -112,6 +112,11 @@ import { ElectrolyteOsmolalityService } from '../services/electrolyteOsmolality'
 import { ArrhythmiaEpService } from '../services/arrhythmiaEpEngine';
 import { ScarceResourceEthicsService } from '../services/scarceResourceEthics';
 import { FederatedPrivacyAuditService } from '../services/federatedPrivacyAudit';
+import { TmaHematologyService } from '../services/tmaHematology';
+import { GeriatricDeliriumBeersService } from '../services/geriatricDeliriumBeers';
+import { EnvenomationAntivenomService } from '../services/envenomationAntivenom';
+import { TropicalCriticalCareService } from '../services/tropicalCriticalCare';
+import { NeuroPrognosticationService } from '../services/neuroPrognostication';
 
 const router = Router();
 
@@ -10338,6 +10343,65 @@ router.post('/federated-privacy/audit', async (req: AuthenticatedRequest, res: R
     res.json(result);
   } catch (error: any) {
     console.error('Error in /federated-privacy/audit:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// SUITE 10: HEMATOLOGY TMA, GERIATRIC DELIRIUM, TOX, TROPICAL & NEURO-PROGNOSIS (PHASES 121–125)
+// ============================================================================
+
+// --- Phase 121: TMA-HEMATOLOGY-GUARD ---
+router.post('/tma-hematology/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await TmaHematologyService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /tma-hematology/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 122: GERIATRIC-DELIRIUM-BEERS ---
+router.post('/geriatric-delirium/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await GeriatricDeliriumBeersService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /geriatric-delirium/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 123: ENVENOMATION-TOX-ANTIVENOM ---
+router.post('/envenomation-antivenom/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await EnvenomationAntivenomService.recordEnvenomation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /envenomation-antivenom/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 124: TROPICAL-MALARIA-DENGUE ---
+router.post('/tropical-critical-care/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await TropicalCriticalCareService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /tropical-critical-care/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 125: NEURO-PROGNOSIS-MULTIMODAL ---
+router.post('/neuro-prognostication/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await NeuroPrognosticationService.recordPrognosis(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /neuro-prognostication/evaluate:', error);
     res.status(500).json({ error: error.message });
   }
 });
