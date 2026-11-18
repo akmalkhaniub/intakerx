@@ -3781,6 +3781,77 @@ export async function bootstrap() {
         logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_handoff_audit_pat ON handoff_verification_audits(patient_id);
+
+      -- =========================================================================
+      -- SUITE 9: CARDIOPULMONARY DIGITAL TWIN, EP, ACID-BASE & AI GOVERNANCE (PHASES 116–120)
+      -- =========================================================================
+
+      -- Phase 116: DIGITAL-TWIN-VENT
+      CREATE TABLE IF NOT EXISTS ventilator_digital_twin_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        driving_pressure_cmh2o NUMERIC(5, 1) NOT NULL,
+        mechanical_power_j_min NUMERIC(5, 2) NOT NULL,
+        static_compliance_ml_cmh2o NUMERIC(5, 1) NOT NULL,
+        auto_peep_cmh2o NUMERIC(4, 1) NOT NULL DEFAULT 0.0,
+        vent_safety_tier VARCHAR(32) NOT NULL,
+        prone_positioning_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        twin_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_vent_twin_pat ON ventilator_digital_twin_logs(patient_id);
+
+      -- Phase 117: ELECTROLYTE-OSMOLALITY
+      CREATE TABLE IF NOT EXISTS electrolyte_osmolality_evals (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        corrected_sodium_meq_l NUMERIC(5, 1) NOT NULL,
+        corrected_anion_gap NUMERIC(5, 1) NOT NULL,
+        osmolar_gap NUMERIC(5, 1) NOT NULL,
+        ods_overcorrection_risk BOOLEAN NOT NULL DEFAULT FALSE,
+        acid_base_diagnosis VARCHAR(128) NOT NULL,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_elyte_pat ON electrolyte_osmolality_evals(patient_id);
+
+      -- Phase 118: CARDIO-ARRHYTHMIA-EP
+      CREATE TABLE IF NOT EXISTS arrhythmia_ep_evals (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        qtc_fredericia_ms NUMERIC(5, 1) NOT NULL,
+        tisdale_risk_score INTEGER NOT NULL,
+        tdp_storm_risk VARCHAR(32) NOT NULL,
+        contraindicated_drugs JSONB DEFAULT '[]'::jsonb,
+        ep_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ep_pat ON arrhythmia_ep_evals(patient_id);
+
+      -- Phase 119: ETHICS-TRIAGE-ALLOC
+      CREATE TABLE IF NOT EXISTS scarce_resource_allocations (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        allocation_priority_score INTEGER NOT NULL,
+        priority_tier VARCHAR(32) NOT NULL,
+        time_limited_trial_hours INTEGER NOT NULL DEFAULT 72,
+        allocation_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ethics_pat ON scarce_resource_allocations(patient_id);
+
+      -- Phase 120: FEDERATED-PRIVACY-AUDIT
+      CREATE TABLE IF NOT EXISTS federated_privacy_audits (
+        id SERIAL PRIMARY KEY,
+        model_id VARCHAR(64) NOT NULL,
+        phi_leak_count INTEGER NOT NULL DEFAULT 0,
+        epsilon_spent NUMERIC(6, 3) NOT NULL,
+        psi_drift_score NUMERIC(5, 3) NOT NULL,
+        governance_status VARCHAR(64) NOT NULL,
+        audit_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_priv_model ON federated_privacy_audits(model_id);
     `);
 
     console.log('Database tables and indexes verified/created.');

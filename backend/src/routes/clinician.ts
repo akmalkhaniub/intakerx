@@ -107,6 +107,11 @@ import { BayesianPkPdService } from '../services/bayesianPkPd';
 import { SepsisSubphenotypeService } from '../services/sepsisSubphenotype';
 import { PocusVexusService } from '../services/pocusVexus';
 import { HandoffHallucinationGuardService } from '../services/handoffHallucinationGuard';
+import { VentilatorDigitalTwinService } from '../services/ventilatorDigitalTwin';
+import { ElectrolyteOsmolalityService } from '../services/electrolyteOsmolality';
+import { ArrhythmiaEpService } from '../services/arrhythmiaEpEngine';
+import { ScarceResourceEthicsService } from '../services/scarceResourceEthics';
+import { FederatedPrivacyAuditService } from '../services/federatedPrivacyAudit';
 
 const router = Router();
 
@@ -10274,6 +10279,65 @@ router.post('/handoff-guard/verify', async (req: AuthenticatedRequest, res: Resp
     res.json(result);
   } catch (error: any) {
     console.error('Error in /handoff-guard/verify:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// SUITE 9: DIGITAL TWIN, EP, ACID-BASE, CSC ETHICS & AI GOVERNANCE (PHASES 116–120)
+// ============================================================================
+
+// --- Phase 116: DIGITAL-TWIN-VENT ---
+router.post('/vent-digital-twin/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await VentilatorDigitalTwinService.recordVentTwin(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /vent-digital-twin/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 117: ELECTROLYTE-OSMOLALITY ---
+router.post('/electrolyte-osmolality/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await ElectrolyteOsmolalityService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /electrolyte-osmolality/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 118: CARDIO-ARRHYTHMIA-EP ---
+router.post('/arrhythmia-ep/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await ArrhythmiaEpService.recordEpEval(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /arrhythmia-ep/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 119: ETHICS-TRIAGE-ALLOC ---
+router.post('/scarce-ethics/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await ScarceResourceEthicsService.recordAllocation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /scarce-ethics/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 120: FEDERATED-PRIVACY-AUDIT ---
+router.post('/federated-privacy/audit', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await FederatedPrivacyAuditService.recordAudit(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /federated-privacy/audit:', error);
     res.status(500).json({ error: error.message });
   }
 });
