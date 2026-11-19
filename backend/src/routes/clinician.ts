@@ -117,6 +117,11 @@ import { GeriatricDeliriumBeersService } from '../services/geriatricDeliriumBeer
 import { EnvenomationAntivenomService } from '../services/envenomationAntivenom';
 import { TropicalCriticalCareService } from '../services/tropicalCriticalCare';
 import { NeuroPrognosticationService } from '../services/neuroPrognostication';
+import { DamageControlSurgeryService } from '../services/damageControlSurgery';
+import { ReboaTraumaService } from '../services/reboaTrauma';
+import { MicrocirculationNirsService } from '../services/microcirculationNirs';
+import { TransplantDonorMgmtService } from '../services/transplantDonorMgmt';
+import { AnaphylaxisMastCellService } from '../services/anaphylaxisMastCell';
 
 const router = Router();
 
@@ -10402,6 +10407,65 @@ router.post('/neuro-prognostication/evaluate', async (req: AuthenticatedRequest,
     res.json(result);
   } catch (error: any) {
     console.error('Error in /neuro-prognostication/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// SUITE 11: COMPLEX SURGICAL CRITICAL CARE, TRAUMA & MICROVASCULAR (PHASES 126–130)
+// ============================================================================
+
+// --- Phase 126: DAMAGE-CONTROL-SURGERY ---
+router.post('/damage-control-surgery/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await DamageControlSurgeryService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /damage-control-surgery/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 127: REBOA-TRAUMA-HEMODYNAMICS ---
+router.post('/reboa-trauma/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await ReboaTraumaService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /reboa-trauma/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 128: SUBCLINICAL-MICROCIRCULATION-NIRS ---
+router.post('/microcirculation-nirs/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await MicrocirculationNirsService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /microcirculation-nirs/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 129: TRANSPLANT-DONOR-OPTIMIZATION ---
+router.post('/transplant-donor-mgmt/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await TransplantDonorMgmtService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /transplant-donor-mgmt/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 130: ANAPHYLAXIS-PERIOPERATIVE-MAST-CELL ---
+router.post('/anaphylaxis-mast-cell/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await AnaphylaxisMastCellService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /anaphylaxis-mast-cell/evaluate:', error);
     res.status(500).json({ error: error.message });
   }
 });

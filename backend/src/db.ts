@@ -3923,6 +3923,86 @@ export async function bootstrap() {
         logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_neuroprog_pat ON neuro_prognostication_evals(patient_id);
+
+      -- Phase 126: DAMAGE-CONTROL-SURGERY
+      CREATE TABLE IF NOT EXISTS damage_control_surgery_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        lethal_triad_present BOOLEAN NOT NULL DEFAULT FALSE,
+        hypothermia_c NUMERIC(4,1),
+        arterial_ph NUMERIC(4,2),
+        base_deficit_meq NUMERIC(5,2),
+        coagulopathy_inr NUMERIC(4,2),
+        open_abdomen_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        tac_technique VARCHAR(64) NOT NULL,
+        planned_icu_resuscitation_hrs INTEGER NOT NULL DEFAULT 24,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_dcs_pat ON damage_control_surgery_logs(patient_id);
+
+      -- Phase 127: REBOA-TRAUMA-HEMODYNAMICS
+      CREATE TABLE IF NOT EXISTS reboa_trauma_missions (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        aortic_zone VARCHAR(16) NOT NULL,
+        balloon_volume_ml NUMERIC(4,1) NOT NULL,
+        occlusion_start_time TIMESTAMP NOT NULL,
+        max_ischemia_duration_min INTEGER NOT NULL,
+        is_partial_reboa BOOLEAN NOT NULL DEFAULT FALSE,
+        target_distal_map_mmhg INTEGER,
+        ischemia_risk_tier VARCHAR(32) NOT NULL,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_reboa_pat ON reboa_trauma_missions(patient_id);
+
+      -- Phase 128: SUBCLINICAL-MICROCIRCULATION-NIRS
+      CREATE TABLE IF NOT EXISTS microcirculation_nirs_evals (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        sto2_percentage NUMERIC(4,1) NOT NULL,
+        mfi_score NUMERIC(3,2) NOT NULL,
+        ppv_percentage NUMERIC(4,1) NOT NULL,
+        macro_map_mmhg INTEGER NOT NULL,
+        hemodynamic_coherence_loss VARCHAR(64) NOT NULL,
+        resuscitation_guidance TEXT NOT NULL,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_microcirc_pat ON microcirculation_nirs_evals(patient_id);
+
+      -- Phase 129: TRANSPLANT-DONOR-OPTIMIZATION
+      CREATE TABLE IF NOT EXISTS transplant_donor_mgmt_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        donor_mgmt_goals_met INTEGER NOT NULL DEFAULT 0,
+        total_dmg_targets INTEGER NOT NULL DEFAULT 8,
+        neurogenic_shock_present BOOLEAN NOT NULL DEFAULT FALSE,
+        diabetes_insipidus_active BOOLEAN NOT NULL DEFAULT FALSE,
+        triple_hormone_therapy_active BOOLEAN NOT NULL DEFAULT FALSE,
+        optn_bundle_compliance_tier VARCHAR(32) NOT NULL,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_transplant_donor_pat ON transplant_donor_mgmt_logs(patient_id);
+
+      -- Phase 130: ANAPHYLAXIS-PERIOPERATIVE-MAST-CELL
+      CREATE TABLE IF NOT EXISTS anaphylaxis_mast_cell_events (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        ring_messmer_grade VARCHAR(16) NOT NULL,
+        suspected_trigger VARCHAR(128) NOT NULL,
+        epinephrine_total_dose_mg NUMERIC(6,3) NOT NULL,
+        refractory_shock BOOLEAN NOT NULL DEFAULT FALSE,
+        glucagon_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        methylene_blue_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        sugammadex_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        peak_tryptase_ug_l NUMERIC(6,2),
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_anaphylaxis_pat ON anaphylaxis_mast_cell_events(patient_id);
     `);
 
     console.log('Database tables and indexes verified/created.');
