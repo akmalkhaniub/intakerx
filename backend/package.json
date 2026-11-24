@@ -5,6 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "start": "node dist/index.js",
     "dev": "nodemon --watch src -e ts --exec ts-node src/index.ts",
     "eval:safety": "ts-node src/eval/adversarial_eval.ts",
@@ -29,10 +31,13 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.14.9",
     "@types/pg": "^8.11.6",
+    "@types/supertest": "^7.2.1",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.10",
     "nodemon": "^3.1.4",
+    "supertest": "^7.3.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.2"
+    "typescript": "^5.5.2",
+    "vitest": "^2.1.9"
   }
 }

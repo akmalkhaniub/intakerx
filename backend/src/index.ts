@@ -16,11 +16,16 @@ import { pool } from './db';
 import { generateSOAPSummary } from './routes/intake';
 import { activeCallSockets } from './activeCalls';
 import { PHIService } from './services/phi';
+import { scrubIncomingPiiMiddleware } from './middleware/piiScrubber';
 
-const app = express();
+export const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/api/intake', scrubIncomingPiiMiddleware);
+app.use('/api/clinician', scrubIncomingPiiMiddleware);
+app.use('/api/portal', scrubIncomingPiiMiddleware);
+app.use('/api/telephony', scrubIncomingPiiMiddleware);
 
 // Mount API routes
 app.use('/api/auth', authRoutes);
@@ -501,9 +506,10 @@ You MUST respond strictly in the following JSON format:
   });
 });
 
-// Start Server
+// Start Server when invoked as entry point
 const PORT = config.port;
-server.listen(PORT, () => {
-  console.log(`[Server] IntakeRx backend listening on port ${PORT}`);
-});
-// Trigger nodemon restart after env port change
+if (require.main === module && process.env.NODE_ENV !== 'test') {
+  server.listen(PORT, () => {
+    console.log(`[Server] IntakeRx backend listening on port ${PORT}`);
+  });
+}

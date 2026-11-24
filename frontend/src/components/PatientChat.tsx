@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, Mic, MicOff, AlertTriangle, ShieldCheck, HeartPulse, User, LogIn, FileText, CheckCircle, Camera } from 'lucide-react';
 import BodyMap, { PainPoint } from './BodyMap';
 import ImageAttachmentModal from './ImageAttachmentModal';
+import { scrubPii } from '../utils/piiScrubber';
 
 interface VisualizerProps {
   isRecording: boolean;
@@ -473,7 +474,7 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
             regionName: point.regionName,
             intensity: point.intensity,
             quality: point.quality,
-            radiationDetails: point.radiationDetails
+            radiationDetails: point.radiationDetails ? scrubPii(point.radiationDetails).scrubbedText : point.radiationDetails
           })
         });
         await loadSessionDetails(sessionId);
@@ -499,7 +500,10 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(fileData)
+        body: JSON.stringify({
+          ...fileData,
+          caption: fileData.caption ? scrubPii(fileData.caption).scrubbedText : fileData.caption
+        })
       });
       if (res.ok) {
         await loadSessionDetails(sessionId);
@@ -514,7 +518,7 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
     if (e) e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
 
-    const textToSend = inputValue;
+    const textToSend = scrubPii(inputValue).scrubbedText;
     setInputValue('');
     setIsLoading(true);
 
@@ -562,18 +566,19 @@ export default function PatientChat({ backendUrl }: PatientChatProps) {
   };
 
   const sendSpeechInput = (text: string) => {
+    const scrubbedText = scrubPii(text).scrubbedText;
     if (ws && ws.readyState === WebSocket.OPEN) {
       // Optimistically add text
-      setMessages(prev => [...prev, { sender: 'patient', content: text, createdAt: new Date().toISOString() }]);
+      setMessages(prev => [...prev, { sender: 'patient', content: scrubbedText, createdAt: new Date().toISOString() }]);
       setIsLoading(true);
       
       ws.send(JSON.stringify({
         type: 'user_speech',
-        text
+        text: scrubbedText
       }));
     } else {
       // Fallback to REST API if WebSocket isn't connected
-      setInputValue(text);
+      setInputValue(scrubbedText);
       handleSendMessage();
     }
   };

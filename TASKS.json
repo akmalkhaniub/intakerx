@@ -1,7 +1,7 @@
 [
   {
     "id": "IRX-001",
-    "status": "TODO",
+    "status": "DONE",
     "priority": 1,
     "title": "Consolidate Fragmented Test Scripts into Unified Vitest Suite",
     "description": "Convert `backend/src/test_cds.ts`, `backend/src/test_fhir.ts`, and `backend/src/test_discharge.ts` into a structured Vitest test suite with mock LLM fixtures under `backend/tests/`.",
@@ -13,7 +13,7 @@
   },
   {
     "id": "IRX-002",
-    "status": "TODO",
+    "status": "DONE",
     "priority": 2,
     "title": "Implement Client-Side PII Scrubbing Middleware",
     "description": "Add client-side and pre-prompt sanitization regex and named entity filters that redact SSN, credit cards, and direct identifiers with [REDACTED_PII] tokens.",

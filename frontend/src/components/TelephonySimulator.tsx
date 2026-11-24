@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Phone, PhoneOff, Volume2, Mic, User, Server, Terminal } from 'lucide-react';
+import { scrubPii } from '../utils/piiScrubber';
 
 interface TelephonySimulatorProps {
   backendUrl: string;
@@ -96,7 +97,8 @@ export default function TelephonySimulator({ backendUrl }: TelephonySimulatorPro
       rec.lang = 'en-US';
 
       rec.onresult = (event: any) => {
-        const speechToText = event.results[event.results.length - 1][0].transcript;
+        const rawSpeech = event.results[event.results.length - 1][0].transcript;
+        const speechToText = scrubPii(rawSpeech).scrubbedText;
         console.log('[Telephony Speech Input]:', speechToText);
         
         // Add to transcript

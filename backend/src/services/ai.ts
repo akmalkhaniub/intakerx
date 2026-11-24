@@ -1,4 +1,5 @@
 import { config } from '../config';
+import { scrubPii } from './piiScrubber';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'model';
@@ -37,6 +38,7 @@ export class AIService {
       throw new Error('GEMINI_API_KEY is not configured.');
     }
 
+    const sanitizedText = scrubPii(text).scrubbedText;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.embeddingModel}:embedContent?key=${apiKey}`;
     
     try {
@@ -46,7 +48,7 @@ export class AIService {
         body: JSON.stringify({
           model: `models/${config.embeddingModel}`,
           content: {
-            parts: [{ text }]
+            parts: [{ text: sanitizedText }]
           },
           outputDimensionality: 768
         }),
@@ -82,12 +84,17 @@ export class AIService {
     } = {}
   ): Promise<string> {
     const { provider, model, apiKey, baseUrl } = this.getProviderConfig(options.provider, options.model);
+    const safeSystemPrompt = systemPrompt ? scrubPii(systemPrompt).scrubbedText : systemPrompt;
+    const safeMessages = messages.map((m) => ({
+      ...m,
+      content: scrubPii(m.content).scrubbedText,
+    }));
 
     if (provider === 'gemini') {
       const url = `${baseUrl}/${model}:generateContent?key=${apiKey}`;
       
       // Format messages for Gemini (system instruction is separate, user/model are roles)
-      const geminiContents = messages.map(m => {
+      const geminiContents = safeMessages.map(m => {
         let role = m.role === 'assistant' ? 'model' : m.role;
         if (role === 'system') role = 'user'; // System messages are not allowed in contents
         return {
@@ -103,9 +110,9 @@ export class AIService {
         }
       };
 
-      if (systemPrompt) {
+      if (safeSystemPrompt) {
         requestBody.systemInstruction = {
-          parts: [{ text: systemPrompt }]
+          parts: [{ text: safeSystemPrompt }]
         };
       }
 
@@ -138,10 +145,10 @@ export class AIService {
       const url = baseUrl;
 
       const formattedMessages = [];
-      if (systemPrompt) {
-        formattedMessages.push({ role: 'system', content: systemPrompt });
+      if (safeSystemPrompt) {
+        formattedMessages.push({ role: 'system', content: safeSystemPrompt });
       }
-      for (const msg of messages) {
+      for (const msg of safeMessages) {
         formattedMessages.push({
           role: msg.role === 'model' ? 'assistant' : msg.role,
           content: msg.content
@@ -204,8 +211,14 @@ export class AIService {
       // We will implement full SSE streaming for Gemini first.
     }
 
+    const safeSystemPrompt = systemPrompt ? scrubPii(systemPrompt).scrubbedText : systemPrompt;
+    const safeMessages = messages.map((m) => ({
+      ...m,
+      content: scrubPii(m.content).scrubbedText,
+    }));
+
     const url = `${baseUrl}/${model}:streamGenerateContent?key=${apiKey}`;
-    const geminiContents = messages.map(m => {
+    const geminiContents = safeMessages.map(m => {
       let role = m.role === 'assistant' ? 'model' : m.role;
       if (role === 'system') role = 'user';
       return {
@@ -221,9 +234,9 @@ export class AIService {
       }
     };
 
-    if (systemPrompt) {
+    if (safeSystemPrompt) {
       requestBody.systemInstruction = {
-        parts: [{ text: systemPrompt }]
+        parts: [{ text: safeSystemPrompt }]
       };
     }
 
