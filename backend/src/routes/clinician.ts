@@ -122,6 +122,11 @@ import { ReboaTraumaService } from '../services/reboaTrauma';
 import { MicrocirculationNirsService } from '../services/microcirculationNirs';
 import { TransplantDonorMgmtService } from '../services/transplantDonorMgmt';
 import { AnaphylaxisMastCellService } from '../services/anaphylaxisMastCell';
+import { ImpellaMicroaxialService } from '../services/impellaMicroaxial';
+import { EcmoRecirculationService } from '../services/ecmoRecirculation';
+import { VentilatorAsynchronyService } from '../services/ventilatorAsynchrony';
+import { VasoplegicShockRescueService } from '../services/vasoplegicShockRescue';
+import { CardiacTamponadeDrainageService } from '../services/cardiacTamponadeDrainage';
 
 const router = Router();
 
@@ -10466,6 +10471,65 @@ router.post('/anaphylaxis-mast-cell/evaluate', async (req: AuthenticatedRequest,
     res.json(result);
   } catch (error: any) {
     console.error('Error in /anaphylaxis-mast-cell/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// SUITE 12: CARDIOTHORACIC ICU, MCS & ECLS (PHASES 131–135)
+// ============================================================================
+
+// --- Phase 131: IMPELLA-MICROAXIAL-FLOW ---
+router.post('/impella-microaxial/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await ImpellaMicroaxialService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /impella-microaxial/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 132: ECMO-RECIRCULATION-HARLEQUIN ---
+router.post('/ecmo-recirculation/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await EcmoRecirculationService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /ecmo-recirculation/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 133: VENTILATOR-ASYNCHRONY-NEUROMUSCULAR ---
+router.post('/ventilator-asynchrony/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await VentilatorAsynchronyService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /ventilator-asynchrony/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 134: POST-CARDIOTOMY-VASOPLEGIA ---
+router.post('/vasoplegic-shock/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await VasoplegicShockRescueService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /vasoplegic-shock/evaluate:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Phase 135: CARDIAC-SURGERY-DRAINAGE-TAMPONADE ---
+router.post('/cardiac-tamponade/evaluate', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await CardiacTamponadeDrainageService.recordEvaluation(req.body);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error in /cardiac-tamponade/evaluate:', error);
     res.status(500).json({ error: error.message });
   }
 });

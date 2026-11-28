@@ -4003,6 +4003,87 @@ export async function bootstrap() {
         logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_anaphylaxis_pat ON anaphylaxis_mast_cell_events(patient_id);
+
+      -- Phase 131: IMPELLA-MICROAXIAL-FLOW
+      CREATE TABLE IF NOT EXISTS impella_microaxial_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        device_model VARCHAR(32) NOT NULL,
+        p_level VARCHAR(8) NOT NULL,
+        flow_rate_lpm NUMERIC(3,1) NOT NULL,
+        motor_current_ma INTEGER NOT NULL,
+        purge_pressure_mmhg INTEGER NOT NULL,
+        purge_flow_ml_hr NUMERIC(4,1) NOT NULL,
+        suction_alarm_present BOOLEAN NOT NULL DEFAULT FALSE,
+        suction_etiology VARCHAR(64) NOT NULL,
+        cardiac_power_output_watts NUMERIC(4,2),
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_impella_pat ON impella_microaxial_logs(patient_id);
+
+      -- Phase 132: ECMO-RECIRCULATION-HARLEQUIN
+      CREATE TABLE IF NOT EXISTS ecmo_recirculation_events (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        ecmo_mode VARCHAR(16) NOT NULL,
+        recirculation_fraction_pct NUMERIC(4,1),
+        differential_hypoxemia_present BOOLEAN NOT NULL DEFAULT FALSE,
+        right_radial_spo2_pct INTEGER,
+        femoral_art_spo2_pct INTEGER,
+        recirculation_risk_tier VARCHAR(32) NOT NULL,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_ecmo_recirc_pat ON ecmo_recirculation_events(patient_id);
+
+      -- Phase 133: VENTILATOR-ASYNCHRONY-NEUROMUSCULAR
+      CREATE TABLE IF NOT EXISTS ventilator_asynchrony_evals (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        asynchrony_index_pct NUMERIC(4,1) NOT NULL,
+        reverse_triggering_detected BOOLEAN NOT NULL DEFAULT FALSE,
+        double_triggering_detected BOOLEAN NOT NULL DEFAULT FALSE,
+        ineffective_triggering_detected BOOLEAN NOT NULL DEFAULT FALSE,
+        breath_stacking_volutrauma_risk VARCHAR(32) NOT NULL,
+        neuromuscular_blockade_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_vent_async_pat ON ventilator_asynchrony_evals(patient_id);
+
+      -- Phase 134: POST-CARDIOTOMY-VASOPLEGIA
+      CREATE TABLE IF NOT EXISTS vasoplegic_shock_rescue_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        norepinephrine_equivalent_mcg_kg_min NUMERIC(5,2) NOT NULL,
+        systemic_vascular_resistance_dynes INTEGER NOT NULL,
+        cardiac_index_l_min_m2 NUMERIC(3,1) NOT NULL,
+        vasoplegia_severity_tier VARCHAR(32) NOT NULL,
+        vasopressin_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        methylene_blue_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        hydroxocobalamin_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        angiotensin_ii_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_vasoplegia_pat ON vasoplegic_shock_rescue_logs(patient_id);
+
+      -- Phase 135: CARDIAC-SURGERY-DRAINAGE-TAMPONADE
+      CREATE TABLE IF NOT EXISTS cardiac_tamponade_drainage_logs (
+        id SERIAL PRIMARY KEY,
+        patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+        chest_tube_rate_ml_hr INTEGER NOT NULL,
+        cumulative_drainage_4h_ml INTEGER NOT NULL,
+        surgical_reexploration_indicated BOOLEAN NOT NULL DEFAULT FALSE,
+        occult_tamponade_suspected BOOLEAN NOT NULL DEFAULT FALSE,
+        pulsus_paradoxus_mmhg INTEGER,
+        diastolic_equalization_present BOOLEAN NOT NULL DEFAULT FALSE,
+        emergency_bedside_resternotomy_alert BOOLEAN NOT NULL DEFAULT FALSE,
+        eval_output JSONB DEFAULT '{}'::jsonb,
+        logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_tamponade_pat ON cardiac_tamponade_drainage_logs(patient_id);
     `);
 
     console.log('Database tables and indexes verified/created.');
